@@ -1,0 +1,39 @@
+# 环境变量（含 API Key，切勿提交）
+.env
+.env.local
+.env.*.local
+
+# Python
+python-ai/.venv/
+python-ai/__pycache__/
+python-ai/**/__pycache__/
+python-ai/**/*.py[cod]
+python-ai/.pytest_cache/
+python-ai/.mypy_cache/
+python-ai/*.egg-info/
+python-ai/dist/
+python-ai/build/
+
+# Java / Maven
+java-service/target/
+java-service/.classpath
+java-service/.project
+java-service/.settings/
+
+# Node / Vue
+web/node_modules/
+web/dist/
+web/dist-ssr/
+
+# IDE
+.idea/
+*.iml
+.vscode/*
+!web/.vscode/extensions.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker 本地数据（若有）
+*.log

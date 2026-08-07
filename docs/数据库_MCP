@@ -1,0 +1,249 @@
+
+# 数据库设计文档
+
+本页面描述 agriops-copilot 项目的数据库结构、核心表设计、字段说明、关系结构以及向量库（pgvector）的使用方式。
+
+数据库使用：
+
+- **PostgreSQL 16+**
+- **pgvector 扩展（用于 RAG 向量检索）**
+
+---
+
+# 🧱 1. 数据库总览
+
+数据库分为两类：
+
+### **业务数据库（Java 服务）**
+- 用户与权限（RBAC）
+- 审批流（Workflow）
+- 采购、库存、供应链数据
+- 操作日志
+
+### **AI 数据库（Python 服务）**
+- 文档向量库（pgvector）
+- RAG 索引表
+- 文档元数据
+
+---
+
+# 🗄️ 2. 核心业务表设计（Java）
+
+## 2.1 用户表（users）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | uuid | 主键 |
+| username | varchar | 登录名 |
+| password | varchar | 密码（加密） |
+| role_id | uuid | 角色 ID |
+| created_at | timestamp | 创建时间 |
+
+---
+
+## 2.2 角色表（roles）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | uuid | 主键 |
+| name | varchar | 角色名（admin/user） |
+| description | text | 描述 |
+
+---
+
+## 2.3 审批流表（workflow）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | uuid | 主键 |
+| type | varchar | 审批类型（采购/库存调整） |
+| status | varchar | 状态（pending/approved/rejected） |
+| created_by | uuid | 发起人 |
+| created_at | timestamp | 创建时间 |
+
+---
+
+## 2.4 审批流步骤表（workflow_steps）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | uuid | 主键 |
+| workflow_id | uuid | 审批流 ID |
+| step_order | int | 步骤顺序 |
+| approver_id | uuid | 审批人 |
+| status | varchar | 状态 |
+| comment | text | 审批意见 |
+
+---
+
+# 📚 3. AI 向量库设计（Python）
+
+AI 服务使用 pgvector：
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+## 3.1 文档向量表（document_vectors）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | uuid | 主键 |
+| document_id | uuid | 文档 ID |
+| content | text | 原文片段 |
+| embedding | vector(1536) | 向量 |
+| created_at | timestamp | 创建时间 |
+
+---
+
+## 3.2 文档元数据表（documents）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | uuid | 主键 |
+| filename | varchar | 文件名 |
+| file_type | varchar | 类型（pdf/docx/xlsx） |
+| uploaded_by | uuid | 上传者 |
+| created_at | timestamp | 上传时间 |
+
+---
+
+# 🔍 4. RAG 查询示例
+
+```sql
+SELECT content
+FROM document_vectors
+ORDER BY embedding <-> '[1.23, 0.98, ...]'::vector
+LIMIT 5;
+```
+
+---
+
+# 🔗 5. 表关系图（逻辑）
+
+```
+users ───────┐
+             │
+roles ───────┘
+
+workflow ─────── workflow_steps
+
+documents ─────── document_vectors
+```
+
+---
+
+# 📌 6. 数据库迁移
+
+Java 使用：
+
+```
+Flyway / Liquibase
+```
+
+Python 使用：
+
+```
+Alembic
+```
+
+---
+
+
+
+
+# MCP 工具说明文档
+
+本页面描述 agriops-copilot 中使用的 MCP（Model Context Protocol）工具，包括工具类型、调用方式、输入输出格式以及在 Agent 中的使用方式。
+
+---
+
+# 🧱 1. MCP 工具总览
+
+MCP 工具用于：
+
+- Agent 调用外部能力  
+- 执行任务（搜索、数据库、文件解析）  
+- 扩展模型能力  
+
+---
+
+# 🔧 2. 工具类型
+
+| 工具类型 | 说明 |
+|---------|------|
+| HTTP 工具 | 调用外部 API |
+| 数据库工具 | 查询 PostgreSQL |
+| 文件解析工具 | 解析 PDF/Word/Excel |
+| RAG 工具 | 执行向量检索 |
+| 系统工具 | 获取环境信息 |
+
+---
+
+# 🧩 3. 工具定义示例（Python）
+
+```python
+class SearchTool(BaseTool):
+    name = "search"
+    description = "执行网络搜索"
+
+    def run(self, query: str):
+        return bing_search(query)
+```
+
+---
+
+# 🔗 4. Agent 调用工具示例
+
+```python
+agent.run(
+    "帮我查一下库存不足的商品",
+    tools=[search_tool, db_tool]
+)
+```
+
+---
+
+# 📡 5. 工具输入输出格式
+
+### 输入格式（JSON）
+
+```json
+{
+  "query": "库存不足的商品"
+}
+```
+
+### 输出格式
+
+```json
+{
+  "results": [...]
+}
+```
+
+---
+
+# 🧠 6. 工具在 RAG 中的作用
+
+- 文档解析工具 → 提取文本  
+- 向量工具 → 生成 embedding  
+- 数据库工具 → 写入 pgvector  
+- RAG 工具 → 执行向量检索  
+- Agent 工具 → 组合多个工具完成任务  
+
+---
+
+# 📚 总结
+
+你现在拥有：
+
+- MCP 工具类型  
+- 工具定义示例  
+- Agent 调用示例  
+- 输入输出格式  
+- RAG 中的工具协作方式  
+
+你可以将此内容复制到新的 Page。
+
+---
