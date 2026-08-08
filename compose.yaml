@@ -1,38 +1,22 @@
 services:
-  milvus:
-    image: milvusdb/milvus:2.3.4
-    container_name: milvus
-    restart: always
-    ports:
-      - "19530:19530"
-    volumes:
-      - milvus_data:/var/lib/milvus
-
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
-    container_name: es
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-    ports:
-      - "9200:9200"
-    volumes:
-      - es_data:/usr/share/elasticsearch/data
-
   db:
-    image: postgres:15
-    container_name: agriops-db
-    restart: always
+    image: pgvector/pgvector:pg16
+    container_name: regops-db
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: agriops
-      POSTGRES_PASSWORD: agriops123
-      POSTGRES_DB: agriops_db
+      POSTGRES_USER: regops
+      POSTGRES_PASSWORD: regops123
+      POSTGRES_DB: regops_db
     ports:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ./docs/sql/init_pgvector.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U regops -d regops_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  milvus_data:
-  es_data:
   db_data:

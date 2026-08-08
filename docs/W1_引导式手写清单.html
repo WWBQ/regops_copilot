@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>W1 引导式手写清单 · RegOps Copilot</title>
+<style>
+:root{--ink:#182235;--muted:#657186;--line:#dfe5ed;--bg:#f5f7fa;--panel:#fff;--nav:#111c30;--blue:#2563eb;--bluebg:#eaf1ff;--green:#14825f;--greenbg:#e9f8f1;--amber:#a96308;--amberbg:#fff5df;--red:#b42318;--redbg:#fff0ee;--r:14px;--sh:0 10px 26px rgba(15,23,42,.08)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.top{position:sticky;top:0;z-index:20;background:var(--nav);color:#fff;box-shadow:0 3px 14px #0003}.toprow{min-height:60px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 18px;flex-wrap:wrap}
+.brand b{display:block}.brand small{color:#a9b6ca;font-size:12px}
+.prog{display:flex;align-items:center;gap:10px;color:#c9d2df;font-size:13px}.prog b{color:#fff}
+.bar{height:8px;width:140px;background:#334155;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#2563eb,#13a77d);transition:width .25s}
+.layout{max-width:1200px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:20px;padding:20px}
+.side{position:sticky;top:80px;align-self:start;max-height:calc(100vh - 100px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px;box-shadow:var(--sh)}
+.side h2{font-size:14px;margin:4px 8px 10px;color:var(--muted)}.slink{display:block;width:100%;border:0;background:transparent;text-align:left;color:#46536a;border-radius:8px;padding:8px 10px;margin:2px 0;font-size:14px;cursor:pointer}.slink.on{background:var(--bluebg);color:#184ba6;font-weight:700}.slink:hover{background:#f2f5f9}
+.sidefoot{border-top:1px solid var(--line);margin-top:10px;padding:10px 8px;font-size:12px;color:var(--muted)}
+main{min-width:0}.panel{background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:20px;margin-bottom:16px}
+.section{font-size:22px;margin:0 0 10px}.sub{font-size:17px;margin:18px 0 8px;color:#2d3a4f}.muted{color:var(--muted);font-size:14px}.small{font-size:12px;color:var(--muted)}
+.call{border-left:4px solid var(--blue);background:var(--bluebg);border-radius:0 10px 10px 0;padding:12px 14px;margin:12px 0}.call.good{border-color:var(--green);background:var(--greenbg)}.call.warn{border-color:var(--amber);background:var(--amberbg)}
+.badge{display:inline-block;border-radius:999px;padding:3px 8px;margin:0 4px 4px 0;background:#eef2f7;color:#526076;font-size:11px;font-weight:700}.badge.must{background:var(--redbg);color:var(--red)}.badge.day{background:var(--bluebg);color:#184ba6}.badge.done{background:var(--greenbg);color:var(--green)}
+.dayhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;padding:12px 14px;background:linear-gradient(90deg,#eef2ff,#fff);border:1px solid var(--line);border-radius:10px;border-left:4px solid var(--blue)}
+.step{border:1px solid var(--line);border-radius:11px;margin:10px 0;overflow:hidden;background:#fff}.step summary{padding:12px 14px;cursor:pointer;font-weight:700;background:#fafbfd;list-style:none;display:flex;align-items:center;gap:10px}.step summary::-webkit-details-marker{display:none}.step summary .num{background:var(--blue);color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}.step.done summary .num{background:var(--green)}.step .body{padding:14px 16px;border-top:1px solid var(--line)}
+.checkrow{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;margin:8px 0;padding:8px 10px;border-radius:8px}.checkrow:hover{background:#f8fafc}.checkrow input{width:18px;height:18px;margin-top:3px;cursor:pointer}.checkrow.done label{text-decoration:line-through;color:var(--muted)}
+.code{font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap;background:#111827;color:#e6edf7;padding:12px 14px;border-radius:9px;overflow:auto;font-size:13px;line-height:1.55;margin:10px 0}
+.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;margin:10px 0}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:14px}th{background:var(--bg);font-size:12px;color:#536075}
+.tree{font-family:ui-monospace,Consolas,monospace;font-size:13px;background:#f8fafc;border:1px solid var(--line);border-radius:9px;padding:14px;line-height:1.6;white-space:pre-wrap}
+.facts{display:grid;grid-template-columns:100px 1fr;gap:6px 12px;margin:10px 0;font-size:14px}.facts dt{font-weight:700;color:#49566b}.facts dd{margin:0}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.tool{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13px}.tool:hover{background:#f2f5f9}
+.footer{text-align:center;font-size:12px;color:var(--muted);padding:8px 16px 24px}
+@media(max-width:820px){.layout{display:block;padding:12px}.side{position:relative;top:auto;max-height:none;display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px}.side h2,.sidefoot{display:none}.slink{width:auto}}
+@media print{.top,.side,.tools{display:none!important}.layout{display:block;max-width:none}.panel{box-shadow:none;break-inside:avoid}}
+</style>
+</head>
+<body>
+<header class="top"><div class="toprow">
+  <div class="brand"><b>W1 引导式手写清单</b><small>RegOps Copilot · python-ai/ · 自己写核心代码 · 环境可借用</small></div>
+  <div class="prog">进度 <b id="pct">0%</b><div class="bar"><i id="bar" style="width:0"></i></div></div>
+</div></header>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<main id="main"></main>
+</div>
+<div class="footer">项目路径：<code>/Users/chengfeng/Desktop/AI/regops_copilot</code> · 勾选保存在本机浏览器 · 配合主学习系统 W1 Must 使用</div>
+<script>
+"use strict";
+const KEY="regops-w1-checklist:v1";
+const state=load();
+const NAV=[
+  {id:"intro",label:"怎么用"},
+  {id:"libs",label:"Python 库"},
+  {id:"tree",label:"目录结构"},
+  {id:"day1",label:"Day 1 · w1-1"},
+  {id:"day2",label:"Day 2 · w1-2"},
+  {id:"day3",label:"Day 3 · w1-3"},
+  {id:"day46",label:"Day 4–6 预览"},
+  {id:"stuck",label:"卡住怎么办"},
+  {id:"refs",label:"文档链接"}
+];
+const CHECKS=[
+  {id:"d0-env",sec:"day1",label:"Step 0：docker compose ps healthy；cp .env.example .env 并填 API Key"},
+  {id:"d0-dir",sec:"day1",label:"Step 0：mkdir app/models app/schemas app/api tests；激活 .venv"},
+  {id:"d1-config",sec:"day1",label:"Step 1：写完 app/config.py，Settings 能读到环境变量"},
+  {id:"d1-base",sec:"day1",label:"Step 2：写完 app/models/base.py 抽象类 + 异常"},
+  {id:"d1-deepseek",sec:"day1",label:"Step 3：DeepSeekClient 终端能打出模型回复"},
+  {id:"d1-qwen",sec:"day1",label:"Step 4（可选）：QwenClient 或明天补"},
+  {id:"d1-report",sec:"day1",label:"Step 5：docs/model_selection_w1.md 质量/延迟/Token 三列"},
+  {id:"d1-must",sec:"day1",label:"主学习系统勾选 w1-1"},
+  {id:"d2-schema",sec:"day2",label:"写完 app/schemas/compliance.py 合规 DTO"},
+  {id:"d2-test",sec:"day2",label:"tests/test_schemas.py 至少 5 合法 + 5 非法"},
+  {id:"d2-must",sec:"day2",label:"pytest 全绿；主系统勾选 w1-2"},
+  {id:"d3-main",sec:"day3",label:"app/main.py + api/health chat models 三个路由"},
+  {id:"d3-test",sec:"day3",label:"tests/test_api.py Mock LLM，断网可测"},
+  {id:"d3-run",sec:"day3",label:"uvicorn 启动；curl /health /chat；/docs 可打开"},
+  {id:"d3-must",sec:"day3",label:"pytest 全绿；主系统勾选 w1-3"},
+  {id:"pip",sec:"libs",label:"pip install 完成并写入 requirements.txt"}
+];
+let route=location.hash.slice(1)||"intro";
+
+function load(){try{return JSON.parse(localStorage.getItem(KEY)||"{}")}catch{return{}}}
+function save(){localStorage.setItem(KEY,JSON.stringify(state));renderProgress()}
+function isDone(id){return!!state[id]}
+function toggle(id){state[id]=!state[id];save();render()}
+function renderProgress(){
+  const n=CHECKS.filter(c=>isDone(c.id)).length;
+  const p=CHECKS.length?Math.round(n/CHECKS.length*100):0;
+  document.getElementById("pct").textContent=p+"%";
+  document.getElementById("bar").style.width=p+"%";
+}
+function e(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+function check(id,label){
+  const d=isDone(id);
+  return `<div class="checkrow ${d?"done":""}"><input type="checkbox" id="${id}" ${d?"checked":""} onchange="toggle('${id}')"><label for="${id}">${e(label)}</label></div>`;
+}
+function checksFor(sec){return CHECKS.filter(c=>c.sec===sec).map(c=>check(c.id,c.label)).join("")}
+
+function renderSide(){
+  document.getElementById("side").innerHTML=`<h2>导航</h2>${NAV.map(n=>`<button class="slink ${route===n.id?"on":""}" onclick="go('${n.id}')">${e(n.label)}</button>`).join("")}<div class="sidefoot"><button class="tool" onclick="resetAll()">重置勾选</button><br><br>原则：核心代码自己写；卡住 &gt;30min 再求助</div>`;
+}
+
+function go(id){route=id;location.hash=id;render()}
+function resetAll(){if(confirm("清除所有勾选？")){Object.keys(state).forEach(k=>delete state[k]);save();render()}}
+
+function intro(){return `
+<div class="panel">
+  <div class="dayhead"><b>怎么用这份清单</b><span class="badge must">引导式从 0</span></div>
+  <div class="call good"><b>原则：</b>ModelClient、DTO、API、pytest <b>自己写</b>；Docker、pgvector、Git、依赖列表可以借用现成配置。</div>
+  <dl class="facts">
+    <dt>项目路径</dt><dd><code>/Users/chengfeng/Desktop/AI/regops_copilot/python-ai</code></dd>
+    <dt>数据库</dt><dd><code>docker compose up -d db</code> · pgvector 已配 · localhost:5432</dd>
+    <dt>前端</dt><dd><b>W9 再碰 web/</b> · W1 用 Swagger <code>/docs</code> 当演示 UI</dd>
+    <dt>节奏</dt><dd>Day 1 → w1-1 · Day 2 → w1-2 · Day 3 → w1-3 · Day 4–6 见预览</dd>
+    <dt>交付标准</dt><dd>代码 + pytest + 简短文档 + 能口述「为什么这样设计」</dd>
+  </dl>
+  <div class="call warn"><b>2 小时最短路径（今天时间紧）：</b>pip install → config.py → base.py + deepseek.py → 终端跑通一次 chat → 明天补对比表。</div>
+  ${checksFor("libs").replace(check("pip","pip install 完成并写入 requirements.txt"),"")}
+</div>`}
+
+function libs(){return `
+<div class="panel">
+  <h2 class="section">Python 库：W1 要用哪些</h2>
+  <h3 class="sub">Day 1–3 必装</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>库</th><th>干什么</th><th>哪天的任务</th></tr></thead>
+    <tbody>
+      <tr><td><code>fastapi</code></td><td>Web 框架，写 /health、/chat</td><td>Day 3</td></tr>
+      <tr><td><code>uvicorn[standard]</code></td><td>启动 FastAPI</td><td>Day 3</td></tr>
+      <tr><td><code>pydantic</code></td><td>Schema、字段校验</td><td>Day 2</td></tr>
+      <tr><td><code>pydantic-settings</code></td><td>从 .env 读 API Key</td><td>Day 1</td></tr>
+      <tr><td><code>httpx</code></td><td>异步 HTTP 调 DeepSeek/Qwen</td><td>Day 1</td></tr>
+      <tr><td><code>python-dotenv</code></td><td>本地加载 .env（可选）</td><td>Day 1</td></tr>
+      <tr><td><code>pytest</code></td><td>跑测试</td><td>Day 2–3</td></tr>
+      <tr><td><code>pytest-asyncio</code></td><td>测 async 函数</td><td>Day 3</td></tr>
+    </tbody>
+  </table></div>
+  <h3 class="sub">W1 暂时不用装</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>库</th><th>什么时候装</th></tr></thead>
+    <tbody>
+      <tr><td><code>sqlalchemy</code> / <code>psycopg</code> / <code>pgvector</code></td><td>W2–W3 连库、RAG</td></tr>
+      <tr><td><code>langchain</code> / <code>langgraph</code></td><td>W5–W6</td></tr>
+      <tr><td><code>openai</code> SDK</td><td>可选；W1 用 httpx 直调 REST 更好理解</td></tr>
+    </tbody>
+  </table></div>
+  <div class="code">cd /Users/chengfeng/Desktop/AI/regops_copilot/python-ai
+source .venv/bin/activate
+python --version   # 建议 3.11/3.12；3.14 若装包报错再降版本
+
+pip install fastapi "uvicorn[standard]" pydantic pydantic-settings httpx python-dotenv pytest pytest-asyncio
+pip freeze > requirements.txt</div>
+  ${check("pip","pip install 完成并写入 requirements.txt")}
+</div>`}
+
+function tree(){return `
+<div class="panel">
+  <h2 class="section">W1 结束时的目录结构</h2>
+  <div class="tree">python-ai/
+├── app/
+│   ├── __init__.py
+│   ├── main.py              ← FastAPI 入口（Day 3）
+│   ├── config.py            ← 读 .env（Day 1）
+│   ├── models/
+│   │   ├── base.py          ← 抽象 LLMClient（Day 1）
+│   │   ├── deepseek.py      ← Day 1
+│   │   └── qwen.py          ← Day 1 可选
+│   ├── schemas/
+│   │   ├── chat.py          ← Day 3
+│   │   └── compliance.py    ← 合规 DTO（Day 2）
+│   └── api/
+│       ├── health.py        ← Day 3
+│       ├── chat.py
+│       └── models.py
+├── tests/
+│   ├── test_schemas.py      ← Day 2
+│   ├── test_model_client.py
+│   └── test_api.py          ← Day 3
+├── requirements.txt
+└── （.env 在项目根目录，不提交 git）</div>
+  <p class="muted"><b>Day 1 只建一半：</b>config + models/ + 终端测通 LLM。schemas/、api/、main.py 留到 Day 2–3。</p>
+</div>`}
+
+function day1(){return `
+<div class="panel">
+  <div class="dayhead"><b>Day 1</b><span class="badge day">Must w1-1</span><span class="muted">ModelClient · 约 4–5h</span></div>
+  <p><b>目标：</b>封装可替换的 ModelClient，至少调通 DeepSeek 或 Qwen，写选型对比表。</p>
+  ${checksFor("day1")}
+
+  <details class="step" open><summary><span class="num">0</span>开工前（15 min）</summary><div class="body">
+    <div class="code">cd /Users/chengfeng/Desktop/AI/regops_copilot
+docker compose ps
+cp .env.example .env    # 填 DEEPSEEK_API_KEY 或 QWEN_API_KEY
+
+cd python-ai && source .venv/bin/activate
+mkdir -p app/models app/schemas app/api tests
+touch app/__init__.py app/models/__init__.py</div>
+  </div></details>
+
+  <details class="step"><summary><span class="num">1</span>app/config.py（30 min）</summary><div class="body">
+    <ul>
+      <li>用 <code>pydantic_settings.BaseSettings</code></li>
+      <li>字段：<code>deepseek_api_key</code>、<code>qwen_api_key</code>、<code>default_model</code></li>
+      <li><code>env_file</code> 指向项目根 <code>../.env</code></li>
+      <li>提供 <code>get_settings()</code> 单例</li>
+    </ul>
+    <div class="code"># 验收
+python -c "from app.config import get_settings; print(get_settings().default_model)"</div>
+  </div></details>
+
+  <details class="step"><summary><span class="num">2</span>app/models/base.py（45 min）</summary><div class="body">
+    <ul>
+      <li>抽象类 <code>LLMClient(ABC)</code></li>
+      <li><code>async def chat(messages, *, temperature=0.1) -> str</code></li>
+      <li><code>async def chat_with_usage(...) -> ChatResult</code>（content, tokens, latency_ms）</li>
+      <li>异常：<code>ModelTimeoutError</code>、<code>ModelRateLimitError</code>、<code>ModelBadResponseError</code></li>
+      <li>messages 格式：<code>[{"role":"user","content":"..."}]</code></li>
+    </ul>
+    <p class="small"><b>面试点：</b>为什么抽象类？→ 换模型不改业务代码。</p>
+  </div></details>
+
+  <details class="step"><summary><span class="num">3</span>app/models/deepseek.py（1h）</summary><div class="body">
+    <ul>
+      <li><code>httpx.AsyncClient</code> POST DeepSeek API（OpenAI 兼容）</li>
+      <li>超时 30s；429 限流退避重试 1 次</li>
+      <li>解析 <code>usage</code>、记录 <code>latency_ms</code></li>
+      <li><b>日志禁止打印完整 API Key</b></li>
+    </ul>
+    <div class="code"># 验收
+python -c "
+import asyncio
+from app.models.deepseek import DeepSeekClient
+async def main():
+    c = DeepSeekClient()
+    r = await c.chat_with_usage([{'role':'user','content':'什么是审慎监管？一句话'}])
+    print(r.content[:80], r.latency_ms, 'ms')
+asyncio.run(main())
+"</div>
+  </div></details>
+
+  <details class="step"><summary><span class="num">4</span>app/models/qwen.py（可选，1h）</summary><div class="body">
+    <p>同样实现 <code>LLMClient</code>。只有一个 Key 时可明天再补。</p>
+  </div></details>
+
+  <details class="step"><summary><span class="num">5</span>docs/model_selection_w1.md（30 min）</summary><div class="body">
+    <p>同一批 5–10 道金融小题，表格列：<b>质量(1-5) · 延迟 · Token</b></p>
+    <p class="small">示例题：审慎监管 · 不良贷款率升高 · MLF 与 LPR 关系</p>
+  </div></details>
+</div>`}
+
+function day2(){return `
+<div class="panel">
+  <div class="dayhead"><b>Day 2</b><span class="badge day">Must w1-2</span><span class="muted">合规 DTO · 约 3h</span></div>
+  <p><b>目标：</b>合规审查结论 DTO + Schema 测试，坏样例全部被拒。</p>
+  ${checksFor("day2")}
+
+  <details class="step" open><summary><span class="num">1</span>app/schemas/compliance.py</summary><div class="body">
+    <div class="tablewrap"><table>
+      <thead><tr><th>字段</th><th>类型</th><th>约束</th></tr></thead>
+      <tbody>
+        <tr><td>conclusion</td><td>str</td><td>非空，max 500</td></tr>
+        <tr><td>risk_level</td><td>Literal</td><td>"低" / "中" / "高"</td></tr>
+        <tr><td>clause_refs</td><td>list[str]</td><td><b>至少 1 条</b>条款编号</td></tr>
+        <tr><td>evidence_quotes</td><td>list[str]</td><td>证据引用</td></tr>
+        <tr><td>confidence</td><td>float</td><td>0.0 – 1.0</td></tr>
+      </tbody>
+    </table></div>
+    <p>Validator 示例：无 clause_refs → 失败；risk_level 乱写 → 失败；confidence &gt; 1 → 失败。</p>
+  </div></details>
+
+  <details class="step"><summary><span class="num">2</span>tests/test_schemas.py</summary><div class="body">
+    <p>至少 <b>5 合法 + 5 非法</b> 用例。非法例：缺 clause_refs、乱写 risk_level、confidence=1.5。</p>
+    <div class="code">pytest tests/test_schemas.py -v</div>
+  </div></details>
+</div>`}
+
+function day3(){return `
+<div class="panel">
+  <div class="dayhead"><b>Day 3</b><span class="badge day">Must w1-3</span><span class="muted">FastAPI 骨架 · 约 5h</span></div>
+  <p><b>目标：</b>/health、/chat、/models + pytest（Mock LLM，断网可测）。</p>
+  ${checksFor("day3")}
+
+  <details class="step"><summary><span class="num">1</span>app/main.py</summary><div class="body">
+    <ul><li>创建 FastAPI 实例，挂载 health / chat / models 三个 router</li><li>可选：全局异常处理</li></ul>
+  </div></details>
+
+  <details class="step"><summary><span class="num">2</span>app/api/health.py</summary><div class="body">
+    <p><code>GET /health</code> → <code>{"status":"ok", ...}</code>（db 状态可先写固定值或 ping pg）</p>
+  </div></details>
+
+  <details class="step"><summary><span class="num">3</span>app/api/chat.py</summary><div class="body">
+    <ul>
+      <li>POST /chat · body: ChatRequest（message: str）</li>
+      <li>依赖注入：按 config 返回 DeepSeekClient 或 QwenClient</li>
+      <li>返回 ChatResponse（reply + disclaimer 免责字段）</li>
+    </ul>
+  </div></details>
+
+  <details class="step"><summary><span class="num">4</span>app/api/models.py</summary><div class="body">
+    <p><code>GET /models</code> → 当前可用模型列表</p>
+  </div></details>
+
+  <details class="step"><summary><span class="num">5</span>tests/test_api.py + 启动验收</summary><div class="body">
+    <p>用 httpx AsyncClient + ASGITransport；<b>Mock LLMClient.chat</b>。</p>
+    <div class="code">uvicorn app.main:app --reload --port 8000
+
+curl http://localhost:8000/health
+curl -X POST http://localhost:8000/chat \\
+  -H "Content-Type: application/json" \\
+  -d '{"message":"你好"}'
+
+pytest -v
+open http://localhost:8000/docs</div>
+  </div></details>
+</div>`}
+
+function day46(){return `
+<div class="panel">
+  <h2 class="section">Day 4–6 预览（现在别做）</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>天</th><th>任务 ID</th><th>做什么</th></tr></thead>
+    <tbody>
+      <tr><td>Day 4</td><td>w1-4</td><td><code>eval/</code> 目录，30 条黄金集 JSON + eval 脚本</td></tr>
+      <tr><td>Day 5</td><td>w1-5</td><td><code>DATA_SOURCES.md</code>、OpenAPI 整理、Monorepo 文档</td></tr>
+      <tr><td>Day 6</td><td>w1-6</td><td>5 份基准选型卡（CFLUE / FinEval / FinQA / FinanceBench / FinMTEB）</td></tr>
+    </tbody>
+  </table></div>
+  <div class="call"><b>Day 1–3 未完成前，不要碰 eval 和基准卡。</b></div>
+</div>`}
+
+function stuck(){return `
+<div class="panel">
+  <h2 class="section">卡住怎么办</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>卡点</th><th>先自查</th><th>问 AI 时贴什么</th></tr></thead>
+    <tbody>
+      <tr><td>pip 装失败</td><td>Python 是否 3.14 太新</td><td>完整报错</td></tr>
+      <tr><td>API 401</td><td>Key、.env 路径</td><td>config 加载结果（Key 打码）</td></tr>
+      <tr><td>httpx 超时</td><td>网络 / 代理</td><td>异常类型</td></tr>
+      <tr><td>pytest 失败</td><td>Schema 还是 API</td><td><code>pytest -v</code> 输出</td></tr>
+    </tbody>
+  </table></div>
+  <div class="call good"><b>规则：</b>卡住 &gt; 30 分钟再问。贴「文件名 + 报错 + 试过的一件事」。不要一上来要完整代码。</div>
+</div>`}
+
+function refs(){return `
+<div class="panel">
+  <h2 class="section">推荐文档（只看对应章节）</h2>
+  <ul>
+    <li><a href="https://fastapi.tiangolo.com/tutorial/first-steps/" target="_blank" rel="noopener">FastAPI First Steps</a> → Day 3</li>
+    <li><a href="https://docs.pydantic.dev/latest/concepts/models/" target="_blank" rel="noopener">Pydantic Models</a> → Day 2</li>
+    <li><a href="https://www.python-httpx.org/async/" target="_blank" rel="noopener">httpx AsyncClient</a> → Day 1</li>
+    <li><a href="https://docs.pytest.org/en/stable/getting-started.html" target="_blank" rel="noopener">pytest Getting Started</a> → Day 2</li>
+    <li>DeepSeek API：<a href="https://api-docs.deepseek.com/" target="_blank" rel="noopener">api-docs.deepseek.com</a></li>
+  </ul>
+  <p class="muted">主学习系统：<code>~/Desktop/大模型应用开发工程师_10周转岗学习系统_金融版.html</code> → ②学习清单 → 第 1 周</p>
+</div>`}
+
+const PAGES={intro,libs,tree,day1,day2,day3,day46,stuck,refs};
+
+function render(){
+  if(!PAGES[route])route="intro";
+  document.getElementById("main").innerHTML=(PAGES[route]||intro)();
+  renderSide();
+  renderProgress();
+  document.querySelectorAll(".step").forEach(el=>{
+    const id=el.querySelector("summary .num")?.textContent;
+    const sec=route;
+    const map={"0":"d0","1":"d1","2":"d1","3":"d1","4":"d1","5":"d1"};
+    // visual only - steps don't have separate check state
+  });
+}
+window.toggle=toggle;window.go=go;window.resetAll=resetAll;
+window.addEventListener("hashchange",()=>{route=location.hash.slice(1)||"intro";render()});
+render();
+</script>
+</body>
+</html>
