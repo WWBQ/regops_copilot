@@ -7,6 +7,7 @@
 python-ai/.venv/
 python-ai/__pycache__/
 python-ai/**/__pycache__/
+**/__pycache__/
 python-ai/**/*.py[cod]
 python-ai/.pytest_cache/
 python-ai/.mypy_cache/
@@ -34,6 +35,11 @@ web/dist-ssr/
 # OS
 .DS_Store
 Thumbs.db
+
+# 本地金样本 PDF（巨潮下载，不进仓库）
+data/raw/
+data/labeling/
+data/objects/
 
 # Docker 本地数据（若有）
 *.log

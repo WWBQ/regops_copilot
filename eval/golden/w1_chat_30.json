@@ -1,0 +1,310 @@
+{
+  "version": "w1-v1",
+  "description": "W1 聊天评测黄金集：15 制度条款理解 + 15 财报数字提取。数字题来源均为 2024 年报（2025 年披露），晚于 FinQA/CFLUE 等公开基准主要构造期。",
+  "default_params": {
+    "temperature": 0.0,
+    "prompt_version": "w1-default"
+  },
+  "items": [
+    {
+      "id": "w1-001",
+      "category": "clause",
+      "question": "商业银行资本充足率监管通常关注哪三个层次指标？请简要列出。",
+      "expected": "核心一级资本充足率|一级资本充足率|总资本充足率",
+      "grading": "contains",
+      "source_doc": "《商业银行资本管理办法》公开监管框架",
+      "why_clean": "制度概念题，不依赖特定财报；用于测金融术语理解"
+    },
+    {
+      "id": "w1-002",
+      "category": "clause",
+      "question": "什么是「审慎监管」？用一句话说明其核心要义。",
+      "expected": "审慎|风险|约束|稳健",
+      "grading": "contains",
+      "source_doc": "银行业监管公开表述",
+      "why_clean": "概念题，测模型对监管原则的理解"
+    },
+    {
+      "id": "w1-003",
+      "category": "clause",
+      "question": "MLF（中期借贷便利）与 LPR（贷款市场报价利率）在政策传导中通常是什么关系？",
+      "expected": "MLF|LPR|政策利率|传导",
+      "grading": "contains",
+      "source_doc": "央行公开市场操作公开说明",
+      "why_clean": "宏观金融常识，RegOps 投研/合规场景高频"
+    },
+    {
+      "id": "w1-004",
+      "category": "clause",
+      "question": "反洗钱工作中，金融机构对客户通常要履行哪三项基本义务？",
+      "expected": "客户身份识别|大额和可疑交易报告|客户身份资料|交易记录保存",
+      "grading": "contains",
+      "source_doc": "《反洗钱法》公开要点",
+      "why_clean": "合规固定知识点"
+    },
+    {
+      "id": "w1-005",
+      "category": "clause",
+      "question": "什么是「拨备覆盖率」？它衡量的是什么？",
+      "expected": "贷款损失准备|不良贷款|覆盖",
+      "grading": "contains",
+      "source_doc": "银行监管指标公开定义",
+      "why_clean": "与 w1-016 等数字题配套的口径理解"
+    },
+    {
+      "id": "w1-006",
+      "category": "clause",
+      "question": "商业银行「关联交易」监管为什么要关注交易公允性和披露？",
+      "expected": "公允|披露|利益输送|风险",
+      "grading": "contains",
+      "source_doc": "关联交易监管公开规则",
+      "why_clean": "合规审查场景常见考点"
+    },
+    {
+      "id": "w1-007",
+      "category": "clause",
+      "question": "巴塞尔协议III（Basel III）框架下，银行资本监管通常说的「三大支柱」是什么？",
+      "expected": "最低资本要求|监管审查|市场约束|信息披露",
+      "grading": "contains",
+      "source_doc": "巴塞尔III公开框架",
+      "why_clean": "国际监管常识，面试常问"
+    },
+    {
+      "id": "w1-008",
+      "category": "clause",
+      "question": "上市公司信息披露的「真实、准确、完整、及时」四性要求分别指什么？各用一句话。",
+      "expected": "真实|准确|完整|及时",
+      "grading": "contains",
+      "source_doc": "《证券法》信息披露公开原则",
+      "why_clean": "RegOps 文档合规基础"
+    },
+    {
+      "id": "w1-009",
+      "category": "clause",
+      "question": "流动性风险监管中，「流动性覆盖率（LCR）」大致衡量什么？",
+      "expected": "优质流动性资产|30天|净现金流出",
+      "grading": "contains",
+      "source_doc": "流动性风险监管公开指标",
+      "why_clean": "银行监管指标理解"
+    },
+    {
+      "id": "w1-010",
+      "category": "clause",
+      "question": "什么是「系统重要性银行（D-SIB）」？监管为何对其附加要求？",
+      "expected": "系统重要性|附加资本|风险外溢|处置",
+      "grading": "contains",
+      "source_doc": "D-SIB 公开监管名单与规则",
+      "why_clean": "大型银行业务语境"
+    },
+    {
+      "id": "w1-011",
+      "category": "clause",
+      "question": "绿色金融中，「洗绿」（greenwashing）风险主要指什么？",
+      "expected": "虚假|夸大|绿色|披露",
+      "grading": "contains",
+      "source_doc": "绿色金融公开监管指引",
+      "why_clean": "ESG/绿色金融合规场景"
+    },
+    {
+      "id": "w1-012",
+      "category": "clause",
+      "question": "理财子公司与母行之间为什么要建立「防火墙」机制？",
+      "expected": "隔离|风险|利益冲突|独立",
+      "grading": "contains",
+      "source_doc": "理财子公司监管公开要求",
+      "why_clean": "资管合规常见题"
+    },
+    {
+      "id": "w1-013",
+      "category": "clause",
+      "question": "存款保险制度中，投保机构加入存款保险体系的核心意义是什么？",
+      "expected": "存款人|保护|偿付|稳定",
+      "grading": "contains",
+      "source_doc": "《存款保险条例》公开要点",
+      "why_clean": "金融稳定基础设施常识"
+    },
+    {
+      "id": "w1-014",
+      "category": "clause",
+      "question": "在合规审查结论中，为什么必须引用具体「条款编号」而不能只给笼统结论？",
+      "expected": "依据|可追溯|条款|证据",
+      "grading": "contains",
+      "source_doc": "RegOps w1-2 合规 DTO 设计",
+      "why_clean": "对接项目 compliance Schema 业务规则"
+    },
+    {
+      "id": "w1-015",
+      "category": "clause",
+      "question": "FinQA/TAT-QA 类 benchmark 主要评测模型的什么能力？和纯知识选择题有何不同？",
+      "expected": "表格|数字|推理|证据",
+      "grading": "contains",
+      "source_doc": "FinQA/TAT-QA 公开论文任务定义",
+      "why_clean": "衔接 Day 6 基准调研与 Day 4 数字题设计"
+    },
+    {
+      "id": "w1-016",
+      "category": "number",
+      "question": "工商银行（601398）2024 年归属于母公司股东的净利润是多少亿元？只回答数字，保留两位小数。",
+      "expected": "3658.63",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.05,
+      "unit": "亿元",
+      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
+      "why_clean": "FinQA 主要截止 2021 年前数据，2024 年报为干净留出"
+    },
+    {
+      "id": "w1-017",
+      "category": "number",
+      "question": "工商银行 2024 年末不良贷款率是多少？只回答百分比数字，保留两位小数，不要带百分号。",
+      "expected": "1.34",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.02,
+      "unit": "%",
+      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
+      "why_clean": "2024 披露，晚于多数公开金融 QA 集"
+    },
+    {
+      "id": "w1-018",
+      "category": "number",
+      "question": "工商银行 2024 年末资本充足率（总资本充足率）是多少？只回答数字，保留两位小数。",
+      "expected": "19.39",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.05,
+      "unit": "%",
+      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
+      "why_clean": "同上"
+    },
+    {
+      "id": "w1-019",
+      "category": "number",
+      "question": "工商银行 2024 年营业收入是多少亿元？只回答数字，保留两位小数。",
+      "expected": "8218.03",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.1,
+      "unit": "亿元",
+      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
+      "why_clean": "同上"
+    },
+    {
+      "id": "w1-020",
+      "category": "number",
+      "question": "工商银行 2024 年末核心一级资本充足率是多少？只回答数字，保留两位小数。",
+      "expected": "14.10",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.05,
+      "unit": "%",
+      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
+      "why_clean": "同上"
+    },
+    {
+      "id": "w1-021",
+      "category": "number",
+      "question": "工商银行 2024 年末拨备覆盖率是多少？只回答数字，保留两位小数。",
+      "expected": "214.91",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.1,
+      "unit": "%",
+      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
+      "why_clean": "同上"
+    },
+    {
+      "id": "w1-022",
+      "category": "number",
+      "question": "工商银行 2024 年加权平均净资产收益率（ROE）是多少？只回答数字，保留两位小数。",
+      "expected": "9.88",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.05,
+      "unit": "%",
+      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
+      "why_clean": "比率类指标，测模型是否乱算"
+    },
+    {
+      "id": "w1-023",
+      "category": "number",
+      "question": "招商银行（600036）2024 年营业收入是多少亿元？只回答数字，保留两位小数。",
+      "expected": "3374.88",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.1,
+      "unit": "亿元",
+      "source_doc": "招商银行2024年度报告，披露日 2025-03-25",
+      "why_clean": "2024 披露，跨行验证"
+    },
+    {
+      "id": "w1-024",
+      "category": "number",
+      "question": "招商银行 2024 年归属于本行股东的净利润是多少亿元？只回答数字，保留两位小数。",
+      "expected": "1483.91",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.05,
+      "unit": "亿元",
+      "source_doc": "招商银行2024年度报告，披露日 2025-03-25",
+      "why_clean": "同上"
+    },
+    {
+      "id": "w1-025",
+      "category": "number",
+      "question": "招商银行 2024 年末不良贷款率是多少？只回答数字，保留两位小数。",
+      "expected": "0.95",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.02,
+      "unit": "%",
+      "source_doc": "招商银行2024年度报告，披露日 2025-03-25",
+      "why_clean": "同上"
+    },
+    {
+      "id": "w1-026",
+      "category": "number",
+      "question": "招商银行 2024 年末拨备覆盖率是多少？只回答数字，保留两位小数。",
+      "expected": "411.98",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.1,
+      "unit": "%",
+      "source_doc": "招商银行2024年度报告，披露日 2025-03-25",
+      "why_clean": "同上"
+    },
+    {
+      "id": "w1-027",
+      "category": "number",
+      "question": "招商银行 2024 年净利息收入是多少亿元？只回答数字，保留两位小数。",
+      "expected": "2112.77",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.1,
+      "unit": "亿元",
+      "source_doc": "招商银行2024年度报告，披露日 2025-03-25",
+      "why_clean": "同上"
+    },
+    {
+      "id": "w1-028",
+      "category": "number",
+      "question": "建设银行 2024 年归属于本行股东的净利润是多少亿元？只回答数字，保留两位小数。",
+      "expected": "3355.77",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.1,
+      "unit": "亿元",
+      "source_doc": "建设银行2024年度报告摘要（对比2025年报披露数据）",
+      "why_clean": "2024 业绩，晚于 FinQA 构造期"
+    },
+    {
+      "id": "w1-029",
+      "category": "number",
+      "question": "建设银行 2024 年营业收入是多少亿元？只回答数字，保留两位小数。",
+      "expected": "7469.70",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 0.1,
+      "unit": "亿元",
+      "source_doc": "建设银行2024年度报告摘要",
+      "why_clean": "同上"
+    },
+    {
+      "id": "w1-030",
+      "category": "number",
+      "question": "招商银行 2024 年末资产总额是多少亿元？只回答数字，保留两位小数。",
+      "expected": "121520.36",
+      "grading": "numeric_tolerance",
+      "numeric_tolerance": 1.0,
+      "unit": "亿元",
+      "source_doc": "招商银行2024年度报告，披露日 2025-03-25",
+      "why_clean": "大数提取，测单位/量级是否搞错"
+    }
+  ]
+}

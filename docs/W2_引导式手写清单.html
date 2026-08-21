@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>W2 引导式手写清单 · RegOps Copilot · RAG 入库</title>
+<style>
+:root{--ink:#182235;--muted:#657186;--line:#dfe5ed;--bg:#f5f7fa;--panel:#fff;--nav:#0f2e24;--blue:#2563eb;--bluebg:#eaf1ff;--green:#14825f;--greenbg:#e9f8f1;--teal:#0d9488;--tealbg:#e6f7f4;--amber:#a96308;--amberbg:#fff5df;--red:#b42318;--redbg:#fff0ee;--r:14px;--sh:0 10px 26px rgba(15,23,42,.08)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.top{position:sticky;top:0;z-index:20;background:var(--nav);color:#fff;box-shadow:0 3px 14px #0003}.toprow{min-height:60px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 18px;flex-wrap:wrap}
+.brand b{display:block}.brand small{color:#a9c4b8;font-size:12px}
+.prog{display:flex;align-items:center;gap:10px;color:#c9d2df;font-size:13px}.prog b{color:#fff}
+.bar{height:8px;width:140px;background:#334155;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#0d9488,#2563eb);transition:width .25s}
+.layout{max-width:1200px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:20px;padding:20px}
+.side{position:sticky;top:80px;align-self:start;max-height:calc(100vh - 100px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px;box-shadow:var(--sh)}
+.side h2{font-size:14px;margin:4px 8px 10px;color:var(--muted)}.slink{display:block;width:100%;border:0;background:transparent;text-align:left;color:#46536a;border-radius:8px;padding:8px 10px;margin:2px 0;font-size:14px;cursor:pointer}.slink.on{background:var(--tealbg);color:#0f5c50;font-weight:700}.slink:hover{background:#f2f5f9}
+.sidefoot{border-top:1px solid var(--line);margin-top:10px;padding:10px 8px;font-size:12px;color:var(--muted)}
+main{min-width:0}.panel{background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:20px;margin-bottom:16px}
+.section{font-size:22px;margin:0 0 10px}.sub{font-size:17px;margin:18px 0 8px;color:#2d3a4f}.muted{color:var(--muted);font-size:14px}.small{font-size:12px;color:var(--muted)}
+.call{border-left:4px solid var(--teal);background:var(--tealbg);border-radius:0 10px 10px 0;padding:12px 14px;margin:12px 0}.call.good{border-color:var(--green);background:var(--greenbg)}.call.warn{border-color:var(--amber);background:var(--amberbg)}
+.badge{display:inline-block;border-radius:999px;padding:3px 8px;margin:0 4px 4px 0;background:#eef2f7;color:#526076;font-size:11px;font-weight:700}.badge.must{background:var(--redbg);color:var(--red)}.badge.day{background:var(--tealbg);color:#0f5c50}.badge.review{background:var(--amberbg);color:var(--amber)}
+.dayhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;padding:12px 14px;background:linear-gradient(90deg,#e6f7f4,#fff);border:1px solid var(--line);border-radius:10px;border-left:4px solid var(--teal)}
+.step{border:1px solid var(--line);border-radius:11px;margin:10px 0;overflow:hidden;background:#fff}.step summary{padding:12px 14px;cursor:pointer;font-weight:700;background:#fafbfd;list-style:none;display:flex;align-items:center;gap:10px}.step summary::-webkit-details-marker{display:none}.step summary .num{background:var(--teal);color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}.step .body{padding:14px 16px;border-top:1px solid var(--line)}
+.checkrow{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;margin:8px 0;padding:8px 10px;border-radius:8px}.checkrow:hover{background:#f8fafc}.checkrow input{width:18px;height:18px;margin-top:3px;cursor:pointer}.checkrow.done label{text-decoration:line-through;color:var(--muted)}
+.code{font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap;background:#111827;color:#e6edf7;padding:12px 14px;border-radius:9px;overflow:auto;font-size:13px;line-height:1.55;margin:10px 0}
+.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;margin:10px 0}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:14px}th{background:var(--bg);font-size:12px;color:#536075}
+.tree{font-family:ui-monospace,Consolas,monospace;font-size:13px;background:#f8fafc;border:1px solid var(--line);border-radius:9px;padding:14px;line-height:1.6;white-space:pre-wrap}
+.facts{display:grid;grid-template-columns:100px 1fr;gap:6px 12px;margin:10px 0;font-size:14px}.facts dt{font-weight:700;color:#49566b}.facts dd{margin:0}
+.flowpipe{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;margin:14px 0}.fstep{flex:1;min-width:115px;border:1px solid var(--line);border-radius:9px;padding:10px;background:#fff;font-size:13px;line-height:1.45}.fstep b{display:block;font-size:11px;color:var(--teal);margin-bottom:4px}.fstep code{font-size:11px;background:#f1f5f9;padding:1px 4px;border-radius:4px}.farr{color:#94a3b8;font-size:18px;align-self:center;flex:0}.flayer{border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px 0;background:#fafbfd}.flayer>.lbl{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.tool{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 11px;cursor:pointer;font-size:13px}.tool:hover{background:#f2f5f9}
+.footer{text-align:center;font-size:12px;color:var(--muted);padding:8px 16px 24px}
+@media(max-width:820px){.layout{display:block;padding:12px}.side{position:relative;top:auto;max-height:none;display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px}.side h2,.sidefoot{display:none}.slink{width:auto}}
+@media print{.top,.side,.tools{display:none!important}.layout{display:block;max-width:none}.panel{box-shadow:none;break-inside:avoid}}
+</style>
+</head>
+<body>
+<header class="top"><div class="toprow">
+  <div class="brand"><b>W2 引导式手写清单</b><small>RegOps · RAG 入库周 · 文档解析 → 三表 → 切分 → pgvector → 基线 RAG</small></div>
+  <div class="prog">进度 <b id="pct">0%</b><div class="bar"><i id="bar" style="width:0"></i></div></div>
+</div></header>
+<div class="layout">
+<aside class="side" id="side"></aside>
+<main id="main"></main>
+</div>
+<div class="footer">项目路径：<code>/Users/chengfeng/Desktop/AI/regops_copilot</code> · <a href="W1_引导式手写清单.html" style="color:#93c5fd">← W1 清单</a> · 勾选保存在本机浏览器</div>
+<script>
+"use strict";
+const KEY="regops-w2-checklist:v1";
+const state=load();
+const NAV=[
+  {id:"intro",label:"怎么用"},
+  {id:"flow",label:"数据流图 ⭐"},
+  {id:"libs",label:"Python 库"},
+  {id:"tree",label:"目录结构"},
+  {id:"day1",label:"Day 1 · w2-1"},
+  {id:"day23",label:"Day 2–3 · w2-2"},
+  {id:"day4",label:"Day 4 · w2-3"},
+  {id:"day5",label:"Day 5 · w2-4"},
+  {id:"day6",label:"Day 6 · w2-5"},
+  {id:"day7",label:"Day 7 · w2-6"},
+  {id:"ext",label:"扩展 · PDF/XBRL"},
+  {id:"stuck",label:"卡住怎么办"},
+  {id:"refs",label:"文档链接"}
+];
+const CHECKS=[
+  {id:"pre-w1",sec:"intro",label:"W1 已完成：/chat 可调通、pytest 17 passed"},
+  {id:"pre-db",sec:"intro",label:"docker compose up -d db · pgvector healthy"},
+  {id:"d1-parse",sec:"day1",label:"w2-1：PDF 解析管线可跑（Docling 或 pypdf 起步）"},
+  {id:"d1-noise",sec:"day1",label:"w2-1：docs/NOISE_PATTERNS.md 六类噪声 + 样例"},
+  {id:"d1-layout",sec:"day1",label:"（可选）NOISE §0 填写版面块标注口径"},
+  {id:"d1-must",sec:"day1",label:"主系统勾选 w2-1"},
+  {id:"d23-read",sec:"day23",label:"w2-2：手拆 2 份制造业年报（会计复习）"},
+  {id:"d23-schema",sec:"day23",label:"w2-2：Financial Fact Schema + fin_metric 表设计"},
+  {id:"d23-doc",sec:"day23",label:"w2-2：通读 docs/INGEST_VALIDATION.md 三道质量门"},
+  {id:"d23-g1",sec:"day23",label:"G1 金额一致性：normalize_amount + 同事实比对 + 单测"},
+  {id:"d23-g2",sec:"day23",label:"G2 财务勾稽：ACCOUNTING_RULES R01–R03 实现 + 单测"},
+  {id:"d23-g3",sec:"day23",label:"G3 证据坐标：关键 fact 的 page_no + bbox 校验"},
+  {id:"d23-gold",sec:"day23",label:"5 家金样本：三道门通过或 human_review 可追溯"},
+  {id:"d23-must",sec:"day23",label:"故意错例（单位/勾稽/bbox）均能拦下；勾选 w2-2"},
+  {id:"d4-chunk",sec:"day4",label:"w2-3：可配置切分 + 条款元数据字段齐全"},
+  {id:"d4-must",sec:"day4",label:"主系统勾选 w2-3"},
+  {id:"d5-sql",sec:"day5",label:"w2-4：document/chunk/fin_metric/ingest_job 表 + 迁移"},
+  {id:"d5-must",sec:"day5",label:"主系统勾选 w2-4"},
+  {id:"d6-pipe",sec:"day6",label:"w2-5：upload→parse→clean→chunk→embed→upsert 状态机"},
+  {id:"d6-dedup",sec:"day6",label:"w2-5：重复披露不重复入库；修订稿覆盖旧版"},
+  {id:"d6-must",sec:"day6",label:"主系统勾选 w2-5"},
+  {id:"d7-rag",sec:"day7",label:"w2-6：Top-K 基线 RAG + 引用页码/条款号"},
+  {id:"d7-eval",sec:"day7",label:"w2-6：30 条检索集 + 无证据拒答"},
+  {id:"d7-must",sec:"day7",label:"主系统勾选 w2-6"},
+  {id:"pip",sec:"libs",label:"W2 依赖 pip install 完成"}
+];
+let route=location.hash.slice(1)||"intro";
+
+function load(){try{return JSON.parse(localStorage.getItem(KEY)||"{}")}catch{return{}}}
+function save(){localStorage.setItem(KEY,JSON.stringify(state));renderProgress()}
+function toggle(id){state[id]=!state[id];save();render()}
+function renderProgress(){
+  const n=CHECKS.filter(c=>state[c.id]).length;
+  const p=CHECKS.length?Math.round(n/CHECKS.length*100):0;
+  document.getElementById("pct").textContent=p+"%";
+  document.getElementById("bar").style.width=p+"%";
+}
+function e(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+function check(id,label){
+  const d=!!state[id];
+  return `<div class="checkrow ${d?"done":""}"><input type="checkbox" id="${id}" ${d?"checked":""} onchange="toggle('${id}')"><label for="${id}">${e(label)}</label></div>`;
+}
+function checksFor(sec){return CHECKS.filter(c=>c.sec===sec).map(c=>check(c.id,c.label)).join("")}
+
+function renderSide(){
+  document.getElementById("side").innerHTML=`<h2>导航</h2>${NAV.map(n=>`<button class="slink ${route===n.id?"on":""}" onclick="go('${n.id}')">${e(n.label)}</button>`).join("")}<div class="sidefoot"><button class="tool" onclick="resetAll()">重置勾选</button><br><br>按<b>数据流</b>读 ingest/ 和 rag/</div>`;
+}
+function go(id){route=id;location.hash=id;render()}
+function resetAll(){if(confirm("清除所有勾选？")){Object.keys(state).forEach(k=>delete state[k]);save();render()}}
+
+function intro(){return `
+<div class="panel">
+  <div class="dayhead"><b>W2 本周目标</b><span class="badge must">RAG 入库</span></div>
+  <p><b>模块：</b>金融文档解析 → 三表结构化 → 切分元数据 → pgvector 表 → 幂等入库 → 基线 RAG</p>
+  <div class="call good"><b>读代码心法：</b>跟一条 PDF 从上传到变成向量、再被问答检索——不要先啃 Docling 全文档。</div>
+  <dl class="facts">
+    <dt>前置</dt><dd>W1 <code>/chat</code> 已通 · <a href="W1_引导式手写清单.html#flow">W1 数据流图</a></dd>
+    <dt>主目录</dt><dd><code>python-ai/app/ingest/</code> · <code>python-ai/app/rag/</code></dd>
+    <dt>数据库</dt><dd>PostgreSQL + pgvector（已有 <code>doc_chunks</code> 可扩展）</dd>
+    <dt>数据源</dt><dd>巨潮资讯网公开年报 PDF（5–10 份金样本）</dd>
+    <dt>节奏</dt><dd>7 个工作日 · Day 2–3 含 2 天会计复习</dd>
+  </dl>
+  ${checksFor("intro")}
+</div>`}
+
+function flow(){return `
+<div class="panel">
+  <h2 class="section">W2 总数据流（一张图看懂本周）</h2>
+  <div class="flowpipe">
+    <div class="fstep"><b>输入</b>PDF 年报<br>巨潮下载</div><div class="farr">→</div>
+    <div class="fstep"><b>ingest/</b>解析+清洗</div><div class="farr">→</div>
+    <div class="fstep"><b>ingest/</b>三表抽取</div><div class="farr">→</div>
+    <div class="fstep"><b>ingest/</b>切分+元数据</div><div class="farr">→</div>
+    <div class="fstep"><b>ingest/</b>embed</div><div class="farr">→</div>
+    <div class="fstep"><b>PostgreSQL</b>向量+事实表</div><div class="farr">→</div>
+    <div class="fstep"><b>rag/</b>检索+生成</div><div class="farr">→</div>
+    <div class="fstep"><b>输出</b>带引用的回答</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h3 class="sub">链路 A · 文档入库（w2-1 → w2-5）</h3>
+  <div class="flowpipe">
+    <div class="fstep"><b>① API/CLI</b><code>POST /ingest</code><br>上传 PDF</div><div class="farr">→</div>
+    <div class="fstep"><b>② ingest_job</b>状态=PENDING</div><div class="farr">→</div>
+    <div class="fstep"><b>③ parse</b><code>parser.py</code><br>Docling（主路径）</div><div class="farr">→</div>
+    <div class="fstep"><b>④ clean</b><code>cleaner.py</code><br>NOISE_PATTERNS</div>
+  </div>
+  <div class="flayer"><div class="lbl">支线 · 三表 + 三道质量门（w2-2）</div>
+    <div class="flowpipe">
+      <div class="fstep"><b>extract</b><code>financial.py</code><br>Financial Fact</div><div class="farr">→</div>
+      <div class="fstep"><b>G1</b>金额一致性</div><div class="farr">→</div>
+      <div class="fstep"><b>G2</b>财务勾稽</div><div class="farr">→</div>
+      <div class="fstep"><b>G3</b>证据坐标</div><div class="farr">→</div>
+      <div class="fstep"><b>fin_metric</b>或 human_review</div>
+    </div>
+  </div>
+  <div class="flowpipe">
+    <div class="fstep"><b>⑤ chunk</b><code>chunker.py</code><br>条款元数据</div><div class="farr">→</div>
+    <div class="fstep"><b>⑥ embed</b>Embedding API</div><div class="farr">→</div>
+    <div class="fstep"><b>⑦ upsert</b>content_hash 幂等</div><div class="farr">→</div>
+    <div class="fstep"><b>⑧ DB</b>document+chunk</div>
+  </div>
+  <div class="call warn"><b>幂等键：</b>同一公告 <code>content_hash</code> 或 <code>doc_id+version</code> 重复上传 → 更新不重复插入。</div>
+</div>
+
+<div class="panel">
+  <h3 class="sub">链路 B · 基线 RAG 问答（w2-6）</h3>
+  <div class="flowpipe">
+    <div class="fstep"><b>① 用户</b>POST /rag/ask</div><div class="farr">→</div>
+    <div class="fstep"><b>② embed</b>问题向量化</div><div class="farr">→</div>
+    <div class="fstep"><b>③ retrieve</b><code>rag/retriever.py</code><br>pgvector Top-K</div><div class="farr">→</div>
+    <div class="fstep"><b>④ 阈值</b>无结果→拒答</div>
+  </div>
+  <div class="flowpipe">
+    <div class="fstep"><b>⑤ prompt</b>上下文+问题</div><div class="farr">→</div>
+    <div class="fstep"><b>⑥ LLM</b>复用 W1 Client</div><div class="farr">→</div>
+    <div class="fstep"><b>⑦ 响应</b>answer+citations<br>page/clause_no</div>
+  </div>
+  <div class="code"># W2 检索 SQL 概念（余弦距离）
+SELECT id, content, metadata, 1 - (embedding &lt;=&gt; :q) AS score
+FROM doc_chunks ORDER BY embedding &lt;=&gt; :q LIMIT 5;</div>
+</div>
+
+<div class="panel">
+  <h3 class="sub">链路 C · 数据在 PG 里怎么存</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>表</th><th>存什么</th><th>谁写</th></tr></thead>
+    <tbody>
+      <tr><td><code>document</code></td><td>文件元信息、source_hash、版本</td><td>ingest</td></tr>
+      <tr><td><code>doc_chunks</code> / chunk</td><td>文本块 + embedding 向量</td><td>ingest</td></tr>
+      <tr><td><code>fin_metric</code></td><td>三表结构化数字（单位归一化到元）</td><td>ingest</td></tr>
+      <tr><td><code>ingest_job</code></td><td>管线状态、错误、重试</td><td>ingest</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<div class="panel">
+  <h3 class="sub">按数据流读代码的顺序</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>顺序</th><th>路径</th><th>跟什么数据</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><code>ingest/parser.py</code></td><td>PDF → 原始文本+表格</td></tr>
+      <tr><td>2</td><td><code>ingest/cleaner.py</code></td><td>噪声 → 干净文本</td></tr>
+      <tr><td>3</td><td><code>ingest/financial.py</code></td><td>表格 → fin_metric 行</td></tr>
+      <tr><td>4</td><td><code>ingest/chunker.py</code></td><td>长文本 → 块+元数据</td></tr>
+      <tr><td>5</td><td><code>ingest/pipeline.py</code></td><td>整条状态机</td></tr>
+      <tr><td>6</td><td><code>rag/retriever.py</code></td><td>query → Top-K chunks</td></tr>
+      <tr><td>7</td><td><code>rag/qa.py</code></td><td>chunks → LLM → 引用回答</td></tr>
+    </tbody>
+  </table></div>
+</div>`}
+
+function libs(){return `
+<div class="panel">
+  <h2 class="section">W2 新增 Python 库</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>库</th><th>干什么</th><th>哪天的任务</th></tr></thead>
+    <tbody>
+      <tr><td><code>sqlalchemy[asyncio]</code></td><td>ORM 访问 PostgreSQL</td><td>Day 5+</td></tr>
+      <tr><td><code>asyncpg</code> 或 <code>psycopg[binary]</code></td><td>异步 PG 驱动</td><td>Day 5+</td></tr>
+      <tr><td><code>pgvector</code></td><td>SQLAlchemy 向量类型</td><td>Day 5+</td></tr>
+      <tr><td><code>alembic</code></td><td>数据库迁移（可选）</td><td>Day 5</td></tr>
+      <tr><td><code>docling</code></td><td>PDF 解析（主路径；扫描件低置信 → human_review）</td><td>Day 1</td></tr>
+      <tr><td><code>pandas</code></td><td>表格清洗、三表处理</td><td>Day 2–3</td></tr>
+      <tr><td><code>httpx</code></td><td>调 Embedding API</td><td>Day 6</td></tr>
+    </tbody>
+  </table></div>
+  <div class="code">cd python-ai && source .venv/bin/activate
+pip install docling sqlalchemy[asyncio] asyncpg pgvector alembic pandas
+# Docling 首次运行会下载 OCR/layout 模型，较慢属正常
+pip freeze > requirements.txt</div>
+  ${check("pip","W2 依赖 pip install 完成")}
+</div>`}
+
+function tree(){return `
+<div class="panel">
+  <h2 class="section">W2 结束时的目录结构</h2>
+  <div class="tree">python-ai/app/
+├── ingest/                    ← W2 主战场
+│   ├── parser.py              # PDF → 结构化文本
+│   ├── cleaner.py             # 噪声清洗
+│   ├── financial.py           # 三表抽取 + 勾稽
+│   ├── chunker.py             # 切分 + 元数据
+│   ├── pipeline.py            # 状态机 orchestrator
+│   └── embeddings.py          # 调 Embedding API
+├── rag/
+│   ├── retriever.py           # pgvector Top-K
+│   └── qa.py                  # 检索 + LLM + 引用
+├── db/
+│   ├── session.py             # SQLAlchemy 连接
+│   └── models.py              # ORM 表定义
+├── api/
+│   ├── ingest.py              # POST /ingest
+│   └── rag.py                 # POST /rag/ask
+docs/
+├── NOISE_PATTERNS.md          # w2-1
+├── INGEST_VALIDATION.md       # w2-2 三道质量门 ⭐
+├── ACCOUNTING_RULES.md        # w2-2 G2 勾稽索引
+└── sql/migrations/            # w2-4
+eval/
+└── retrieval_w2.jsonl         # w2-6  30 条检索集</div>
+</div>`}
+
+function day1(){return `
+<div class="panel">
+  <div class="dayhead"><b>Day 1</b><span class="badge day">w2-1</span><span class="muted">解析 + 噪声清单 · 7h</span></div>
+  <p><b>目标：</b>PDF 能解析成带页码/标题的文本；六类金融噪声有文档和规则。</p>
+  ${checksFor("day1")}
+  <details class="step" open><summary><span class="num">1</span>下载 5–10 份金样本 PDF</summary><div class="body">
+    <p>巨潮资讯网 → 选不同行业制造业年报 → 放 <code>data/raw/</code>（不进 git，写 .gitignore）</p>
+  </div></details>
+  <details class="step"><summary><span class="num">2</span>app/ingest/parser.py</summary><div class="body">
+    <ul>
+      <li>输入：PDF 路径 → 输出：<code>list[PageBlock]</code>（page, text, tables）</li>
+      <li><b>Docling 主路径</b>：表格带 <code>table.prov</code> / <code>cell.bbox</code>（G3 预留）</li>
+      <li>保留 source_file、page_no、content_hash</li>
+      <li>解析失败 → 抛 <code>ParseError</code> 进 ingest_job 错误队列，<b>不静默跳过</b></li>
+    </ul>
+  </div></details>
+  <details class="step"><summary><span class="num">3</span>docs/NOISE_PATTERNS.md</summary><div class="body">
+    <p>六类噪声各写：描述 · 正则/规则 · 命中样例 · 处理结论。模板已 scaffold：<a href="NOISE_PATTERNS.md">docs/NOISE_PATTERNS.md</a></p>
+    <p class="small"><b>§0 版面块口径：</b>若做过 PDF 版面分类标注，把 Header/Footer/Body/Table 定义写进 §0（见模板）。</p>
+    <ol class="small">
+      <li>元信息拼接（日期/证券代码/公告编号）</li>
+      <li>模板化免责段</li>
+      <li>双栏硬换行</li>
+      <li>页眉页脚泄漏</li>
+      <li>跨页表头重复</li>
+      <li>HTML/JS 残留</li>
+    </ol>
+  </div></details>
+  <details class="step"><summary><span class="num">4</span>app/ingest/cleaner.py</summary><div class="body">
+    <p>按 NOISE_PATTERNS 逐条应用；输出清洗前后字符数、命中统计。</p>
+  </div></details>
+</div>`}
+
+function day23(){return `
+<div class="panel">
+  <div class="dayhead"><b>Day 2–3</b><span class="badge review">含 2 天复习</span><span class="badge day">w2-2</span></div>
+  <p><b>目标：</b>三表 → <b>Financial Fact</b> → 通过 <b>G1/G2/G3 三道质量门</b> 再入库；手拆 2 份年报建立直觉。</p>
+  ${checksFor("day23")}
+  <div class="call good"><b>设计稿：</b><a href="INGEST_VALIDATION.md">docs/INGEST_VALIDATION.md</a>（完整）· <a href="ACCOUNTING_RULES.md">ACCOUNTING_RULES.md</a>（G2 索引）</div>
+  <div class="call warn"><b>金融数据铁律：</b>①「34,000 万元」= 3.4 亿元；② ROE/毛利率等<b>直读报表</b>；③<b>不比整页数字集合</b>，只比同一金融事实。</div>
+
+  <details class="step" open><summary><span class="num">1</span>手拆 2 份制造业年报（各 1 天）</summary><div class="body">
+    <ul>
+      <li>手算：资产 = 负债 + 权益（对应 G2 R01）</li>
+      <li>对比归母净利润 vs 净利润</li>
+      <li>读间接法现金流量表调节</li>
+      <li>记录关键行在 PDF 的 <b>页码</b>（对应 G3）</li>
+    </ul>
+  </div></details>
+
+  <details class="step"><summary><span class="num">2</span>Financial Fact + fin_metric Schema</summary><div class="body">
+    <p>见 INGEST_VALIDATION §1：<code>concept, period, scope, value_yuan, page_no, bbox, parser, status</code></p>
+    <p><code>fact_key = concept + period + scope + currency + statement</code></p>
+  </div></details>
+
+  <details class="step"><summary><span class="num">3</span>G1 · 金额一致性</summary><div class="body">
+    <ul>
+      <li><code>CRITICAL_CONCEPTS</code> + <code>ALIASES</code></li>
+      <li><code>normalize_amount</code>（Decimal，括号负，<code>—</code>≠0）</li>
+      <li>同 <code>fact_key</code> 多 parser 比对；冲突 → <code>human_review</code></li>
+    </ul>
+    <p class="small">代码：<code>app/ingest/facts.py</code> · <code>validation.py</code></p>
+  </div></details>
+
+  <details class="step"><summary><span class="num">4</span>G2 · 财务勾稽</summary><div class="body">
+    <p>实现 ACCOUNTING_RULES <b>R01–R03</b>；<code>check_equation</code> + 万元显示容差。</p>
+    <p class="small">代码：<code>app/ingest/reconciliation.py</code></p>
+  </div></details>
+
+  <details class="step"><summary><span class="num">5</span>G3 · 证据坐标完整性</summary><div class="body">
+    <ul>
+      <li>关键 fact 必须有 <code>page_no</code> + 有效 <code>bbox</code></li>
+      <li>Docling：<code>table.prov</code> 唯一页码；跨页表 → review</li>
+      <li>（可选）BBox 裁剪 + 局部 OCR 核对 <code>raw_value</code></li>
+    </ul>
+  </div></details>
+
+  <details class="step"><summary><span class="num">6</span>tests/test_financial.py + 5 家金样本</summary><div class="body">
+    <ul>
+      <li>单测：单位换算、勾稽 pass/fail、缺 bbox fail</li>
+      <li>5 家公司：三道门全过或 <code>human_review</code> 带 reason</li>
+      <li>故意错例必须拦下，<b>禁止静默入库</b></li>
+    </ul>
+  </div></details>
+</div>`}
+
+function day4(){return `
+<div class="panel">
+  <div class="dayhead"><b>Day 4</b><span class="badge day">w2-3</span><span class="muted">切分 + 元数据 · 5h</span></div>
+  ${checksFor("day4")}
+  <details class="step" open><summary><span class="num">1</span>app/ingest/chunker.py</summary><div class="body">
+    <p>可配置：chunk_size、overlap；<b>表格尽量不拦腰切断</b></p>
+    <p>每块 metadata：<code>source, page, clause_no, effective_date, dept_acl, version</code></p>
+  </div></details>
+  <details class="step"><summary><span class="num">2</span>验收</summary><div class="body">
+    <ul><li>无空块、无超长块（如 &gt;2000 字）</li><li>条款号能反查原文</li><li>旧 version 可隔离查询</li></ul>
+  </div></details>
+</div>`}
+
+function day5(){return `
+<div class="panel">
+  <div class="dayhead"><b>Day 5</b><span class="badge day">w2-4</span><span class="muted">PG 数据模型 · 5h</span></div>
+  ${checksFor("day5")}
+  <details class="step" open><summary><span class="num">1</span>扩展 docs/sql/ 或 Alembic 迁移</summary><div class="body">
+    <p>表：document, chunk（或扩展现有 doc_chunks）, fin_metric, ingest_job</p>
+    <p>索引：HNSW on embedding；doc_id；content_hash UNIQUE</p>
+  </div></details>
+  <details class="step"><summary><span class="num">2</span>app/db/models.py + session.py</summary><div class="body">
+    <p>SQLAlchemy 2.0 async；DATABASE_URL 复用 W1 config</p>
+  </div></details>
+</div>`}
+
+function day6(){return `
+<div class="panel">
+  <div class="dayhead"><b>Day 6</b><span class="badge day">w2-5</span><span class="muted">幂等入库管线 · 5h</span></div>
+  ${checksFor("day6")}
+  <details class="step" open><summary><span class="num">1</span>app/ingest/pipeline.py 状态机</summary><div class="body">
+    <div class="flowpipe">
+      <div class="fstep">PENDING</div><div class="farr">→</div>
+      <div class="fstep">PARSING</div><div class="farr">→</div>
+      <div class="fstep">CLEANING</div><div class="farr">→</div>
+      <div class="fstep">CHUNKING</div><div class="farr">→</div>
+      <div class="fstep">EMBEDDING</div><div class="farr">→</div>
+      <div class="fstep">DONE / FAILED</div>
+    </div>
+    <p>content_hash 幂等；修订稿 version+1 覆盖旧 chunk（软删或 is_active=false）</p>
+  </div></details>
+  <details class="step"><summary><span class="num">2</span>POST /ingest API</summary><div class="body">
+    <p>上传 PDF → 返回 job_id → GET /ingest/{job_id} 查状态</p>
+  </div></details>
+</div>`}
+
+function day7(){return `
+<div class="panel">
+  <div class="dayhead"><b>Day 7</b><span class="badge day">w2-6</span><span class="muted">基线 RAG · 5h</span></div>
+  ${checksFor("day7")}
+  <details class="step" open><summary><span class="num">1</span>app/rag/retriever.py</summary><div class="body">
+    <p>embed 问题 → pgvector Top-K → 返回 chunks + score</p>
+  </div></details>
+  <details class="step"><summary><span class="num">2</span>app/rag/qa.py</summary><div class="body">
+    <p>无 chunk 或 score &lt; 阈值 → 拒答；有证据 → LLM 生成 + citations 列表</p>
+  </div></details>
+  <details class="step"><summary><span class="num">3</span>eval/retrieval_w2.jsonl</summary><div class="body">
+    <p>30 条：question, relevant_doc_ids, relevant_pages；跑 Recall@K 基线</p>
+  </div></details>
+  <div class="code">curl -X POST http://localhost:8000/rag/ask \\
+  -H "Content-Type: application/json" \\
+  -d '{"question":"该公司2023年净利润是多少？"}'</div>
+</div>`}
+
+function ext(){return `
+<div class="panel">
+  <div class="dayhead"><b>扩展 · PDF vs XBRL</b><span class="badge review">W2 后 / W4 前</span></div>
+  <p><b>不必 W2 Day 1 就做</b>，但面试和问数设计需要能讲清两条数据路径的分工。</p>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th></th><th>PDF</th><th>XBRL</th></tr></thead>
+    <tbody>
+      <tr><td><b>是什么</b></td><td>人读版面（巨潮年报 PDF）</td><td>机读结构化披露（tag + taxonomy）</td></tr>
+      <tr><td><b>RegOps 用途</b></td><td>RAG 叙述、条款引用、chunk</td><td><code>fin_metric</code> 数字、W4 问数</td></tr>
+      <tr><td><b>解析</b></td><td>Docling + NOISE_PATTERNS</td><td>instance XML 解析</td></tr>
+      <tr><td><b>数字准确度</b></td><td>易错（OCR/表格/单位）</td><td>高（标准 tag + 上下文）</td></tr>
+      <tr><td><b>何时做</b></td><td>W2–W3 <b>Must</b></td><td>W4 <b>可选增强</b></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="call good"><b>工程原则：</b>有 XBRL → 数字以结构化源为准，PDF 交叉验证；无 XBRL → PDF + 勾稽规则。不让 LLM 从扫描 PDF 硬猜 ROE/净利润。</div>
+
+  <h3 class="sub">和版面标注工作的关系</h3>
+  <p>上游微调版面模型 + 你做过 PDF 块分类标注 → 迁移到 <code>NOISE_PATTERNS.md §0</code>，不是 RegOps 里再训一遍版面模型。</p>
+
+  <h3 class="sub">链接</h3>
+  <ul>
+    <li><a href="https://www.xbrl.org/the-standard/what/what-is-xbrl/" target="_blank" rel="noopener">XBRL · What is XBRL?</a></li>
+    <li><a href="NOISE_PATTERNS.md">docs/NOISE_PATTERNS.md</a> · §2 PDF/XBRL 分工</li>
+    <li><a href="面试_工程化笔记.md">面试笔记 Q26</a></li>
+  </ul>
+</div>`}
+
+function stuck(){return `
+<div class="panel">
+  <h2 class="section">卡住怎么办</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>卡点</th><th>先查</th></tr></thead>
+    <tbody>
+      <tr><td>Docling 装不上</td><td>先用 pypdf 跑通管线，Docling 后补</td></tr>
+      <tr><td>pgvector 维度错</td><td>embedding 模型输出维度 = 表 vector(n) 的 n</td></tr>
+      <tr><td>勾稽不过</td><td>单位是否统一到元；是否合并 vs 母公司口径混了</td></tr>
+      <tr><td>检索无结果</td><td>chunk 是否入库；embedding 是否 NULL</td></tr>
+      <tr><td>重复入库</td><td>content_hash 唯一约束是否生效</td></tr>
+    </tbody>
+  </table></div>
+</div>`}
+
+function refs(){return `
+<div class="panel">
+  <h2 class="section">推荐资源</h2>
+  <ul>
+    <li><a href="https://github.com/docling-project/docling" target="_blank" rel="noopener">Docling</a> · PDF 解析</li>
+    <li><a href="https://github.com/pgvector/pgvector" target="_blank" rel="noopener">pgvector</a> · 向量检索</li>
+    <li>FinQA / TAT-QA · 三表标注参考（学习系统 ④ 资源）</li>
+    <li><a href="https://www.xbrl.org/the-standard/what/what-is-xbrl/" target="_blank" rel="noopener">XBRL 标准介绍</a> · PDF/XBRL 分工</li>
+    <li><a href="INGEST_VALIDATION.md">INGEST_VALIDATION.md</a> · w2-2 三道质量门</li>
+    <li><a href="ACCOUNTING_RULES.md">ACCOUNTING_RULES.md</a> · G2 勾稽规则</li>
+    <li><a href="NOISE_PATTERNS.md">NOISE_PATTERNS.md</a> · w2-1 噪声</li>
+    <li><a href="面试_工程化笔记.md">面试_工程化笔记.md</a> · 本文档 Q&A 合集</li>
+    <li><a href="W1_引导式手写清单.html#flow">W1 数据流图</a> · LLM 调用链</li>
+  </ul>
+</div>`}
+
+const PAGES={intro,flow,libs,tree,day1,day23,day4,day5,day6,day7,ext,stuck,refs};
+function render(){
+  if(!PAGES[route])route="intro";
+  document.getElementById("main").innerHTML=(PAGES[route]||intro)();
+  renderSide();renderProgress();
+}
+window.toggle=toggle;window.go=go;window.resetAll=resetAll;
+window.addEventListener("hashchange",()=>{route=location.hash.slice(1)||"intro";render()});
+render();
+</script>
+</body>
+</html>

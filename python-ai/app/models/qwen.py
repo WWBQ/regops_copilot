@@ -24,7 +24,7 @@ class QwenClient(LLMClient):
         *,
         base_url: str = DEFAULT_BASE_URL,
         model: str = DEFAULT_MODEL,
-        timeout: float = 30.0,
+        timeout: float = 120.0,
     ) -> None:
         if not api_key:
             raise ValueError("Qwen API key is required")
@@ -64,12 +64,21 @@ class QwenClient(LLMClient):
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 response = await self._post_with_retry(client, url, headers, payload)
         except httpx.TimeoutException as exc:
+            logger.error("Qwen request timed out after %ss", self._timeout)
             raise ModelTimeoutError("Qwen request timed out") from exc
         except httpx.HTTPError as exc:
+            logger.error("Qwen HTTP error: %s", exc)
             raise ModelBadResponseError(f"Qwen HTTP error: {exc}") from exc
 
         latency_ms = (time.perf_counter() - started) * 1000
-        return self._parse_response(response, latency_ms)
+        result = self._parse_response(response, latency_ms)
+        logger.info(
+            "Qwen chat ok latency_ms=%.0f prompt_tokens=%d completion_tokens=%d",
+            result.latency_ms,
+            result.prompt_tokens,
+            result.completion_tokens,
+        )
+        return result
 
     async def _post_with_retry(
         self,
@@ -83,8 +92,14 @@ class QwenClient(LLMClient):
             logger.warning("Qwen rate limited, retrying once")
             response = await client.post(url, headers=headers, json=payload)
         if response.status_code == 429:
+            logger.error("Qwen rate limit exceeded after retry")
             raise ModelRateLimitError("Qwen rate limit exceeded")
         if response.status_code >= 400:
+            logger.error(
+                "Qwen API error status=%s body=%s",
+                response.status_code,
+                response.text[:200],
+            )
             raise ModelBadResponseError(
                 f"Qwen API error {response.status_code}: {response.text[:200]}"
             )
@@ -96,6 +111,7 @@ class QwenClient(LLMClient):
             content = data["choices"][0]["message"]["content"]
             usage = data.get("usage", {})
         except (KeyError, IndexError, ValueError) as exc:
+            logger.error("Invalid Qwen response format: %s", exc)
             raise ModelBadResponseError("Invalid Qwen response format") from exc
 
         return ChatResult(

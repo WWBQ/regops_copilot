@@ -1,3 +1,33 @@
+server:
+  port: 8080
+
 spring:
   application:
     name: java-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/regops_db}
+    username: ${SPRING_DATASOURCE_USERNAME:regops}
+    password: ${SPRING_DATASOURCE_PASSWORD:regops123}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+regops:
+  python-ai:
+    base-url: ${REGOPS_PYTHON_AI_BASE_URL:http://localhost:8000}
+    connect-timeout-ms: 5000
+    read-timeout-ms: 120000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{requestId:-}]"

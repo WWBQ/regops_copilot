@@ -12,11 +12,28 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
       - ./docs/sql/init_pgvector.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ./docs/sql/w2_tables.sql:/docker-entrypoint-initdb.d/02_w2_tables.sql:ro
+      - ./docs/sql/w3_chat_sessions.sql:/docker-entrypoint-initdb.d/03_w3_sessions.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U regops -d regops_db"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  java-service:
+    build: ./java-service
+    container_name: regops-java
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/regops_db
+      SPRING_DATASOURCE_USERNAME: regops
+      SPRING_DATASOURCE_PASSWORD: regops123
+      REGOPS_PYTHON_AI_BASE_URL: http://host.docker.internal:8000
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   db_data:

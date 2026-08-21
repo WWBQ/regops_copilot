@@ -6,15 +6,18 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- RAG 文档块表（embedding 维度与模型一致，默认 1024）
 CREATE TABLE IF NOT EXISTS doc_chunks (
     id          BIGSERIAL PRIMARY KEY,
+    source_type VARCHAR(8)  NOT NULL DEFAULT 'pdf',
     doc_id      VARCHAR(64) NOT NULL,
     chunk_index INT NOT NULL,
     content     TEXT NOT NULL,
     metadata    JSONB DEFAULT '{}',
     embedding   vector(1024),
-    created_at  TIMESTAMPTZ DEFAULT NOW()
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT ck_doc_chunks_source_type CHECK (source_type IN ('pdf', 'web'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_doc_chunks_doc_id ON doc_chunks(doc_id);
+CREATE INDEX IF NOT EXISTS idx_doc_chunks_source_doc ON doc_chunks(source_type, doc_id);
 
 -- 有向量数据后再建 HNSW 索引；空表建索引也可以
 CREATE INDEX IF NOT EXISTS idx_doc_chunks_embedding
