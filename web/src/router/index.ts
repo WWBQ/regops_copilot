@@ -2,6 +2,11 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import ChatPanel from '../components/chat/ChatPanel.vue'
 import DocumentViewerView from '../views/documents/DocumentViewerView.vue'
+import SystemHealthView from '../views/ops/SystemHealthView.vue'
+import IngestMonitorView from '../views/ops/IngestMonitorView.vue'
+import LogsMonitorView from '../views/ops/LogsMonitorView.vue'
+import EvalReportView from '../views/ops/EvalReportView.vue'
+import RagMonitorView from '../views/ops/RagMonitorView.vue'
 import ProfileView from '../views/account/ProfileView.vue'
 import PlaceholderView from '../views/PlaceholderView.vue'
 import CreateTaskView from '../views/labeling/CreateTaskView.vue'
@@ -37,8 +42,14 @@ const router = createRouter({
     {
       path: '/ops/ingest',
       name: 'ingest-monitor',
-      component: PlaceholderView,
+      component: IngestMonitorView,
       meta: { title: '解析监控', pageId: 'ingest-monitor', group: 'ops' },
+    },
+    {
+      path: '/ops/rag',
+      name: 'rag-monitor',
+      component: RagMonitorView,
+      meta: { title: 'RAG 检索监控', pageId: 'rag-monitor', group: 'ops' },
     },
     {
       path: '/quality/gates',
@@ -97,19 +108,19 @@ const router = createRouter({
     {
       path: '/ops/logs',
       name: 'logs',
-      component: PlaceholderView,
+      component: LogsMonitorView,
       meta: { title: '日志监控', pageId: 'logs', group: 'ops' },
     },
     {
       path: '/ops/health',
       name: 'health',
-      component: PlaceholderView,
+      component: SystemHealthView,
       meta: { title: '系统健康', pageId: 'health', group: 'ops' },
     },
     {
       path: '/ops/eval',
       name: 'eval',
-      component: PlaceholderView,
+      component: EvalReportView,
       meta: { title: '评估报告', pageId: 'eval', group: 'ops' },
     },
     {

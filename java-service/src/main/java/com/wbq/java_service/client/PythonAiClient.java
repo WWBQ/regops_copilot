@@ -143,6 +143,199 @@ public class PythonAiClient {
         }
     }
 
+    public Map<String, Object> listRagTraces(int limit, int offset, String outcome) {
+        return exchange(() -> restClient.get()
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/ops/rag-traces")
+                            .queryParam("limit", limit)
+                            .queryParam("offset", offset);
+                    if (outcome != null && !outcome.isBlank()) {
+                        builder.queryParam("outcome", outcome);
+                    }
+                    return builder.build();
+                })
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> getRagTrace(int traceId) {
+        return exchange(() -> restClient.get()
+                .uri("/ops/rag-traces/{traceId}", traceId)
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> listEvalTasks() {
+        return exchange(() -> restClient.get()
+                .uri("/ops/eval/tasks")
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> listEvalRuns(String taskId, int limit) {
+        return exchange(() -> restClient.get()
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/ops/eval/runs")
+                            .queryParam("limit", limit);
+                    if (taskId != null && !taskId.isBlank()) {
+                        builder.queryParam("task_id", taskId);
+                    }
+                    return builder.build();
+                })
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> getEvalRun(String runId, boolean includeReport) {
+        return exchange(() -> restClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/ops/eval/runs/{runId}")
+                        .queryParam("include_report", includeReport)
+                        .build(runId))
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> startEvalRun(Map<String, Object> body) {
+        return exchange(() -> restClient.post()
+                .uri("/ops/eval/runs")
+                .headers(this::forwardRequestId)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> listEvalGoldenSets() {
+        return exchange(() -> restClient.get()
+                .uri("/ops/eval/golden-sets")
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> uploadEvalGoldenSet(Map<String, Object> body) {
+        return exchange(() -> restClient.post()
+                .uri("/ops/eval/golden-sets/upload")
+                .headers(this::forwardRequestId)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> createEvalTask(Map<String, Object> body) {
+        return exchange(() -> restClient.post()
+                .uri("/ops/eval/tasks")
+                .headers(this::forwardRequestId)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> deleteEvalTask(String taskId) {
+        return exchange(() -> restClient.delete()
+                .uri("/ops/eval/tasks/{taskId}", taskId)
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> deleteEvalRun(String runId) {
+        return exchange(() -> restClient.delete()
+                .uri("/ops/eval/runs/{runId}", runId)
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> getSystemOverview() {
+        return exchange(() -> restClient.get()
+                .uri("/ops/system/overview")
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> getIngestOverview() {
+        return exchange(() -> restClient.get()
+                .uri("/ops/ingest/overview")
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> listIngestJobs(Integer limit, Integer offset, String status, String targetType) {
+        return exchange(() -> restClient.get()
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/ops/ingest/jobs");
+                    if (limit != null) {
+                        builder.queryParam("limit", limit);
+                    }
+                    if (offset != null) {
+                        builder.queryParam("offset", offset);
+                    }
+                    if (status != null && !status.isBlank()) {
+                        builder.queryParam("status", status);
+                    }
+                    if (targetType != null && !targetType.isBlank()) {
+                        builder.queryParam("target_type", targetType);
+                    }
+                    return builder.build();
+                })
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> listSessionIngestDocuments(Integer limit, Integer offset, String status) {
+        return exchange(() -> restClient.get()
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/ops/ingest/session-documents");
+                    if (limit != null) {
+                        builder.queryParam("limit", limit);
+                    }
+                    if (offset != null) {
+                        builder.queryParam("offset", offset);
+                    }
+                    if (status != null && !status.isBlank()) {
+                        builder.queryParam("status", status);
+                    }
+                    return builder.build();
+                })
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> listLogEvents(Integer limit, Integer offset, String source, String level) {
+        return exchange(() -> restClient.get()
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/ops/logs/events");
+                    if (limit != null) {
+                        builder.queryParam("limit", limit);
+                    }
+                    if (offset != null) {
+                        builder.queryParam("offset", offset);
+                    }
+                    if (source != null && !source.isBlank()) {
+                        builder.queryParam("source", source);
+                    }
+                    if (level != null && !level.isBlank()) {
+                        builder.queryParam("level", level);
+                    }
+                    return builder.build();
+                })
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
     private static String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
     }

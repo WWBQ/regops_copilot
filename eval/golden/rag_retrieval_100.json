@@ -1,0 +1,2345 @@
+{
+  "version": "rag-retrieval-v1",
+  "description": "RAG 检索评测黄金集 100 条：覆盖 5 家 2024 年报（比亚迪/长城/美的/格力/三一），含财务数字、比率、产品列举、分部业务、合规风险、治理、ESG、战略与同比等题型。gold_pages 由 doc_chunks 关键词探测生成，评测指标为 Recall@k / MRR（page 粒度）。",
+  "default_params": {
+    "top_k": 12,
+    "min_score": 0.42,
+    "metrics": [
+      "recall_at_k",
+      "mrr",
+      "page_hit_at_k"
+    ]
+  },
+  "category_counts": {
+    "numeric_financial": 21,
+    "numeric_ratio": 10,
+    "product_enum": 10,
+    "segment_business": 10,
+    "compliance_risk": 10,
+    "governance": 10,
+    "esg_sustainability": 10,
+    "strategy_outlook": 9,
+    "cross_year_compare": 10
+  },
+  "items": [
+    {
+      "id": "rag-001",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年营业收入是多少",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        10,
+        11,
+        24,
+        25,
+        34
+      ],
+      "probe_keywords": [
+        "营业收入",
+        "营业总收入"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "主要会计数据",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-002",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        11
+      ],
+      "probe_keywords": [
+        "归属于上市公司股东的净利润"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "归属于上市公司股东的净利润",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-003",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年末总资产是多少",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        11,
+        41,
+        138,
+        277
+      ],
+      "probe_keywords": [
+        "总资产"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "总资产",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-004",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年经营活动产生的现金流量净额是多少",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        11,
+        34,
+        149,
+        155,
+        157
+      ],
+      "probe_keywords": [
+        "经营活动产生的现金流量净额"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "经营活动产生的现金流量净额",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-005",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年研发投入约为多少",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        3,
+        14,
+        23,
+        27,
+        34
+      ],
+      "probe_keywords": [
+        "研发投入",
+        "542"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "董事长",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-006",
+      "category": "numeric_ratio",
+      "question": "比亚迪2024年汽车业务毛利率是多少",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        213,
+        2,
+        3,
+        4,
+        9
+      ],
+      "probe_keywords": [
+        "毛利率",
+        "汽车"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "毛利率",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-007",
+      "category": "numeric_ratio",
+      "question": "比亚迪2024年加权平均净资产收益率ROE是多少",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        11
+      ],
+      "probe_keywords": [
+        "加权平均净资产收益率"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "加权平均净资产收益率",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-008",
+      "category": "product_enum",
+      "question": "比亚迪2024年推出了哪些新车型或新产品",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        29,
+        3,
+        13,
+        15,
+        16
+      ],
+      "probe_keywords": [
+        "推出",
+        "上市",
+        "发布"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "推出",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-009",
+      "category": "product_enum",
+      "question": "比亚迪2024年新能源汽车销量是多少",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        3,
+        15,
+        49,
+        2,
+        13
+      ],
+      "probe_keywords": [
+        "新能源汽车销量",
+        "销量"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "新能源汽车销量",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-010",
+      "category": "segment_business",
+      "question": "比亚迪2024年境外收入占比或境外业务情况",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        127,
+        185,
+        3,
+        11,
+        13
+      ],
+      "probe_keywords": [
+        "境外",
+        "海外"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "境外",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-011",
+      "category": "segment_business",
+      "question": "比亚迪2024年分产品或分行业收入结构",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        25,
+        24
+      ],
+      "probe_keywords": [
+        "分行业",
+        "分产品"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "分行业",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-012",
+      "category": "compliance_risk",
+      "question": "比亚迪2024年内部控制评价报告结论",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        72,
+        50,
+        65,
+        71,
+        73
+      ],
+      "probe_keywords": [
+        "内部控制评价",
+        "内部控制"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "内部控制评价",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-013",
+      "category": "compliance_risk",
+      "question": "比亚迪年报第一节披露了哪些主要风险",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        5
+      ],
+      "probe_keywords": [
+        "风险因素",
+        "重大风险"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "风险因素",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-014",
+      "category": "governance",
+      "question": "比亚迪2024年利润分配预案或分红方案",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        69,
+        48,
+        49,
+        65,
+        68
+      ],
+      "probe_keywords": [
+        "利润分配",
+        "派发现金"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "利润分配",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-015",
+      "category": "governance",
+      "question": "比亚迪2024年董事会成员有哪些",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        55,
+        57,
+        2,
+        3,
+        9
+      ],
+      "probe_keywords": [
+        "董事",
+        "董事会成员"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "董事",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-016",
+      "category": "esg_sustainability",
+      "question": "比亚迪2024年碳排放或温室气体排放披露",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        97
+      ],
+      "probe_keywords": [
+        "碳排放",
+        "温室气体"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "碳排放",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-017",
+      "category": "esg_sustainability",
+      "question": "比亚迪2024年绿色低碳或ESG方面有哪些举措",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        43,
+        13,
+        14,
+        21,
+        42
+      ],
+      "probe_keywords": [
+        "绿色",
+        "ESG",
+        "低碳"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "绿色",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-018",
+      "category": "strategy_outlook",
+      "question": "比亚迪2024年发展战略或经营计划",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        33,
+        42,
+        48
+      ],
+      "probe_keywords": [
+        "发展战略",
+        "经营计划"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "发展战略",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-019",
+      "category": "cross_year_compare",
+      "question": "比亚迪2024年营业收入同比增长率是多少",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        2,
+        3,
+        10,
+        11,
+        13
+      ],
+      "probe_keywords": [
+        "同比增长",
+        "营业收入"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "同比增长",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-020",
+      "category": "cross_year_compare",
+      "question": "比亚迪2024年研发投入同比增长情况",
+      "doc_id": "002594_2024",
+      "company_code": "002594",
+      "company_name": "比亚迪",
+      "report_year": 2024,
+      "gold_pages": [
+        3,
+        14,
+        23,
+        34,
+        2
+      ],
+      "probe_keywords": [
+        "研发投入",
+        "同比"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "研发投入",
+      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-021",
+      "category": "numeric_financial",
+      "question": "长城汽车2024年营业收入是多少",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        19,
+        185,
+        261,
+        319
+      ],
+      "probe_keywords": [
+        "营业收入"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "营业收入",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-022",
+      "category": "numeric_financial",
+      "question": "长城汽车2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        2,
+        10,
+        16,
+        42,
+        77
+      ],
+      "probe_keywords": [
+        "归属于上市公司股东的净利润",
+        "归属于母公司"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "归属于上市公司股东的净利润",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-023",
+      "category": "numeric_financial",
+      "question": "长城汽车2024年研发费用是多少",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        206,
+        225,
+        263,
+        275,
+        321
+      ],
+      "probe_keywords": [
+        "研发费用",
+        "研发支出"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "研发费用",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-024",
+      "category": "numeric_financial",
+      "question": "长城汽车2024年经营活动现金流量净额是多少",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        26
+      ],
+      "probe_keywords": [
+        "经营活动产生的现金流量净额"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "经营活动产生的现金流量净额",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-025",
+      "category": "numeric_ratio",
+      "question": "长城汽车2024年海外业务毛利率变化",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        10,
+        13,
+        16,
+        19,
+        21
+      ],
+      "probe_keywords": [
+        "毛利率",
+        "海外"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "毛利率",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-026",
+      "category": "numeric_ratio",
+      "question": "长城汽车2024年销量或整车销量是多少",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        13,
+        19,
+        15,
+        18,
+        21
+      ],
+      "probe_keywords": [
+        "销量",
+        "123.45"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "销量",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-027",
+      "category": "product_enum",
+      "question": "2024年长城新推出的车型有哪些",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        22,
+        23,
+        21
+      ],
+      "probe_keywords": [
+        "新推出",
+        "上市",
+        "哈弗",
+        "坦克"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "新推出",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-028",
+      "category": "product_enum",
+      "question": "长城灵魂S2000摩托车2024年何时发布",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        20,
+        23
+      ],
+      "probe_keywords": [
+        "长城灵魂",
+        "S2000"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "长城灵魂",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-029",
+      "category": "segment_business",
+      "question": "长城汽车2024年海外销售多少万辆",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        19,
+        21,
+        13,
+        10,
+        16
+      ],
+      "probe_keywords": [
+        "海外",
+        "45.41",
+        "海外年销售"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "海外",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-030",
+      "category": "segment_business",
+      "question": "长城汽车2024年SUV或越野业务情况",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        19,
+        20,
+        22,
+        25,
+        13
+      ],
+      "probe_keywords": [
+        "SUV",
+        "越野"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "SUV",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-031",
+      "category": "compliance_risk",
+      "question": "长城汽车2024年内部控制自我评价",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        47,
+        51,
+        99,
+        106,
+        108
+      ],
+      "probe_keywords": [
+        "内部控制"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "内部控制",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-032",
+      "category": "compliance_risk",
+      "question": "长城汽车2024年审计意见类型",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        167,
+        168,
+        169,
+        170,
+        2
+      ],
+      "probe_keywords": [
+        "审计报告",
+        "审计意见"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "审计报告",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-033",
+      "category": "governance",
+      "question": "长城汽车2024年每股派发现金红利多少",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        2,
+        42,
+        69,
+        70,
+        101
+      ],
+      "probe_keywords": [
+        "派发现金红利",
+        "利润分配"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "派发现金红利",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-034",
+      "category": "governance",
+      "question": "长城汽车2024年股权激励计划情况",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        17,
+        68,
+        71,
+        76,
+        77
+      ],
+      "probe_keywords": [
+        "股权激励"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "股权激励",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-035",
+      "category": "esg_sustainability",
+      "question": "长城汽车2024年环保或碳中和相关披露",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        126,
+        41,
+        124,
+        127,
+        112
+      ],
+      "probe_keywords": [
+        "环保",
+        "碳中和",
+        "绿色"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "环保",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-036",
+      "category": "esg_sustainability",
+      "question": "长城汽车2024年社会责任履行情况",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        40,
+        46,
+        103,
+        111,
+        112
+      ],
+      "probe_keywords": [
+        "社会责任"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "社会责任",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-037",
+      "category": "strategy_outlook",
+      "question": "长城汽车2024年新能源战略或Hi4技术",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        13,
+        19,
+        20,
+        21,
+        40
+      ],
+      "probe_keywords": [
+        "新能源",
+        "Hi4"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "新能源",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-038",
+      "category": "strategy_outlook",
+      "question": "长城汽车2024年全球化战略进展",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        13,
+        14,
+        19,
+        21,
+        24
+      ],
+      "probe_keywords": [
+        "全球化",
+        "海外战略"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "全球化",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-039",
+      "category": "cross_year_compare",
+      "question": "长城汽车2024年海外销售同比增长",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        10,
+        13,
+        16,
+        19,
+        21
+      ],
+      "probe_keywords": [
+        "海外",
+        "同比"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "海外",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-040",
+      "category": "cross_year_compare",
+      "question": "长城汽车2024年净利润同比变动原因",
+      "doc_id": "601633_2024",
+      "company_code": "601633",
+      "company_name": "长城汽车",
+      "report_year": 2024,
+      "gold_pages": [
+        10,
+        13,
+        16,
+        26,
+        2
+      ],
+      "probe_keywords": [
+        "净利润",
+        "同比"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "净利润",
+      "why_clean": "2024年报已入库 doc_id=601633_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-041",
+      "category": "numeric_financial",
+      "question": "美的集团2024年营业总收入是多少",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        2,
+        20,
+        49,
+        53,
+        151
+      ],
+      "probe_keywords": [
+        "营业总收入",
+        "营业收入"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "营业总收入",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-042",
+      "category": "numeric_financial",
+      "question": "美的集团2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        10
+      ],
+      "probe_keywords": [
+        "归属于上市公司股东的净利润"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "归属于上市公司股东的净利润",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-043",
+      "category": "numeric_financial",
+      "question": "美的集团2024年末总资产是多少",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        267
+      ],
+      "probe_keywords": [
+        "总资产"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "总资产",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-044",
+      "category": "numeric_financial",
+      "question": "美的集团2024年经营活动现金流量净额是多少",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        9,
+        53
+      ],
+      "probe_keywords": [
+        "经营活动产生的现金流量净额",
+        "经营活动现金流量",
+        "现金净流量"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "主要会计数据",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-045",
+      "category": "numeric_ratio",
+      "question": "美的集团2024年智能家居业务毛利率",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        151,
+        12,
+        21,
+        27,
+        28
+      ],
+      "probe_keywords": [
+        "毛利率",
+        "智能家居"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "毛利率",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-046",
+      "category": "numeric_ratio",
+      "question": "美的集团2024年加权平均净资产收益率",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        295
+      ],
+      "probe_keywords": [
+        "净资产收益率"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "净资产收益率",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-047",
+      "category": "product_enum",
+      "question": "美的集团2024年发布了哪些新品或新技术",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        41,
+        23,
+        27,
+        37,
+        39
+      ],
+      "probe_keywords": [
+        "发布",
+        "推出",
+        "新品"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "发布",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-048",
+      "category": "product_enum",
+      "question": "美的集团2024年COLMO或高端品牌情况",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        33,
+        47,
+        63,
+        16,
+        21
+      ],
+      "probe_keywords": [
+        "COLMO",
+        "高端品牌"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "COLMO",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-049",
+      "category": "segment_business",
+      "question": "美的集团2024年ToB业务或商业及工业板块",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        12,
+        2,
+        3,
+        19,
+        31
+      ],
+      "probe_keywords": [
+        "ToB",
+        "商业及工业"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "ToB",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-050",
+      "category": "segment_business",
+      "question": "美的集团2024年海外收入占比",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        29,
+        231,
+        3,
+        10,
+        13
+      ],
+      "probe_keywords": [
+        "海外",
+        "境外"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "海外",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-051",
+      "category": "compliance_risk",
+      "question": "美的集团2024年内部控制评价结论",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        93,
+        94,
+        95,
+        126,
+        151
+      ],
+      "probe_keywords": [
+        "内部控制"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "内部控制",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-052",
+      "category": "compliance_risk",
+      "question": "美的集团2024年重大诉讼或仲裁",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        126,
+        127
+      ],
+      "probe_keywords": [
+        "诉讼",
+        "仲裁"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "诉讼",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-053",
+      "category": "governance",
+      "question": "美的集团2024年利润分配方案",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        44,
+        83,
+        84,
+        85,
+        86
+      ],
+      "probe_keywords": [
+        "利润分配",
+        "分红"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "利润分配",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-054",
+      "category": "governance",
+      "question": "美的集团2024年回购股份情况",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        44,
+        48,
+        85,
+        87,
+        88
+      ],
+      "probe_keywords": [
+        "回购"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "回购",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-055",
+      "category": "esg_sustainability",
+      "question": "美的集团2024年节能降碳或绿色制造",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        119,
+        20,
+        40,
+        16,
+        19
+      ],
+      "probe_keywords": [
+        "节能",
+        "降碳",
+        "绿色制造"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "节能",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-056",
+      "category": "esg_sustainability",
+      "question": "美的集团2024年员工培训或人才发展",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        83,
+        25,
+        28,
+        45,
+        59
+      ],
+      "probe_keywords": [
+        "员工培训",
+        "人才"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "员工培训",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-057",
+      "category": "strategy_outlook",
+      "question": "美的集团2024年数字化或智能化转型",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        12,
+        19,
+        27,
+        32,
+        33
+      ],
+      "probe_keywords": [
+        "数字化",
+        "智能化"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "数字化",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-058",
+      "category": "strategy_outlook",
+      "question": "美的集团2024年全球化布局",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        65,
+        13,
+        29,
+        45,
+        47
+      ],
+      "probe_keywords": [
+        "全球化",
+        "海外布局"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "全球化",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-059",
+      "category": "cross_year_compare",
+      "question": "美的集团2024年营业总收入同比增长",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        20,
+        2,
+        15,
+        16,
+        17
+      ],
+      "probe_keywords": [
+        "同比增长",
+        "营业总收入"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "同比增长",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-060",
+      "category": "cross_year_compare",
+      "question": "美的集团2024年净利润同比变动",
+      "doc_id": "000333_2024",
+      "company_code": "000333",
+      "company_name": "美的集团",
+      "report_year": 2024,
+      "gold_pages": [
+        20,
+        54,
+        2,
+        10,
+        15
+      ],
+      "probe_keywords": [
+        "净利润",
+        "同比"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "净利润",
+      "why_clean": "2024年报已入库 doc_id=000333_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-061",
+      "category": "numeric_financial",
+      "question": "格力电器2024年营业收入是多少",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        10,
+        25,
+        34,
+        198,
+        247
+      ],
+      "probe_keywords": [
+        "营业收入"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "营业收入",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-062",
+      "category": "numeric_financial",
+      "question": "格力电器2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        6,
+        10
+      ],
+      "probe_keywords": [
+        "归属于上市公司股东的净利润",
+        "归属于母公司所有者的净利润",
+        "净利润"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "主要会计数据",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-063",
+      "category": "numeric_financial",
+      "question": "格力电器2024年经营活动现金流量净额是多少",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        35
+      ],
+      "probe_keywords": [
+        "经营活动产生的现金流量净额"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "经营活动产生的现金流量净额",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-064",
+      "category": "numeric_financial",
+      "question": "格力电器2024年研发投入是多少",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        21,
+        34,
+        142,
+        31
+      ],
+      "probe_keywords": [
+        "研发投入",
+        "研发支出"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "研发投入",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-065",
+      "category": "numeric_ratio",
+      "question": "格力电器2024年空调业务或家用空调收入",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        10,
+        11,
+        13,
+        14,
+        21
+      ],
+      "probe_keywords": [
+        "空调",
+        "家用空调"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "空调",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-066",
+      "category": "numeric_ratio",
+      "question": "格力电器2024年资产负债率是多少",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        106,
+        117
+      ],
+      "probe_keywords": [
+        "资产负债率",
+        "资产负债",
+        "负债合计",
+        "资产总计"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "资产负债表",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-067",
+      "category": "product_enum",
+      "question": "格力电器2024年推出了哪些新产品",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        12,
+        14,
+        15,
+        22,
+        23
+      ],
+      "probe_keywords": [
+        "推出",
+        "发布",
+        "新品"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "推出",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-068",
+      "category": "product_enum",
+      "question": "格力电器2024年工业制品或装备业务",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        43,
+        235,
+        10,
+        12,
+        22
+      ],
+      "probe_keywords": [
+        "工业制品",
+        "装备"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "工业制品",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-069",
+      "category": "segment_business",
+      "question": "格力电器2024年分产品收入构成",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        10,
+        25
+      ],
+      "probe_keywords": [
+        "分产品",
+        "分行业",
+        "消费领域",
+        "空调"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "管理层讨论",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-070",
+      "category": "segment_business",
+      "question": "格力电器2024年国内外销售比例",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        8,
+        20,
+        10,
+        17,
+        21
+      ],
+      "probe_keywords": [
+        "境内",
+        "境外",
+        "国内",
+        "国外"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "境内",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-071",
+      "category": "compliance_risk",
+      "question": "格力电器2024年内部控制评价",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        44,
+        45,
+        61,
+        62,
+        82
+      ],
+      "probe_keywords": [
+        "内部控制"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "内部控制",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-072",
+      "category": "compliance_risk",
+      "question": "格力电器2024年关联交易披露",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        85,
+        226,
+        227,
+        84,
+        229
+      ],
+      "probe_keywords": [
+        "关联交易"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "关联交易",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-073",
+      "category": "governance",
+      "question": "格力电器2024年分红派息方案",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        2,
+        59,
+        60,
+        233,
+        125
+      ],
+      "probe_keywords": [
+        "利润分配",
+        "派息",
+        "分红"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "利润分配",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-074",
+      "category": "governance",
+      "question": "格力电器2024年股份回购进展",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        59,
+        60,
+        95,
+        103,
+        131
+      ],
+      "probe_keywords": [
+        "回购"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "回购",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-075",
+      "category": "esg_sustainability",
+      "question": "格力电器2024年绿色制造或节能产品",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        13,
+        15,
+        24,
+        52,
+        71
+      ],
+      "probe_keywords": [
+        "绿色",
+        "节能"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "绿色",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-076",
+      "category": "esg_sustainability",
+      "question": "格力电器2024年公益慈善或社会责任",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        63,
+        72
+      ],
+      "probe_keywords": [
+        "公益",
+        "社会责任"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "公益",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-077",
+      "category": "strategy_outlook",
+      "question": "格力电器2024年多元化或工业领域战略",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        10,
+        11,
+        21,
+        12,
+        15
+      ],
+      "probe_keywords": [
+        "多元化",
+        "工业"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "多元化",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-078",
+      "category": "strategy_outlook",
+      "question": "格力电器2024年渠道变革或数字化营销",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        12,
+        13,
+        23,
+        20,
+        24
+      ],
+      "probe_keywords": [
+        "渠道",
+        "数字化"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "渠道",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-079",
+      "category": "cross_year_compare",
+      "question": "格力电器2024年营业收入同比变化",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        10,
+        12,
+        13,
+        24,
+        25
+      ],
+      "probe_keywords": [
+        "营业收入",
+        "同比"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "营业收入",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-080",
+      "category": "cross_year_compare",
+      "question": "格力电器2024年净利润同比变化",
+      "doc_id": "000651_2024",
+      "company_code": "000651",
+      "company_name": "格力电器",
+      "report_year": 2024,
+      "gold_pages": [
+        13,
+        35,
+        7,
+        8,
+        10
+      ],
+      "probe_keywords": [
+        "净利润",
+        "同比"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "净利润",
+      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-081",
+      "category": "numeric_financial",
+      "question": "三一重工2024年营业收入是多少",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        16,
+        177,
+        238,
+        253
+      ],
+      "probe_keywords": [
+        "营业收入"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "营业收入",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-082",
+      "category": "numeric_financial",
+      "question": "三一重工2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        5,
+        6
+      ],
+      "probe_keywords": [
+        "归属于上市公司股东的净利润",
+        "净利润"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "主要会计数据",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-083",
+      "category": "numeric_financial",
+      "question": "三一重工2024年总资产是多少",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        8,
+        20
+      ],
+      "probe_keywords": [
+        "总资产"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "总资产",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-084",
+      "category": "numeric_financial",
+      "question": "三一重工2024年研发费用是多少",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        12,
+        120,
+        179,
+        192
+      ],
+      "probe_keywords": [
+        "研发费用",
+        "研发支出"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "研发费用",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-085",
+      "category": "numeric_ratio",
+      "question": "三一重工2024年挖掘机市占率或销量",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        8,
+        11,
+        12,
+        28,
+        10
+      ],
+      "probe_keywords": [
+        "挖掘机",
+        "市占率",
+        "销量"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "挖掘机",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-086",
+      "category": "numeric_ratio",
+      "question": "三一重工2024年海外主营业务毛利率",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        10,
+        8,
+        9,
+        13,
+        28
+      ],
+      "probe_keywords": [
+        "毛利率",
+        "海外"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "毛利率",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-087",
+      "category": "product_enum",
+      "question": "三一重工2024年推出了哪些新机型或新产品",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        11,
+        12,
+        14,
+        15,
+        57
+      ],
+      "probe_keywords": [
+        "推出",
+        "发布",
+        "新品"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "推出",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-088",
+      "category": "product_enum",
+      "question": "三一重工2024年电动化或新能源产品",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        8,
+        11,
+        12,
+        29,
+        13
+      ],
+      "probe_keywords": [
+        "电动",
+        "新能源"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "电动",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-089",
+      "category": "segment_business",
+      "question": "三一重工2024年海外收入或国际化进展",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        8,
+        9,
+        10,
+        13,
+        28
+      ],
+      "probe_keywords": [
+        "海外",
+        "国际化"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "海外",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-090",
+      "category": "segment_business",
+      "question": "三一重工2024年混凝土机械业务情况",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        8,
+        10,
+        13,
+        14,
+        28
+      ],
+      "probe_keywords": [
+        "混凝土"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "混凝土",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-091",
+      "category": "compliance_risk",
+      "question": "三一重工2024年内部控制评价",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        32,
+        47,
+        85,
+        86,
+        87
+      ],
+      "probe_keywords": [
+        "内部控制"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "内部控制",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-092",
+      "category": "compliance_risk",
+      "question": "三一重工2024年重大风险提示",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        2,
+        8,
+        9,
+        23,
+        29
+      ],
+      "probe_keywords": [
+        "风险"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "风险",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-093",
+      "category": "governance",
+      "question": "三一重工2024年利润分配预案",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        44,
+        45,
+        2,
+        118,
+        206
+      ],
+      "probe_keywords": [
+        "利润分配",
+        "分红"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "利润分配",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-094",
+      "category": "governance",
+      "question": "三一重工2024年董事及高管情况",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        2,
+        31,
+        32,
+        39,
+        40
+      ],
+      "probe_keywords": [
+        "董事",
+        "高级管理人员"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "董事",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-095",
+      "category": "esg_sustainability",
+      "question": "三一重工2024年安全生产或职业健康",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        126
+      ],
+      "probe_keywords": [
+        "安全生产",
+        "职业健康"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "安全生产",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-096",
+      "category": "esg_sustainability",
+      "question": "三一重工2024年绿色制造或减排",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        8,
+        29,
+        30,
+        11,
+        12
+      ],
+      "probe_keywords": [
+        "绿色",
+        "减排",
+        "碳"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "绿色",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-097",
+      "category": "strategy_outlook",
+      "question": "三一重工2024年全球化或国际化战略",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        8,
+        9,
+        12,
+        13,
+        21
+      ],
+      "probe_keywords": [
+        "全球化",
+        "国际化"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "全球化",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-098",
+      "category": "strategy_outlook",
+      "question": "三一重工2024年数字化转型",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        13,
+        8,
+        10,
+        11,
+        12
+      ],
+      "probe_keywords": [
+        "数字化",
+        "智能"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "数字化",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-099",
+      "category": "cross_year_compare",
+      "question": "三一重工2024年营业收入同比增长",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        8,
+        9,
+        12,
+        16,
+        177
+      ],
+      "probe_keywords": [
+        "营业收入",
+        "同比"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "营业收入",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    },
+    {
+      "id": "rag-100",
+      "category": "cross_year_compare",
+      "question": "三一重工2024年海外销售增长",
+      "doc_id": "600031_2024",
+      "company_code": "600031",
+      "company_name": "三一重工",
+      "report_year": 2024,
+      "gold_pages": [
+        8,
+        9,
+        12,
+        13,
+        28
+      ],
+      "probe_keywords": [
+        "海外",
+        "同比",
+        "增长"
+      ],
+      "grading": "page_hit_at_k",
+      "k": 12,
+      "evidence_hint": "海外",
+      "why_clean": "2024年报已入库 doc_id=600031_2024；gold page 由 doc_chunks 关键词探测"
+    }
+  ]
+}

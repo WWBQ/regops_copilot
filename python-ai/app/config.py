@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     rag_rerank_model: str = "BAAI/bge-reranker-v2-m3"
     rag_rerank_candidates: int = 80
     rag_max_chunks_per_page: int = 1
+    rag_trace_enabled: bool = True
+    eval_chat_base_url: str = "http://127.0.0.1:8000"
 
     model_config = SettingsConfigDict(
         # 本地：有 .env 就读文件

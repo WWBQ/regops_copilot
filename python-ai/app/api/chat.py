@@ -2,7 +2,7 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 
 from app.api.deps import get_document_service, get_settings_dep
 from app.config import Settings
@@ -51,6 +51,7 @@ async def chat(
     body: ChatRequest,
     settings: Annotated[Settings, Depends(get_settings_dep)],
     document_service: Annotated[DocumentService, Depends(get_document_service)],
+    x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None,
 ) -> ChatResponse:
     session_id = _valid_session_id(body.session_id)
     model_name = _resolve_model(body, settings)
@@ -84,11 +85,13 @@ async def chat(
                 rag_used=False,
             )
 
-        rag = prepare_chat_rag(
+        rag_result = prepare_chat_rag(
             session_id=session_id,
             question=body.message,
             document_service=document_service,
+            request_id=x_request_id,
         )
+        rag = rag_result.answer
         if rag is not None:
             messages = rag.messages
             citations = [

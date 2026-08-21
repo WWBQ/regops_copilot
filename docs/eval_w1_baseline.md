@@ -51,7 +51,7 @@ python eval/run_w1_chat.py --limit 3
 
 | 周次 | 新增黄金集 |
 |------|------------|
-| W2–W3 | RAG 检索集 80–100 条（带 evidence doc/page） |
+| W2–W3 | RAG 检索集 80–100 条（带 evidence doc/page） → **`eval/golden/rag_retrieval_100.json`** |
 | W4 | Text2SQL 问数 30 条 |
 | W6 | Agent 轨迹 20 条 |
 

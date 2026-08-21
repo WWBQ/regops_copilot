@@ -6,7 +6,8 @@
 |------|------|
 | `init_pgvector.sql` | 扩展 + `doc_chunks`（含 `source_type`） |
 | `w2_tables.sql` | W2：`pdf_document` / `web_document` / `ingest_job` / `fin_metric` + `doc_chunks` 补丁 |
-| `w2_parse_artifact.sql` | 增加 `parse_object_key` 列（解析 JSON 回溯） |
+| `w3_chat_sessions.sql` | W3：`chat_session` / `session_document` |
+| `w4_rag_query_log.sql` | W3：RAG 检索 trace 日志 `rag_query_log` |
 
 ## 新库（Docker 首次启动）
 
@@ -18,6 +19,7 @@
 docker compose exec db psql -U regops -d regops_db -f /docker-entrypoint-initdb.d/02_w2_tables.sql
 # 或本机：
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w2_tables.sql
+psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w4_rag_query_log.sql
 ```
 
 ## 验证

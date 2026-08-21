@@ -13,6 +13,7 @@ from app.main import app
 from app.models.base import ChatResult, LLMClient
 from app.rag.service import Citation as RagCitation
 from app.rag.service import RagAnswer
+from app.rag.trace import RagPrepareResult, RagTrace
 
 
 class FakeLLMClient(LLMClient):
@@ -151,7 +152,11 @@ async def test_chat_with_session_rag(client: AsyncClient):
     with patch("app.api.chat.session_exists", return_value=True), patch(
         "app.api.chat.list_session_documents", return_value=[]
     ), patch(
-        "app.api.chat.prepare_chat_rag", return_value=rag
+        "app.api.chat.prepare_chat_rag",
+        return_value=RagPrepareResult(
+            answer=rag,
+            trace=RagTrace(question="营收多少？", outcome="ok", rag_used=True),
+        ),
     ):
         chat = await client.post(
             "/chat",

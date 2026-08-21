@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import chat, documents, health, labeling, models, sessions, storage
+from app.api import chat, documents, eval_ops, health, labeling, models, ops, sessions, storage
 from app.logging_config import setup_logging
 
 
@@ -40,6 +40,8 @@ app.include_router(models.router)
 app.include_router(labeling.router)
 app.include_router(documents.router)
 app.include_router(storage.router)
+app.include_router(ops.router)
+app.include_router(eval_ops.router)
 
 
 @app.get("/")

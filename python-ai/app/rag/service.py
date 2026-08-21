@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from dataclasses import dataclass
 
+from app.config import get_settings
 from app.db.chunk_repository import ChunkHit, search_keyword_chunks, search_similar_chunks
 from app.db.connection import get_connection
 from app.db.pdf_document_repository import list_company_ready_doc_ids
+from app.db.rag_trace_repository import insert_rag_trace
 from app.db.session_repository import get_ready_doc_ids
 from app.documents.service import DocumentService
 from app.documents.titles import resolve_document_titles
-from app.config import get_settings
 from app.ingest.embeddings import embed_text
 from app.rag.company_scope import filter_doc_ids_for_question
 from app.rag.reranker import rerank_with_cross_encoder
@@ -23,6 +25,7 @@ from app.rag.retrieval import (
     hit_passes_relevance_threshold,
     reciprocal_rank_fusion,
 )
+from app.rag.trace import RagPrepareResult, RagTrace
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +36,6 @@ RAG_SYSTEM_PROMPT = (
     "不要单独列出「引用来源」或大段摘录；只在正文行内标注角标。"
 )
 
-# 寒暄/无实质问题时跳过 RAG，避免无关引用
 _CHITCHAT_RE = re.compile(
     r"^(?:你好|您好|嗨|hi|hello|hey|在吗|在不在|谢谢|多谢|感谢|再见|拜拜|"
     r"早上好|下午好|晚上好|ok|好的|嗯|哦|啊|呀|么|呢|介绍一下|你是谁|你能做什么|"
@@ -41,7 +43,6 @@ _CHITCHAT_RE = re.compile(
     re.IGNORECASE,
 )
 
-# 明显需要查文档/财务时才走 RAG（公司语料库）
 _RAG_INTENT_RE = re.compile(
     r"(?:营收|利润|净利|亏损|收入|成本|费用|负债|资产|现金流|市值|股息|分红|"
     r"研发|投入|"
@@ -58,14 +59,11 @@ _RAG_INTENT_RE = re.compile(
 
 
 def _normalize_question_for_intent(question: str) -> str:
-    """归一化空格/常见年份笔误，避免「2024 年」漏触发 RAG。"""
     text = re.sub(r"(\d+)\s+年", r"\1年", question.strip())
-    text = re.sub(r"024年", "2024年", text)
-    return text
+    return re.sub(r"024年", "2024年", text)
 
 
 def should_use_rag(question: str, *, session_has_ready_docs: bool = False) -> bool:
-    """仅在有文档检索意图，或会话内已上传 PDF 且问题足够具体时走 RAG。"""
     text = _normalize_question_for_intent(question)
     if not text:
         return False
@@ -104,7 +102,6 @@ class RagAnswer:
 
 
 def collect_rag_doc_ids(session_id: str | None) -> list[str]:
-    """会话上传 PDF 优先，再叠加公司年报库（pdf_document ready）。"""
     with get_connection() as conn:
         ordered: list[str] = []
         if session_id:
@@ -119,31 +116,60 @@ def collect_rag_doc_ids(session_id: str | None) -> list[str]:
     return unique
 
 
-def retrieve_hits_for_docs(
+def _max_vector_score(hits: list[ChunkHit]) -> float | None:
+    scores = [hit.vector_score for hit in hits if hit.vector_score is not None]
+    return max(scores) if scores else None
+
+
+def retrieve_hits_with_trace(
     *,
     question: str,
     doc_ids: list[str],
     top_k: int = 5,
-) -> list[ChunkHit]:
-    """Hybrid 检索：向量语义召回 + 问题词关键词召回，RRF 融合后取 top_k。"""
+) -> tuple[list[ChunkHit], dict]:
+    """Hybrid 检索并返回 pipeline 明细（供 trace 持久化）。"""
+    pipeline: dict = {
+        "top_k": top_k,
+        "vector_top": [],
+        "keyword_top": [],
+        "rerank_enabled": False,
+        "rerank_fallback": False,
+        "timing_ms": {},
+    }
     if not doc_ids:
-        return []
+        return [], pipeline
+
     settings = get_settings()
     vector_fetch_k = max(settings.rag_vector_fetch_k, top_k * 10)
     keyword_top_k = max(settings.rag_keyword_top_k, top_k * 3)
-
-    query_vector = embed_text(question)
     keyword_terms = extract_keyword_terms(question)
+    pipeline["keyword_terms"] = keyword_terms
+    pipeline["vector_fetch_k"] = vector_fetch_k
+    pipeline["keyword_top_k"] = keyword_top_k
+
+    t0 = time.perf_counter()
+    query_vector = embed_text(question)
+    pipeline["timing_ms"]["embed"] = round((time.perf_counter() - t0) * 1000, 2)
+
     with get_connection() as conn:
+        t1 = time.perf_counter()
         vector_hits = search_similar_chunks(conn, query_vector, doc_ids, top_k=vector_fetch_k)
-        keyword_hits = (
-            search_keyword_chunks(conn, doc_ids, keyword_terms, top_k=keyword_top_k)
-            if keyword_terms
-            else []
-        )
+        pipeline["timing_ms"]["vector_search"] = round((time.perf_counter() - t1) * 1000, 2)
+
+        keyword_hits: list[ChunkHit] = []
+        if keyword_terms:
+            t2 = time.perf_counter()
+            keyword_hits = search_keyword_chunks(
+                conn, doc_ids, keyword_terms, top_k=keyword_top_k
+            )
+            pipeline["timing_ms"]["keyword_search"] = round((time.perf_counter() - t2) * 1000, 2)
 
     vector_substantive = filter_substantive_hits(vector_hits)
     keyword_substantive = filter_substantive_hits(keyword_hits)
+    pipeline["vector_hit_count"] = len(vector_substantive)
+    pipeline["keyword_hit_count"] = len(keyword_substantive)
+    pipeline["vector_top"] = RagTrace.from_hits(vector_substantive, limit=5)
+    pipeline["keyword_top"] = RagTrace.from_hits(keyword_substantive, limit=5)
 
     if keyword_substantive:
         fused = reciprocal_rank_fusion(
@@ -156,26 +182,44 @@ def retrieve_hits_for_docs(
         fused = vector_substantive
 
     candidates = fused[: max(settings.rag_rerank_candidates, top_k)]
+    pipeline["rerank_enabled"] = settings.rag_rerank_enabled and bool(candidates)
+
     if settings.rag_rerank_enabled and candidates:
         try:
+            t3 = time.perf_counter()
             reranked = rerank_with_cross_encoder(
                 question,
                 candidates,
                 model_name=settings.rag_rerank_model,
                 top_k=len(candidates),
             )
-            return apply_page_diversity(
+            pipeline["timing_ms"]["rerank"] = round((time.perf_counter() - t3) * 1000, 2)
+            hits = apply_page_diversity(
                 reranked,
                 top_k=top_k,
                 max_per_page=settings.rag_max_chunks_per_page,
             )
+            return hits, pipeline
         except Exception:
+            pipeline["rerank_fallback"] = True
             logger.exception("cross-encoder rerank failed, falling back to RRF order")
-    return apply_page_diversity(
+
+    hits = apply_page_diversity(
         candidates,
         top_k=top_k,
         max_per_page=settings.rag_max_chunks_per_page,
     )
+    return hits, pipeline
+
+
+def retrieve_hits_for_docs(
+    *,
+    question: str,
+    doc_ids: list[str],
+    top_k: int = 5,
+) -> list[ChunkHit]:
+    hits, _ = retrieve_hits_with_trace(question=question, doc_ids=doc_ids, top_k=top_k)
+    return hits
 
 
 def build_rag_answer(
@@ -232,6 +276,20 @@ def build_rag_answer(
     return RagAnswer(messages=messages, citations=citations, doc_ids=doc_ids)
 
 
+def save_rag_trace(trace: RagTrace) -> int | None:
+    settings = get_settings()
+    if not settings.rag_trace_enabled:
+        return None
+    try:
+        with get_connection() as conn:
+            row_id = insert_rag_trace(conn, trace)
+            conn.commit()
+            return row_id
+    except Exception:
+        logger.exception("failed to persist rag trace outcome=%s", trace.outcome)
+        return None
+
+
 def prepare_chat_rag(
     *,
     session_id: str | None,
@@ -239,46 +297,83 @@ def prepare_chat_rag(
     document_service: DocumentService,
     top_k: int | None = None,
     min_score: float | None = None,
-) -> RagAnswer | None:
-    """统一 RAG：会话 PDF + 公司年报库；分数不达标则走普通对话。"""
-    from app.config import get_settings
-
-    if not should_use_rag(question, session_has_ready_docs=_session_has_ready_docs(session_id)):
-        logger.info("RAG skipped no-intent question_len=%d session_id=%s", len(question.strip()), session_id)
-        return None
-
+    request_id: str | None = None,
+    persist_trace: bool = True,
+) -> RagPrepareResult:
+    """统一 RAG：会话 PDF + 公司年报库；返回答案与 trace。"""
     settings = get_settings()
     resolved_top_k = top_k if top_k is not None else settings.rag_top_k
     resolved_min_score = min_score if min_score is not None else settings.rag_min_score
+    started = time.perf_counter()
+
+    trace = RagTrace(
+        question=question,
+        outcome="no_intent",
+        request_id=request_id,
+        session_id=session_id,
+        min_score_threshold=resolved_min_score,
+    )
+
+    if not should_use_rag(question, session_has_ready_docs=_session_has_ready_docs(session_id)):
+        logger.info("RAG skipped no-intent question_len=%d session_id=%s", len(question.strip()), session_id)
+        trace.outcome = "no_intent"
+        trace.total_rag_ms = round((time.perf_counter() - started) * 1000, 2)
+        if persist_trace:
+            save_rag_trace(trace)
+        return RagPrepareResult(answer=None, trace=trace)
 
     doc_ids = collect_rag_doc_ids(session_id)
     if not doc_ids:
-        return None
+        trace.outcome = "no_docs"
+        trace.total_rag_ms = round((time.perf_counter() - started) * 1000, 2)
+        if persist_trace:
+            save_rag_trace(trace)
+        return RagPrepareResult(answer=None, trace=trace)
 
     with get_connection() as conn:
         doc_ids = filter_doc_ids_for_question(conn, doc_ids, question)
+    trace.scoped_doc_ids = doc_ids
 
-    hits = retrieve_hits_for_docs(question=question, doc_ids=doc_ids, top_k=resolved_top_k)
+    hits, pipeline = retrieve_hits_with_trace(
+        question=question, doc_ids=doc_ids, top_k=resolved_top_k
+    )
+    trace.keyword_terms = pipeline.get("keyword_terms") or extract_keyword_terms(question)
+    trace.vector_hit_count = int(pipeline.get("vector_hit_count") or 0)
+    trace.keyword_hit_count = int(pipeline.get("keyword_hit_count") or 0)
+    trace.pipeline = pipeline
+
     relevant_hits = [hit for hit in hits if hit_passes_relevance_threshold(hit, resolved_min_score)]
+    trace.max_vector_score = _max_vector_score(hits)
+    trace.final_hit_count = len(relevant_hits)
+    trace.hits = RagTrace.from_hits(relevant_hits if relevant_hits else hits, limit=resolved_top_k)
+    trace.total_rag_ms = round((time.perf_counter() - started) * 1000, 2)
+
     if not relevant_hits:
         logger.info(
-            "RAG skipped session_id=%s question_len=%d max_score=%.3f threshold=%.3f",
+            "RAG skipped session_id=%s question_len=%d max_vector=%s threshold=%.3f",
             session_id,
             len(question),
-            hits[0].score if hits else 0.0,
+            trace.max_vector_score,
             resolved_min_score,
         )
-        return None
+        trace.outcome = "low_score"
+        if persist_trace:
+            save_rag_trace(trace)
+        return RagPrepareResult(answer=None, trace=trace)
 
-    return build_rag_answer(
+    answer = build_rag_answer(
         question=question,
         hits=relevant_hits,
         doc_ids=doc_ids,
         document_service=document_service,
     )
+    trace.outcome = "ok"
+    trace.rag_used = True
+    if persist_trace:
+        save_rag_trace(trace)
+    return RagPrepareResult(answer=answer, trace=trace)
 
 
-# 兼容旧名
 def prepare_session_rag(
     *,
     session_id: str,
@@ -286,7 +381,7 @@ def prepare_session_rag(
     document_service: DocumentService,
     top_k: int | None = None,
     min_score: float | None = None,
-) -> RagAnswer | None:
+) -> RagPrepareResult:
     return prepare_chat_rag(
         session_id=session_id,
         question=question,

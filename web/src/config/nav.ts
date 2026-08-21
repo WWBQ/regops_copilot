@@ -44,10 +44,11 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'ops',
     label: '运维监控',
     items: [
-      { id: 'ingest-monitor', label: '解析监控', path: '/ops/ingest', phase: 'W2-5' },
-      { id: 'logs', label: '日志监控', path: '/ops/logs', phase: 'W2+' },
-      { id: 'health', label: '系统健康', path: '/ops/health', phase: 'W1' },
-      { id: 'eval', label: '评估报告', path: '/ops/eval', phase: 'W1-4' },
+      { id: 'ingest-monitor', label: '解析监控', path: '/ops/ingest', phase: 'W2-5', enabled: true },
+      { id: 'rag-monitor', label: 'RAG 检索监控', path: '/ops/rag', phase: 'W3', enabled: true },
+      { id: 'logs', label: '日志监控', path: '/ops/logs', phase: 'W2+', enabled: true },
+      { id: 'health', label: '系统健康', path: '/ops/health', phase: 'W1', enabled: true },
+      { id: 'eval', label: '评估报告', path: '/ops/eval', phase: 'W1-4', enabled: true },
     ],
   },
 ]
@@ -65,9 +66,16 @@ export const PLACEHOLDER_PAGES: Record<
   'ingest-monitor': {
     title: '解析监控',
     summary:
-      'Docling 解析进度、页数/表格统计、ingest_job 失败重试与 content_hash 去重。批量入库走 CLI，会话上传在合规问答。',
-    backend: 'ingest_job + parser/cleaner 指标',
+      'Docling 解析进度、页数/chunk 统计、ingest_job 与会话上传状态；批量入库走 CLI，会话上传在合规问答。',
+    backend: 'GET /api/ops/ingest/overview',
     phase: 'W2-5',
+  },
+  'rag-monitor': {
+    title: 'RAG 检索监控',
+    summary:
+      '每次问答的 Hybrid 检索 trace：关键词、向量/关键词召回、RRF、精排、最终 top-k 片段与 skip 原因。',
+    backend: 'GET /api/ops/rag-traces',
+    phase: 'W3',
   },
   'quality-gates': {
     title: '质量门 G1/G2/G3',
@@ -104,19 +112,20 @@ export const PLACEHOLDER_PAGES: Record<
   },
   logs: {
     title: '日志监控',
-    summary: 'ingest / chat / RAG / Agent 结构化日志与错误聚合。',
+    summary: 'ingest 失败、会话上传异常、RAG 非成功 trace 的结构化事件聚合。',
+    backend: 'GET /api/ops/logs/events',
     phase: 'W2+',
   },
   health: {
     title: '系统健康',
-    summary: 'python-ai、java-service、PostgreSQL、pgvector 探活。',
-    backend: '/health',
+    summary: 'Java / Python / PostgreSQL / pgvector 探活，语料库、入库任务、RAG trace 与配置概览。',
+    backend: 'GET /api/ops/system/overview',
     phase: 'W1',
   },
   eval: {
     title: '评估报告',
-    summary: 'W1 chat 黄金集、W2 检索集回归报告。',
-    backend: 'eval/run_w1_chat.py',
+    summary: '选择评测任务（W1 聊天 / RAG 检索），一键运行并查看 Recall@k、准确率与明细。',
+    backend: 'POST /api/ops/eval/runs',
     phase: 'W1-4',
   },
   settings: {

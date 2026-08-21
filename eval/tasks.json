@@ -1,0 +1,30 @@
+{
+  "version": "eval-tasks-v1",
+  "tasks": [
+    {
+      "id": "w1_chat",
+      "name": "W1 聊天评测",
+      "description": "30 题：15 制度条款理解 + 15 财报数字提取（/chat 端到端）",
+      "golden_file": "w1_chat_30.json",
+      "runner": "w1_chat",
+      "metrics": [
+        "accuracy",
+        "number_error_rate",
+        "latency_p50_ms"
+      ],
+      "builtin": true
+    },
+    {
+      "id": "rag_retrieval",
+      "name": "RAG 检索评测",
+      "description": "100 题：Hybrid 检索 page 粒度 Recall@k / MRR",
+      "golden_file": "rag_retrieval_100.json",
+      "runner": "rag_retrieval",
+      "metrics": [
+        "recall_at_k",
+        "mrr"
+      ],
+      "builtin": true
+    }
+  ]
+}

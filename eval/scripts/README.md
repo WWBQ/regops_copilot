@@ -9,3 +9,5 @@
 - 下载后放本地 `.gitignore` 目录或机器缓存
 
 待 Day 6 补充：`download_cflue.sh`、`download_fineval.sh` 等。
+
+RAG 检索集生成：`python-ai/.venv/bin/python eval/scripts/build_rag_retrieval_golden.py`
