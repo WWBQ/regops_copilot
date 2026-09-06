@@ -14,6 +14,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(ToolAccessException.class)
+    public ResponseEntity<ApiError> handleToolAccess(ToolAccessException ex) {
+        return ResponseEntity.status(ex.getStatus())
+                .body(new ApiError(ex.getMessage(), Map.of("error_code", ex.getErrorCode())));
+    }
+
     @ExceptionHandler(PythonAiException.class)
     public ResponseEntity<ApiError> handlePythonAi(PythonAiException ex) {
         HttpStatus status = HttpStatus.resolve(ex.getStatusCode());

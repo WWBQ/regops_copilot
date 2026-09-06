@@ -25,6 +25,9 @@ regops:
     base-url: ${REGOPS_PYTHON_AI_BASE_URL:http://localhost:8000}
     connect-timeout-ms: 5000
     read-timeout-ms: 120000
+    service-name: java-service
+    service-token: ${REGOPS_SERVICE_TOKEN:dev-service-token}
+    read-retry-count: 2
 
 management:
   endpoints:

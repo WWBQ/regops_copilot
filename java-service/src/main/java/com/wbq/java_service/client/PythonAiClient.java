@@ -3,6 +3,7 @@ package com.wbq.java_service.client;
 import java.util.List;
 import java.util.Map;
 
+import com.wbq.java_service.config.AppProperties;
 import com.wbq.java_service.dto.chat.ChatRequest;
 import com.wbq.java_service.dto.chat.ChatResponse;
 import com.wbq.java_service.dto.documents.ViewerUrlResponse;
@@ -12,6 +13,7 @@ import com.wbq.java_service.dto.sessions.SessionDocumentResponse;
 import com.wbq.java_service.dto.sessions.SessionDocumentUploadResponse;
 import com.wbq.java_service.exception.PythonAiException;
 import com.wbq.java_service.filter.RequestIdFilter;
+import com.wbq.java_service.util.ReadRetry;
 
 import org.slf4j.MDC;
 import org.springframework.core.ParameterizedTypeReference;
@@ -39,9 +41,35 @@ public class PythonAiClient {
             };
 
     private final RestClient restClient;
+    private final AppProperties properties;
 
-    public PythonAiClient(RestClient pythonRestClient) {
+    public PythonAiClient(RestClient pythonRestClient, AppProperties properties) {
         this.restClient = pythonRestClient;
+        this.properties = properties;
+    }
+
+    public Map<String, Object> invokeTool(
+            String name,
+            Map<String, Object> arguments,
+            String dept,
+            String backend
+    ) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("name", name);
+        body.put("arguments", arguments == null ? Map.of() : arguments);
+        if (dept != null && !dept.isBlank()) {
+            body.put("dept", dept);
+        }
+        if (backend != null && !backend.isBlank()) {
+            body.put("backend", backend);
+        }
+        return exchangeRead(() -> restClient.post()
+                .uri("/tools/invoke")
+                .headers(headers -> forwardOutboundHeaders(headers, dept))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(MAP_TYPE));
     }
 
     public Map<String, Object> health() {
@@ -561,10 +589,29 @@ public class PythonAiClient {
     }
 
     private void forwardRequestId(org.springframework.http.HttpHeaders headers) {
+        forwardOutboundHeaders(headers, null);
+    }
+
+    private void forwardOutboundHeaders(org.springframework.http.HttpHeaders headers, String dept) {
         String requestId = MDC.get(RequestIdFilter.MDC_KEY);
         if (requestId != null && !requestId.isBlank()) {
             headers.set(RequestIdFilter.HEADER, requestId);
         }
+        var python = properties.pythonAi();
+        if (python.serviceName() != null && !python.serviceName().isBlank()) {
+            headers.set("X-Regops-Service", python.serviceName());
+        }
+        if (python.serviceToken() != null && !python.serviceToken().isBlank()) {
+            headers.set("X-Regops-Service-Token", python.serviceToken());
+        }
+        if (dept != null && !dept.isBlank()) {
+            headers.set("X-Regops-Dept", dept);
+        }
+        headers.remove(HttpHeaders.AUTHORIZATION);
+    }
+
+    private <T> T exchangeRead(RestClientSupplier<T> supplier) {
+        return ReadRetry.call(properties.pythonAi().resolvedReadRetryCount(), () -> exchange(supplier));
     }
 
     private <T> T exchange(RestClientSupplier<T> supplier) {

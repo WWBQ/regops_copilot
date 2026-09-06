@@ -17,6 +17,8 @@ RegOps Copilot 的 Java BFF / 业务网关（Spring Boot 3 + Java 21）。
 - `GET /api/documents/{docId}/viewer-url` — 转发文档预签名（W7 加鉴权）
 - `/api/labeling/**` — 转发 python-ai 数据标注（任务、模板、导出、PDF/HTML）
 - `X-Request-ID` — 全链路关联 ID
+- `/api/tools/**` — 只读金融工具（部门隔离）；不代理 RAG；写草稿拒绝
+- Java → Python 带服务身份（`X-Regops-Service` / Token），不转发用户 `Authorization`
 
 ## 本地启动
 
@@ -58,10 +60,13 @@ curl -X POST http://localhost:8080/api/chat \
 ```
 src/main/java/com/wbq/java_service/
 ├── config/          # Security、CORS、RestClient
-├── controller/      # BFF REST
-├── client/          # python-ai HTTP 客户端
+├── controller/      # BFF REST（含 /api/tools）
+├── service/         # 只读金融工具编排
+├── tools/           # 部门 ACL、能力树
+├── client/          # python-ai HTTP 客户端（服务身份 + 读重试）
 ├── dto/             # 请求/响应模型
 ├── filter/          # X-Request-ID
+├── util/            # PII 脱敏、读重试
 └── exception/       # 统一错误格式（detail 字段，对齐 FastAPI）
 ```
 

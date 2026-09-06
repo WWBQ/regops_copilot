@@ -263,6 +263,44 @@ def list_all_for_gates(conn: psycopg.Connection) -> list[FinMetricRow]:
         return [_row_from_db(row) for row in cur.fetchall()]
 
 
+def list_metric_coverage(
+    conn: psycopg.Connection,
+    *,
+    company_code: str | None = None,
+    year: int | None = None,
+    scope: str | None = None,
+    accepted_only: bool = True,
+) -> list[tuple[str, int, str, str]]:
+    """覆盖面：(company_code, year, scope, concept)。供 list_scope 工具。"""
+    clauses = ["company_code IS NOT NULL"]
+    params: list[Any] = []
+    if company_code:
+        clauses.append("company_code = %s")
+        params.append(company_code)
+    if year is not None:
+        clauses.append("EXTRACT(YEAR FROM period) = %s")
+        params.append(year)
+    if scope:
+        clauses.append("scope = %s")
+        params.append(scope)
+    if accepted_only:
+        clauses.append("status = 'auto_accepted'")
+        clauses.append("value_yuan IS NOT NULL")
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT company_code, EXTRACT(YEAR FROM period)::int AS y, scope, concept "
+            f"FROM fin_metric WHERE {' AND '.join(clauses)} "
+            "GROUP BY company_code, y, scope, concept "
+            "ORDER BY company_code, y DESC, scope, concept",
+            params,
+        )
+        return [
+            (str(row[0]), int(row[1]), str(row[2]), str(row[3]))
+            for row in cur.fetchall()
+            if row[0] is not None and row[1] is not None
+        ]
+
+
 def serialize_metric(row: FinMetricRow) -> dict[str, Any]:
     return {
         "id": row.id,

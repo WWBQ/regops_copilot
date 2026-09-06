@@ -82,7 +82,35 @@ curl -s -X POST http://localhost:8000/chat \
 
 # 5. 跑一次合规结论 Schema 校验评测（不依赖 LLM，纯本地）
 python-ai/.venv/bin/python eval/run_compliance_schema.py
+
+# 6. W5 工具目录 / 自省 / MCP（未接入 /chat 循环）
+curl -s http://localhost:8000/tools
+curl -s http://localhost:8000/tools/capabilities
+curl -s -X POST http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+# 7. Java 只读金融工具（必须带部门）
+curl -s http://localhost:8080/api/tools/capabilities
+curl -s -X POST http://localhost:8080/api/tools/lookup \
+  -H 'Content-Type: application/json' -H 'X-Regops-Dept: research' \
+  -d '{"company_code":"002594","concept":"revenue","year":2024,"backend":"mock"}'
 ```
+
+## Agent 友好度自评（w5-6）
+
+量表来自公开金融数据工具的常见实践，不是本项目原创。诚实标缺项。
+
+| 维度 | 优先级 | 现状 | 说明 |
+|---|---|---|---|
+| 非交互 | P0 | 达标 | HTTP / MCP 不暂停等人；缺数直接 `ok=false` |
+| 结构化输出 | P0 | 达标 | `ToolInvokeResponse` 字段稳定；结论走 JSON Schema |
+| 分级退出码 | P1 | 部分 | 用稳定 `error_code`（`missing` / `unauthorized` / `timeout` / `forbidden_write`），不是进程退出码。Java 鉴权是 HTTP 403，业务缺数仍是 200 |
+| 渐进帮助 | P1 | 部分 | `GET /tools` 精简目录，`/tools/schema/{name}` 给完整参数；没有 CLI `--help-full` |
+| dry-run | P1 | 部分 | `create_review_draft` 只拒绝、不落库，没有「将要写入什么」的预演载荷 |
+| 契约自省 | P1 | 达标 | `GET /tools/capabilities` 与 `GET /api/tools/capabilities` |
+
+行业里普遍有命令清单，少有自省，输出 Schema 强制校验更少。本仓库 `emit_conclusion` 不合规直接拒绝，见 [`docs/AGENT_RULES.md`](./docs/AGENT_RULES.md)。
 
 评测报告落在 `eval/reports/<任务>/<时间戳>/`，含 `report.json` 与 `report.md`。
 基线与口径说明见 [`docs/eval_w1_baseline.md`](./docs/eval_w1_baseline.md)、

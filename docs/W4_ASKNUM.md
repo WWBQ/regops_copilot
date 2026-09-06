@@ -28,7 +28,7 @@ docker compose exec -T db psql -U regops -d regops_db -f /docker-entrypoint-init
 
 ## `lookup_metric`
 
-W6 Agent 应调用这个函数，不要自己拼 SQL：
+W6 Agent 应通过 W5 工具 `lookup_metric` 调用这个函数，不要自己拼 SQL：
 
 ```python
 from app.asknum import lookup_metric

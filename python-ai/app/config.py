@@ -2,6 +2,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -36,6 +37,11 @@ class Settings(BaseSettings):
     rag_max_chunks_per_page: int = 1
     rag_trace_enabled: bool = True
     eval_chat_base_url: str = "http://127.0.0.1:8000"
+    tool_backend: str = "live"
+    service_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("REGOPS_SERVICE_TOKEN", "SERVICE_TOKEN"),
+    )
 
     model_config = SettingsConfigDict(
         # 本地：有 .env 就读文件
@@ -43,6 +49,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         # 环境变量优先于 .env（Docker 注入会走这里）
         extra="ignore",
+        populate_by_name=True,
     )
 
 

@@ -35,7 +35,7 @@ flowchart LR
 | RAG 检索、重排、引用、拒答 | **python-ai** | `app/rag/` |
 | 文档解析与入库 | **python-ai** | `app/ingest/`、`app/documents/` |
 | 评测任务与报告 | **python-ai** | `app/eval/` |
-| 问数（受控 lookup） / Agent | **python-ai** | W4：`app/asknum/` 已接 `/chat`；W6 多步仍走同一助手，不另开对话页 |
+| 问数（受控 lookup） / Agent | **python-ai** | W4：`app/asknum/` 已接 `/chat`；W5：`app/tools/` 合同（Function Calling）；W6 多步仍走同一助手，不另开对话页 |
 | 认证、RBAC、部门数据权限 | **java-service** | 当前仍是 Spring Security 开发默认配置，正式鉴权在 **W7** |
 | maker-checker 复核、审计留痕 | **java-service** | **W7 占位**，尚未实现 |
 | 对外 API 聚合与错误归一 | **java-service** | `controller/*ProxyController` + `GlobalExceptionHandler` |
@@ -221,10 +221,13 @@ Schema 校验失败（422）时 `detail` 是数组，元素含 `type`/`loc`/`msg
 | 分组 | 端点 |
 |------|------|
 | 基础 | `GET /`、`GET /health`、`GET /models`、`POST /chat` |
+| 工具合同 | `GET /tools`、`GET /tools/capabilities`、`GET /tools/schema/{name}`、`POST /tools/invoke`（`backend=mock` 可回放） |
+| MCP | `POST /mcp`（JSON-RPC：`initialize` / `tools/list` / `tools/call`） |
 | 文档 | `GET /documents`、`POST /documents/upload`、`GET /documents/{doc_id}`、`GET /documents/{doc_id}/content`、`GET /documents/{doc_id}/viewer-url`、`POST /documents/citation/viewer-url` |
 | 会话 | `POST /sessions`、`GET|POST /sessions/{session_id}/documents`、`GET /sessions/{session_id}/documents/{doc_id}` |
 | 标注 | `GET|POST /labeling/tasks`、`GET /labeling/tasks/{task_id}`、`GET /labeling/tasks/{task_id}/export`、`GET|POST /labeling/tasks/{task_id}/items/{idx}`、`GET /labeling/template` 等 |
 | 运维观测 | `GET /ops/system/overview`、`GET /ops/rag/overview`、`GET /ops/rag-traces`、`GET /ops/rag-traces/{trace_id}`、`GET /ops/asknum-traces`、`GET /ops/asknum-traces/{trace_id}`、`GET /ops/ingest/overview`、`GET /ops/ingest/jobs`、`GET /ops/ingest/session-documents`、`GET /ops/logs/events` |
+| 质量 | `GET /ops/quality/gates`、`GET /ops/quality/facts`、`POST /ops/quality/ingest` |
 | 评测 | `GET|POST /ops/eval/tasks`、`DELETE /ops/eval/tasks/{task_id}`、`GET /ops/eval/golden-sets`、`POST /ops/eval/golden-sets/upload`、`GET|POST /ops/eval/runs`、`GET|DELETE /ops/eval/runs/{run_id}` |
 | 存储 | `GET /storage/objects/{bucket}/{key}`（签名 URL 访问） |
 
@@ -234,6 +237,7 @@ Schema 校验失败（422）时 `detail` 是数组，元素含 `type`/`loc`/`msg
 |-----------|------|------|
 | `HealthController` | `/api` | `GET /health` |
 | `AiProxyController` | `/api` | `GET /models`、`POST /chat` |
+| `ToolController` | `/api/tools` | `GET /capabilities`、`GET /schema/{name}`、`POST /lookup`、`/compare`、`/scope`、`/verify`、`/review-draft`、`/invoke`（部门隔离；不代理 RAG） |
 | `DocumentProxyController` | `/api/documents` | `GET /{docId}/viewer-url`、`GET /{docId}/content` |
 | `SessionProxyController` | `/api/sessions` | `POST ""`、`GET /{sessionId}/documents`、`POST /{sessionId}/documents`（multipart）、`GET /{sessionId}/documents/{docId}` |
 | `OpsProxyController` | `/api/ops` | `GET /rag/overview`、`/rag-traces`、`/rag-traces/{traceId}`、`/asknum-traces`、`/asknum-traces/{traceId}`、`/system/overview`、`/ingest/overview`、`/ingest/jobs`、`/ingest/session-documents`、`/logs/events` |
@@ -254,3 +258,5 @@ Schema 校验失败（422）时 `detail` 是数组，元素含 `type`/`loc`/`msg
 - 数据来源与使用边界：[`DATA_SOURCES.md`](./DATA_SOURCES.md)
 - W1 评测基线：[`eval_w1_baseline.md`](./eval_w1_baseline.md)
 - 入库校验规则：[`INGEST_VALIDATION.md`](./INGEST_VALIDATION.md)
+- W4 问数：[`W4_ASKNUM.md`](./W4_ASKNUM.md)
+- W5 工具合同：[`W5_TOOLS.md`](./W5_TOOLS.md)
