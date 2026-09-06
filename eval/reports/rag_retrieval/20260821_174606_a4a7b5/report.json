@@ -1,0 +1,2986 @@
+{
+  "task_id": "rag_retrieval",
+  "generated_at": "2026-08-21T09:58:11.425410+00:00",
+  "golden_version": "rag-retrieval-v1",
+  "golden_file": "rag_retrieval_100.json",
+  "params": {
+    "limit": 0,
+    "category": null,
+    "top_k": 12
+  },
+  "summary": {
+    "count": 100,
+    "recall_at_k": 0.82,
+    "mrr": 0.5303,
+    "by_category": {
+      "numeric_financial": {
+        "recall_at_k": 0.619,
+        "mrr": 0.3755,
+        "count": 21
+      },
+      "numeric_ratio": {
+        "recall_at_k": 0.9,
+        "mrr": 0.5587,
+        "count": 10
+      },
+      "product_enum": {
+        "recall_at_k": 1.0,
+        "mrr": 0.5283,
+        "count": 10
+      },
+      "segment_business": {
+        "recall_at_k": 1.0,
+        "mrr": 0.5683,
+        "count": 10
+      },
+      "compliance_risk": {
+        "recall_at_k": 0.6,
+        "mrr": 0.385,
+        "count": 10
+      },
+      "governance": {
+        "recall_at_k": 0.8,
+        "mrr": 0.6433,
+        "count": 10
+      },
+      "esg_sustainability": {
+        "recall_at_k": 0.8,
+        "mrr": 0.6125,
+        "count": 10
+      },
+      "strategy_outlook": {
+        "recall_at_k": 0.8889,
+        "mrr": 0.7315,
+        "count": 9
+      },
+      "cross_year_compare": {
+        "recall_at_k": 1.0,
+        "mrr": 0.56,
+        "count": 10
+      }
+    }
+  },
+  "results": [
+    {
+      "id": "rag-001",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年营业收入是多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        10,
+        11,
+        24,
+        25,
+        34
+      ],
+      "retrieved_pages": [
+        137,
+        110,
+        112,
+        109,
+        111,
+        199,
+        10,
+        273,
+        269,
+        272,
+        287,
+        223
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.1429,
+      "top_k": 12
+    },
+    {
+      "id": "rag-002",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        11
+      ],
+      "retrieved_pages": [
+        248,
+        110,
+        11,
+        111,
+        112,
+        236,
+        269,
+        109,
+        227,
+        147,
+        125,
+        144
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.3333,
+      "top_k": 12
+    },
+    {
+      "id": "rag-003",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年末总资产是多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        11,
+        41,
+        138,
+        277
+      ],
+      "retrieved_pages": [
+        110,
+        112,
+        109,
+        137,
+        248,
+        199,
+        223,
+        138,
+        265,
+        111,
+        269,
+        11
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.125,
+      "top_k": 12
+    },
+    {
+      "id": "rag-004",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年经营活动产生的现金流量净额是多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        11,
+        34,
+        149,
+        155,
+        157
+      ],
+      "retrieved_pages": [
+        149,
+        239,
+        155,
+        156,
+        110,
+        34,
+        112,
+        35,
+        137,
+        11,
+        157,
+        109
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-005",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年研发投入约为多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        3,
+        14,
+        23,
+        27,
+        34
+      ],
+      "retrieved_pages": [
+        3,
+        98,
+        34,
+        110,
+        97,
+        112,
+        14,
+        111,
+        245,
+        109,
+        266,
+        269
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-006",
+      "category": "numeric_ratio",
+      "question": "比亚迪2024年汽车业务毛利率是多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        213,
+        2,
+        3,
+        4,
+        9
+      ],
+      "retrieved_pages": [
+        112,
+        110,
+        111,
+        186,
+        109,
+        185,
+        26,
+        272,
+        137,
+        15,
+        35,
+        70
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-007",
+      "category": "numeric_ratio",
+      "question": "比亚迪2024年加权平均净资产收益率ROE是多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        11
+      ],
+      "retrieved_pages": [
+        111,
+        112,
+        110,
+        266,
+        289,
+        109,
+        11,
+        186,
+        248,
+        236,
+        223,
+        70
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.1429,
+      "top_k": 12
+    },
+    {
+      "id": "rag-008",
+      "category": "product_enum",
+      "question": "比亚迪2024年推出了哪些新车型或新产品",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        29,
+        3,
+        13,
+        15,
+        16
+      ],
+      "retrieved_pages": [
+        31,
+        30,
+        29,
+        16,
+        15,
+        28,
+        32,
+        1,
+        98,
+        24,
+        67,
+        3
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.3333,
+      "top_k": 12
+    },
+    {
+      "id": "rag-009",
+      "category": "product_enum",
+      "question": "比亚迪2024年新能源汽车销量是多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        3,
+        15,
+        49,
+        2,
+        13
+      ],
+      "retrieved_pages": [
+        110,
+        112,
+        111,
+        109,
+        15,
+        284,
+        1,
+        283,
+        265,
+        23,
+        98,
+        22
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.2,
+      "top_k": 12
+    },
+    {
+      "id": "rag-010",
+      "category": "segment_business",
+      "question": "比亚迪2024年境外收入占比或境外业务情况",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        127,
+        185,
+        3,
+        11,
+        13
+      ],
+      "retrieved_pages": [
+        35,
+        112,
+        111,
+        186,
+        1,
+        110,
+        272,
+        185,
+        109,
+        273,
+        97,
+        248
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.125,
+      "top_k": 12
+    },
+    {
+      "id": "rag-011",
+      "category": "segment_business",
+      "question": "比亚迪2024年分产品或分行业收入结构",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        25,
+        24
+      ],
+      "retrieved_pages": [
+        186,
+        272,
+        111,
+        110,
+        112,
+        1,
+        109,
+        24,
+        273,
+        229,
+        137,
+        284
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.125,
+      "top_k": 12
+    },
+    {
+      "id": "rag-012",
+      "category": "compliance_risk",
+      "question": "比亚迪2024年内部控制评价报告结论",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        72,
+        50,
+        65,
+        71,
+        73
+      ],
+      "retrieved_pages": [
+        72,
+        97,
+        71,
+        96,
+        68,
+        111,
+        117,
+        140,
+        112,
+        67,
+        137,
+        110
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-013",
+      "category": "compliance_risk",
+      "question": "比亚迪年报第一节披露了哪些主要风险",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        5
+      ],
+      "retrieved_pages": [
+        97,
+        138,
+        140,
+        72,
+        100,
+        24,
+        111,
+        67,
+        10,
+        5,
+        157,
+        139
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.1,
+      "top_k": 12
+    },
+    {
+      "id": "rag-014",
+      "category": "governance",
+      "question": "比亚迪2024年利润分配预案或分红方案",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        69,
+        48,
+        49,
+        65,
+        68
+      ],
+      "retrieved_pages": [
+        69,
+        269,
+        111,
+        186,
+        5,
+        112,
+        110,
+        270,
+        109,
+        49,
+        272,
+        67
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-015",
+      "category": "governance",
+      "question": "比亚迪2024年董事会成员有哪些",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        55,
+        57,
+        2,
+        3,
+        9
+      ],
+      "retrieved_pages": [
+        57,
+        290,
+        70,
+        61,
+        58,
+        60,
+        59,
+        55,
+        65,
+        270,
+        5,
+        64
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-016",
+      "category": "esg_sustainability",
+      "question": "比亚迪2024年碳排放或温室气体排放披露",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        97
+      ],
+      "retrieved_pages": [
+        97,
+        112,
+        110,
+        111,
+        109,
+        1,
+        85,
+        88,
+        80,
+        96,
+        94,
+        79
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-017",
+      "category": "esg_sustainability",
+      "question": "比亚迪2024年绿色低碳或ESG方面有哪些举措",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        43,
+        13,
+        14,
+        21,
+        42
+      ],
+      "retrieved_pages": [
+        97,
+        96,
+        67,
+        98,
+        28,
+        32,
+        15,
+        21,
+        1,
+        68,
+        186,
+        30
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.125,
+      "top_k": 12
+    },
+    {
+      "id": "rag-018",
+      "category": "strategy_outlook",
+      "question": "比亚迪2024年发展战略或经营计划",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        33,
+        42,
+        48
+      ],
+      "retrieved_pages": [
+        97,
+        186,
+        67,
+        98,
+        96,
+        1,
+        24,
+        15,
+        68,
+        30,
+        4,
+        122
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-019",
+      "category": "cross_year_compare",
+      "question": "比亚迪2024年营业收入同比增长率是多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        2,
+        3,
+        10,
+        11,
+        13
+      ],
+      "retrieved_pages": [
+        137,
+        112,
+        110,
+        186,
+        111,
+        109,
+        185,
+        14,
+        15,
+        3,
+        1,
+        26
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.1,
+      "top_k": 12
+    },
+    {
+      "id": "rag-020",
+      "category": "cross_year_compare",
+      "question": "比亚迪2024年研发投入同比增长情况",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        3,
+        14,
+        23,
+        34,
+        2
+      ],
+      "retrieved_pages": [
+        3,
+        110,
+        112,
+        34,
+        15,
+        14,
+        186,
+        98,
+        109,
+        111,
+        1,
+        245
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-021",
+      "category": "numeric_financial",
+      "question": "长城汽车2024年营业收入是多少",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        19,
+        185,
+        261,
+        319
+      ],
+      "retrieved_pages": [
+        19,
+        24,
+        13,
+        31,
+        15,
+        21,
+        23,
+        240,
+        300,
+        297,
+        181,
+        18
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-022",
+      "category": "numeric_financial",
+      "question": "长城汽车2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        2,
+        10,
+        16,
+        42,
+        77
+      ],
+      "retrieved_pages": [
+        2,
+        42,
+        13,
+        70,
+        240,
+        31,
+        300,
+        260,
+        181,
+        97,
+        297,
+        258
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-023",
+      "category": "numeric_financial",
+      "question": "长城汽车2024年研发费用是多少",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        206,
+        225,
+        263,
+        275,
+        321
+      ],
+      "retrieved_pages": [
+        31,
+        167,
+        225,
+        19,
+        263,
+        321,
+        275,
+        24,
+        240,
+        13,
+        168,
+        126
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.3333,
+      "top_k": 12
+    },
+    {
+      "id": "rag-024",
+      "category": "numeric_financial",
+      "question": "长城汽车2024年经营活动现金流量净额是多少",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        26
+      ],
+      "retrieved_pages": [
+        19,
+        24,
+        31,
+        13,
+        21,
+        15,
+        23,
+        145,
+        183,
+        273,
+        240,
+        297
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-025",
+      "category": "numeric_ratio",
+      "question": "长城汽车2024年海外业务毛利率变化",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        10,
+        13,
+        16,
+        19,
+        21
+      ],
+      "retrieved_pages": [
+        19,
+        21,
+        31,
+        24,
+        13,
+        70,
+        69,
+        40,
+        23,
+        15,
+        297,
+        42
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-026",
+      "category": "numeric_ratio",
+      "question": "长城汽车2024年销量或整车销量是多少",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        13,
+        19,
+        15,
+        18,
+        21
+      ],
+      "retrieved_pages": [
+        19,
+        24,
+        21,
+        13,
+        23,
+        15,
+        31,
+        20,
+        40,
+        69,
+        240,
+        52
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-027",
+      "category": "product_enum",
+      "question": "2024年长城新推出的车型有哪些",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        22,
+        23,
+        21
+      ],
+      "retrieved_pages": [
+        20,
+        126,
+        19,
+        21,
+        13,
+        22,
+        23,
+        31,
+        40,
+        24,
+        224,
+        69
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.25,
+      "top_k": 12
+    },
+    {
+      "id": "rag-028",
+      "category": "product_enum",
+      "question": "长城灵魂S2000摩托车2024年何时发布",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        20,
+        23
+      ],
+      "retrieved_pages": [
+        20,
+        23,
+        21,
+        13,
+        126,
+        223,
+        19,
+        31,
+        128,
+        69,
+        146,
+        183
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-029",
+      "category": "segment_business",
+      "question": "长城汽车2024年海外销售多少万辆",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        19,
+        21,
+        13,
+        10,
+        16
+      ],
+      "retrieved_pages": [
+        21,
+        19,
+        24,
+        13,
+        23,
+        15,
+        31,
+        40,
+        20,
+        69,
+        240,
+        297
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-030",
+      "category": "segment_business",
+      "question": "长城汽车2024年SUV或越野业务情况",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        19,
+        20,
+        22,
+        25,
+        13
+      ],
+      "retrieved_pages": [
+        24,
+        13,
+        19,
+        31,
+        42,
+        20,
+        21,
+        23,
+        69,
+        183,
+        163,
+        46
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.5,
+      "top_k": 12
+    },
+    {
+      "id": "rag-031",
+      "category": "compliance_risk",
+      "question": "长城汽车2024年内部控制自我评价",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        47,
+        51,
+        99,
+        106,
+        108
+      ],
+      "retrieved_pages": [
+        108,
+        31,
+        103,
+        69,
+        126,
+        13,
+        46,
+        24,
+        163,
+        111,
+        168,
+        19
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-032",
+      "category": "compliance_risk",
+      "question": "长城汽车2024年审计意见类型",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        167,
+        168,
+        169,
+        170,
+        2
+      ],
+      "retrieved_pages": [
+        167,
+        31,
+        168,
+        126,
+        163,
+        69,
+        46,
+        134,
+        103,
+        127,
+        97,
+        169
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-033",
+      "category": "governance",
+      "question": "长城汽车2024年每股派发现金红利多少",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        2,
+        42,
+        69,
+        70,
+        101
+      ],
+      "retrieved_pages": [
+        2,
+        69,
+        300,
+        42,
+        260,
+        298,
+        299,
+        70,
+        145,
+        258,
+        297,
+        240
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-034",
+      "category": "governance",
+      "question": "长城汽车2024年股权激励计划情况",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        17,
+        68,
+        71,
+        76,
+        77
+      ],
+      "retrieved_pages": [
+        300,
+        298,
+        299,
+        146,
+        297,
+        145,
+        57,
+        69,
+        258,
+        93,
+        31,
+        181
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-035",
+      "category": "esg_sustainability",
+      "question": "长城汽车2024年环保或碳中和相关披露",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        126,
+        41,
+        124,
+        127,
+        112
+      ],
+      "retrieved_pages": [
+        126,
+        46,
+        127,
+        103,
+        31,
+        13,
+        24,
+        124,
+        52,
+        111,
+        69,
+        329
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-036",
+      "category": "esg_sustainability",
+      "question": "长城汽车2024年社会责任履行情况",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        40,
+        46,
+        103,
+        111,
+        112
+      ],
+      "retrieved_pages": [
+        127,
+        46,
+        108,
+        128,
+        111,
+        103,
+        69,
+        31,
+        126,
+        329,
+        24,
+        300
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.5,
+      "top_k": 12
+    },
+    {
+      "id": "rag-037",
+      "category": "strategy_outlook",
+      "question": "长城汽车2024年新能源战略或Hi4技术",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        13,
+        19,
+        20,
+        21,
+        40
+      ],
+      "retrieved_pages": [
+        13,
+        20,
+        21,
+        19,
+        126,
+        40,
+        14,
+        31,
+        24,
+        103,
+        127,
+        23
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-038",
+      "category": "strategy_outlook",
+      "question": "长城汽车2024年全球化战略进展",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        13,
+        14,
+        19,
+        21,
+        24
+      ],
+      "retrieved_pages": [
+        21,
+        13,
+        14,
+        19,
+        24,
+        20,
+        40,
+        69,
+        31,
+        105,
+        103,
+        126
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-039",
+      "category": "cross_year_compare",
+      "question": "长城汽车2024年海外销售同比增长",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        10,
+        13,
+        16,
+        19,
+        21
+      ],
+      "retrieved_pages": [
+        21,
+        19,
+        24,
+        13,
+        31,
+        23,
+        40,
+        20,
+        69,
+        14,
+        126,
+        297
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-040",
+      "category": "cross_year_compare",
+      "question": "长城汽车2024年净利润同比变动原因",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        10,
+        13,
+        16,
+        26,
+        2
+      ],
+      "retrieved_pages": [
+        31,
+        15,
+        42,
+        13,
+        147,
+        69,
+        26,
+        24,
+        70,
+        23,
+        19,
+        146
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.25,
+      "top_k": 12
+    },
+    {
+      "id": "rag-041",
+      "category": "numeric_financial",
+      "question": "美的集团2024年营业总收入是多少",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        2,
+        20,
+        49,
+        53,
+        151
+      ],
+      "retrieved_pages": [
+        2,
+        247,
+        20,
+        249,
+        44,
+        246,
+        279,
+        228,
+        229,
+        223,
+        227,
+        47
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-042",
+      "category": "numeric_financial",
+      "question": "美的集团2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        10
+      ],
+      "retrieved_pages": [
+        2,
+        245,
+        222,
+        20,
+        253,
+        247,
+        243,
+        252,
+        44,
+        279,
+        241,
+        249
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-043",
+      "category": "numeric_financial",
+      "question": "美的集团2024年末总资产是多少",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        267
+      ],
+      "retrieved_pages": [
+        223,
+        284,
+        214,
+        227,
+        247,
+        2,
+        230,
+        241,
+        249,
+        246,
+        222,
+        242
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-044",
+      "category": "numeric_financial",
+      "question": "美的集团2024年经营活动现金流量净额是多少",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        9,
+        53
+      ],
+      "retrieved_pages": [
+        2,
+        247,
+        241,
+        249,
+        44,
+        20,
+        279,
+        229,
+        228,
+        256,
+        165,
+        246
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-045",
+      "category": "numeric_ratio",
+      "question": "美的集团2024年智能家居业务毛利率",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        151,
+        12,
+        21,
+        27,
+        28
+      ],
+      "retrieved_pages": [
+        228,
+        229,
+        47,
+        44,
+        245,
+        233,
+        279,
+        249,
+        222,
+        237,
+        238,
+        151
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.0833,
+      "top_k": 12
+    },
+    {
+      "id": "rag-046",
+      "category": "numeric_ratio",
+      "question": "美的集团2024年加权平均净资产收益率",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        295
+      ],
+      "retrieved_pages": [
+        228,
+        229,
+        279,
+        253,
+        222,
+        245,
+        284,
+        252,
+        295,
+        180,
+        233,
+        230
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.1111,
+      "top_k": 12
+    },
+    {
+      "id": "rag-047",
+      "category": "product_enum",
+      "question": "美的集团2024年发布了哪些新品或新技术",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        41,
+        23,
+        27,
+        37,
+        39
+      ],
+      "retrieved_pages": [
+        38,
+        35,
+        40,
+        23,
+        28,
+        39,
+        36,
+        13,
+        27,
+        21,
+        25,
+        44
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.25,
+      "top_k": 12
+    },
+    {
+      "id": "rag-048",
+      "category": "product_enum",
+      "question": "美的集团2024年COLMO或高端品牌情况",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        33,
+        47,
+        63,
+        16,
+        21
+      ],
+      "retrieved_pages": [
+        228,
+        33,
+        233,
+        13,
+        213,
+        221,
+        229,
+        271,
+        277,
+        218,
+        246,
+        284
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.5,
+      "top_k": 12
+    },
+    {
+      "id": "rag-049",
+      "category": "segment_business",
+      "question": "美的集团2024年ToB业务或商业及工业板块",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        12,
+        2,
+        3,
+        19,
+        31
+      ],
+      "retrieved_pages": [
+        268,
+        165,
+        47,
+        63,
+        228,
+        32,
+        61,
+        48,
+        44,
+        2,
+        28,
+        246
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.1,
+      "top_k": 12
+    },
+    {
+      "id": "rag-050",
+      "category": "segment_business",
+      "question": "美的集团2024年海外收入占比",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        29,
+        231,
+        3,
+        10,
+        13
+      ],
+      "retrieved_pages": [
+        47,
+        20,
+        29,
+        271,
+        231,
+        28,
+        228,
+        30,
+        229,
+        139,
+        279,
+        13
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.3333,
+      "top_k": 12
+    },
+    {
+      "id": "rag-051",
+      "category": "compliance_risk",
+      "question": "美的集团2024年内部控制评价结论",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        93,
+        94,
+        95,
+        126,
+        151
+      ],
+      "retrieved_pages": [
+        28,
+        20,
+        44,
+        179,
+        154,
+        196,
+        13,
+        213,
+        150,
+        220,
+        221,
+        218
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-052",
+      "category": "compliance_risk",
+      "question": "美的集团2024年重大诉讼或仲裁",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        126,
+        127
+      ],
+      "retrieved_pages": [
+        277,
+        220,
+        221,
+        214,
+        207,
+        213,
+        190,
+        209,
+        208,
+        218,
+        285,
+        280
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-053",
+      "category": "governance",
+      "question": "美的集团2024年利润分配方案",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        44,
+        83,
+        84,
+        85,
+        86
+      ],
+      "retrieved_pages": [
+        245,
+        216,
+        83,
+        231,
+        44,
+        228,
+        242,
+        229,
+        243,
+        275,
+        241,
+        246
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.3333,
+      "top_k": 12
+    },
+    {
+      "id": "rag-054",
+      "category": "governance",
+      "question": "美的集团2024年回购股份情况",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        44,
+        48,
+        85,
+        87,
+        88
+      ],
+      "retrieved_pages": [
+        242,
+        276,
+        245,
+        241,
+        188,
+        139,
+        243,
+        275,
+        228,
+        235,
+        277,
+        213
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-055",
+      "category": "esg_sustainability",
+      "question": "美的集团2024年节能降碳或绿色制造",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        119,
+        20,
+        40,
+        16,
+        19
+      ],
+      "retrieved_pages": [
+        13,
+        119,
+        28,
+        268,
+        39,
+        200,
+        263,
+        204,
+        38,
+        25,
+        20,
+        190
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.5,
+      "top_k": 12
+    },
+    {
+      "id": "rag-056",
+      "category": "esg_sustainability",
+      "question": "美的集团2024年员工培训或人才发展",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        83,
+        25,
+        28,
+        45,
+        59
+      ],
+      "retrieved_pages": [
+        83,
+        28,
+        44,
+        61,
+        29,
+        62,
+        25,
+        242,
+        276,
+        48,
+        20,
+        13
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-057",
+      "category": "strategy_outlook",
+      "question": "美的集团2024年数字化或智能化转型",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        12,
+        19,
+        27,
+        32,
+        33
+      ],
+      "retrieved_pages": [
+        27,
+        63,
+        29,
+        13,
+        46,
+        30,
+        28,
+        26,
+        38,
+        59,
+        20,
+        3
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-058",
+      "category": "strategy_outlook",
+      "question": "美的集团2024年全球化布局",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        65,
+        13,
+        29,
+        45,
+        47
+      ],
+      "retrieved_pages": [
+        2,
+        28,
+        45,
+        29,
+        47,
+        61,
+        13,
+        38,
+        21,
+        36,
+        60,
+        62
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.3333,
+      "top_k": 12
+    },
+    {
+      "id": "rag-059",
+      "category": "cross_year_compare",
+      "question": "美的集团2024年营业总收入同比增长",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        20,
+        2,
+        15,
+        16,
+        17
+      ],
+      "retrieved_pages": [
+        229,
+        228,
+        20,
+        2,
+        47,
+        279,
+        247,
+        29,
+        44,
+        28,
+        249,
+        165
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.3333,
+      "top_k": 12
+    },
+    {
+      "id": "rag-060",
+      "category": "cross_year_compare",
+      "question": "美的集团2024年净利润同比变动",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        20,
+        54,
+        2,
+        10,
+        15
+      ],
+      "retrieved_pages": [
+        279,
+        228,
+        222,
+        20,
+        252,
+        229,
+        262,
+        263,
+        249,
+        230,
+        218,
+        242
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.25,
+      "top_k": 12
+    },
+    {
+      "id": "rag-061",
+      "category": "numeric_financial",
+      "question": "格力电器2024年营业收入是多少",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        10,
+        25,
+        34,
+        198,
+        247
+      ],
+      "retrieved_pages": [
+        13,
+        10,
+        233,
+        185,
+        119,
+        25,
+        59,
+        123,
+        124,
+        236,
+        1,
+        11
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.5,
+      "top_k": 12
+    },
+    {
+      "id": "rag-062",
+      "category": "numeric_financial",
+      "question": "格力电器2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        6,
+        10
+      ],
+      "retrieved_pages": [
+        13,
+        59,
+        233,
+        185,
+        25,
+        119,
+        236,
+        198,
+        152,
+        95,
+        123,
+        124
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-063",
+      "category": "numeric_financial",
+      "question": "格力电器2024年经营活动现金流量净额是多少",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        35
+      ],
+      "retrieved_pages": [
+        13,
+        10,
+        185,
+        120,
+        236,
+        124,
+        25,
+        59,
+        123,
+        114,
+        233,
+        119
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-064",
+      "category": "numeric_financial",
+      "question": "格力电器2024年研发投入是多少",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        21,
+        34,
+        142,
+        31
+      ],
+      "retrieved_pages": [
+        13,
+        10,
+        71,
+        21,
+        236,
+        11,
+        25,
+        24,
+        185,
+        200,
+        59,
+        233
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.25,
+      "top_k": 12
+    },
+    {
+      "id": "rag-065",
+      "category": "numeric_ratio",
+      "question": "格力电器2024年空调业务或家用空调收入",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        10,
+        11,
+        13,
+        14,
+        21
+      ],
+      "retrieved_pages": [
+        13,
+        10,
+        119,
+        59,
+        1,
+        124,
+        25,
+        123,
+        174,
+        175,
+        120,
+        233
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-066",
+      "category": "numeric_ratio",
+      "question": "格力电器2024年资产负债率是多少",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        106,
+        117
+      ],
+      "retrieved_pages": [
+        233,
+        13,
+        111,
+        117,
+        185,
+        118,
+        225,
+        112,
+        123,
+        159,
+        236,
+        124
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.25,
+      "top_k": 12
+    },
+    {
+      "id": "rag-067",
+      "category": "product_enum",
+      "question": "格力电器2024年推出了哪些新产品",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        12,
+        14,
+        15,
+        22,
+        23
+      ],
+      "retrieved_pages": [
+        13,
+        17,
+        24,
+        22,
+        15,
+        10,
+        21,
+        12,
+        11,
+        18,
+        23,
+        14
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.25,
+      "top_k": 12
+    },
+    {
+      "id": "rag-068",
+      "category": "product_enum",
+      "question": "格力电器2024年工业制品或装备业务",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        43,
+        235,
+        10,
+        12,
+        22
+      ],
+      "retrieved_pages": [
+        10,
+        13,
+        1,
+        25,
+        123,
+        43,
+        124,
+        175,
+        236,
+        174,
+        169,
+        176
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-069",
+      "category": "segment_business",
+      "question": "格力电器2024年分产品收入构成",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        10,
+        25
+      ],
+      "retrieved_pages": [
+        13,
+        25,
+        119,
+        59,
+        10,
+        233,
+        113,
+        169,
+        124,
+        123,
+        1,
+        43
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.5,
+      "top_k": 12
+    },
+    {
+      "id": "rag-070",
+      "category": "segment_business",
+      "question": "格力电器2024年国内外销售比例",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        8,
+        20,
+        10,
+        17,
+        21
+      ],
+      "retrieved_pages": [
+        10,
+        13,
+        24,
+        59,
+        153,
+        43,
+        236,
+        25,
+        155,
+        11,
+        45,
+        233
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-071",
+      "category": "compliance_risk",
+      "question": "格力电器2024年内部控制评价",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        44,
+        45,
+        61,
+        62,
+        82
+      ],
+      "retrieved_pages": [
+        25,
+        61,
+        45,
+        43,
+        21,
+        13,
+        59,
+        123,
+        236,
+        10,
+        233,
+        11
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.5,
+      "top_k": 12
+    },
+    {
+      "id": "rag-072",
+      "category": "compliance_risk",
+      "question": "格力电器2024年关联交易披露",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        85,
+        226,
+        227,
+        84,
+        229
+      ],
+      "retrieved_pages": [
+        236,
+        219,
+        95,
+        43,
+        123,
+        124,
+        225,
+        231,
+        233,
+        228,
+        61,
+        45
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-073",
+      "category": "governance",
+      "question": "格力电器2024年分红派息方案",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        2,
+        59,
+        60,
+        233,
+        125
+      ],
+      "retrieved_pages": [
+        233,
+        59,
+        236,
+        61,
+        119,
+        43,
+        60,
+        45,
+        206,
+        121,
+        25,
+        185
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-074",
+      "category": "governance",
+      "question": "格力电器2024年股份回购进展",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        59,
+        60,
+        95,
+        103,
+        131
+      ],
+      "retrieved_pages": [
+        95,
+        236,
+        233,
+        59,
+        196,
+        61,
+        195,
+        7,
+        43,
+        185,
+        175,
+        123
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-075",
+      "category": "esg_sustainability",
+      "question": "格力电器2024年绿色制造或节能产品",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        13,
+        15,
+        24,
+        52,
+        71
+      ],
+      "retrieved_pages": [
+        13,
+        22,
+        17,
+        72,
+        169,
+        24,
+        168,
+        71,
+        175,
+        170,
+        1,
+        10
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-076",
+      "category": "esg_sustainability",
+      "question": "格力电器2024年公益慈善或社会责任",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        63,
+        72
+      ],
+      "retrieved_pages": [
+        72,
+        1,
+        43,
+        116,
+        122,
+        236,
+        121,
+        176,
+        173,
+        118,
+        168,
+        112
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-077",
+      "category": "strategy_outlook",
+      "question": "格力电器2024年多元化或工业领域战略",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        10,
+        11,
+        21,
+        12,
+        15
+      ],
+      "retrieved_pages": [
+        10,
+        43,
+        21,
+        24,
+        25,
+        13,
+        11,
+        22,
+        59,
+        17,
+        1,
+        12
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-078",
+      "category": "strategy_outlook",
+      "question": "格力电器2024年渠道变革或数字化营销",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        12,
+        13,
+        23,
+        20,
+        24
+      ],
+      "retrieved_pages": [
+        23,
+        43,
+        12,
+        24,
+        10,
+        13,
+        1,
+        59,
+        25,
+        58,
+        22,
+        233
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-079",
+      "category": "cross_year_compare",
+      "question": "格力电器2024年营业收入同比变化",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        10,
+        12,
+        13,
+        24,
+        25
+      ],
+      "retrieved_pages": [
+        13,
+        10,
+        152,
+        233,
+        175,
+        123,
+        1,
+        119,
+        25,
+        59,
+        124,
+        43
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-080",
+      "category": "cross_year_compare",
+      "question": "格力电器2024年净利润同比变化",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        13,
+        35,
+        7,
+        8,
+        10
+      ],
+      "retrieved_pages": [
+        13,
+        233,
+        152,
+        59,
+        175,
+        119,
+        123,
+        10,
+        124,
+        185,
+        121,
+        122
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-081",
+      "category": "numeric_financial",
+      "question": "三一重工2024年营业收入是多少",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        16,
+        177,
+        238,
+        253
+      ],
+      "retrieved_pages": [
+        10,
+        196,
+        8,
+        85,
+        228,
+        104,
+        67,
+        1,
+        237,
+        90,
+        92,
+        12
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-082",
+      "category": "numeric_financial",
+      "question": "三一重工2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        5,
+        6
+      ],
+      "retrieved_pages": [
+        8,
+        10,
+        196,
+        85,
+        228,
+        1,
+        2,
+        129,
+        96,
+        67,
+        104,
+        238
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-083",
+      "category": "numeric_financial",
+      "question": "三一重工2024年总资产是多少",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        8,
+        20
+      ],
+      "retrieved_pages": [
+        85,
+        196,
+        10,
+        228,
+        8,
+        92,
+        237,
+        90,
+        67,
+        108,
+        104,
+        236
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.2,
+      "top_k": 12
+    },
+    {
+      "id": "rag-084",
+      "category": "numeric_financial",
+      "question": "三一重工2024年研发费用是多少",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        12,
+        120,
+        179,
+        192
+      ],
+      "retrieved_pages": [
+        12,
+        196,
+        237,
+        10,
+        85,
+        129,
+        228,
+        11,
+        67,
+        18,
+        108,
+        130
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-085",
+      "category": "numeric_ratio",
+      "question": "三一重工2024年挖掘机市占率或销量",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        8,
+        11,
+        12,
+        28,
+        10
+      ],
+      "retrieved_pages": [
+        10,
+        1,
+        8,
+        196,
+        11,
+        104,
+        12,
+        130,
+        90,
+        129,
+        85,
+        28
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-086",
+      "category": "numeric_ratio",
+      "question": "三一重工2024年海外主营业务毛利率",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        10,
+        8,
+        9,
+        13,
+        28
+      ],
+      "retrieved_pages": [
+        10,
+        8,
+        9,
+        196,
+        228,
+        129,
+        1,
+        85,
+        237,
+        67,
+        104,
+        130
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-087",
+      "category": "product_enum",
+      "question": "三一重工2024年推出了哪些新机型或新产品",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        11,
+        12,
+        14,
+        15,
+        57
+      ],
+      "retrieved_pages": [
+        10,
+        11,
+        196,
+        13,
+        14,
+        1,
+        12,
+        228,
+        67,
+        108,
+        8,
+        104
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.5,
+      "top_k": 12
+    },
+    {
+      "id": "rag-088",
+      "category": "product_enum",
+      "question": "三一重工2024年电动化或新能源产品",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        8,
+        11,
+        12,
+        29,
+        13
+      ],
+      "retrieved_pages": [
+        12,
+        11,
+        10,
+        8,
+        1,
+        13,
+        196,
+        237,
+        104,
+        229,
+        29,
+        14
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-089",
+      "category": "segment_business",
+      "question": "三一重工2024年海外收入或国际化进展",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        8,
+        9,
+        10,
+        13,
+        28
+      ],
+      "retrieved_pages": [
+        10,
+        1,
+        196,
+        8,
+        9,
+        104,
+        67,
+        92,
+        228,
+        237,
+        85,
+        90
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-090",
+      "category": "segment_business",
+      "question": "三一重工2024年混凝土机械业务情况",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        8,
+        10,
+        13,
+        14,
+        28
+      ],
+      "retrieved_pages": [
+        10,
+        196,
+        13,
+        1,
+        8,
+        92,
+        104,
+        236,
+        109,
+        90,
+        242,
+        85
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-091",
+      "category": "compliance_risk",
+      "question": "三一重工2024年内部控制评价",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        32,
+        47,
+        85,
+        86,
+        87
+      ],
+      "retrieved_pages": [
+        10,
+        1,
+        129,
+        87,
+        228,
+        237,
+        196,
+        47,
+        85,
+        104,
+        86,
+        229
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.25,
+      "top_k": 12
+    },
+    {
+      "id": "rag-092",
+      "category": "compliance_risk",
+      "question": "三一重工2024年重大风险提示",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        2,
+        8,
+        9,
+        23,
+        29
+      ],
+      "retrieved_pages": [
+        196,
+        67,
+        10,
+        237,
+        129,
+        228,
+        229,
+        130,
+        236,
+        66,
+        85,
+        87
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-093",
+      "category": "governance",
+      "question": "三一重工2024年利润分配预案",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        44,
+        45,
+        2,
+        118,
+        206
+      ],
+      "retrieved_pages": [
+        2,
+        10,
+        129,
+        196,
+        44,
+        175,
+        67,
+        228,
+        130,
+        1,
+        229,
+        104
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-094",
+      "category": "governance",
+      "question": "三一重工2024年董事及高管情况",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        2,
+        31,
+        32,
+        39,
+        40
+      ],
+      "retrieved_pages": [
+        104,
+        92,
+        196,
+        228,
+        10,
+        89,
+        110,
+        237,
+        1,
+        2,
+        86,
+        94
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.1,
+      "top_k": 12
+    },
+    {
+      "id": "rag-095",
+      "category": "esg_sustainability",
+      "question": "三一重工2024年安全生产或职业健康",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        126
+      ],
+      "retrieved_pages": [
+        1,
+        104,
+        10,
+        196,
+        92,
+        85,
+        228,
+        89,
+        90,
+        237,
+        86,
+        84
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-096",
+      "category": "esg_sustainability",
+      "question": "三一重工2024年绿色制造或减排",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        8,
+        29,
+        30,
+        11,
+        12
+      ],
+      "retrieved_pages": [
+        1,
+        10,
+        104,
+        196,
+        57,
+        130,
+        89,
+        237,
+        92,
+        129,
+        86,
+        85
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-097",
+      "category": "strategy_outlook",
+      "question": "三一重工2024年全球化或国际化战略",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        8,
+        9,
+        12,
+        13,
+        21
+      ],
+      "retrieved_pages": [
+        10,
+        1,
+        196,
+        8,
+        104,
+        12,
+        9,
+        29,
+        237,
+        14,
+        108,
+        67
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.25,
+      "top_k": 12
+    },
+    {
+      "id": "rag-098",
+      "category": "strategy_outlook",
+      "question": "三一重工2024年数字化转型",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        13,
+        8,
+        10,
+        11,
+        12
+      ],
+      "retrieved_pages": [
+        10,
+        1,
+        196,
+        104,
+        11,
+        92,
+        228,
+        129,
+        90,
+        13,
+        130,
+        237
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 1.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-099",
+      "category": "cross_year_compare",
+      "question": "三一重工2024年营业收入同比增长",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        8,
+        9,
+        12,
+        16,
+        177
+      ],
+      "retrieved_pages": [
+        10,
+        1,
+        8,
+        196,
+        104,
+        228,
+        12,
+        238,
+        108,
+        85,
+        237,
+        129
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.3333,
+      "top_k": 12
+    },
+    {
+      "id": "rag-100",
+      "category": "cross_year_compare",
+      "question": "三一重工2024年海外销售增长",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        8,
+        9,
+        12,
+        13,
+        28
+      ],
+      "retrieved_pages": [
+        10,
+        1,
+        9,
+        8,
+        196,
+        104,
+        228,
+        108,
+        29,
+        13,
+        129,
+        85
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.3333,
+      "top_k": 12
+    }
+  ]
+}

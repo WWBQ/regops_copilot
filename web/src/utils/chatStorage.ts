@@ -41,6 +41,6 @@ export function createWelcomeMessage(): ChatMessage {
     id: 'welcome',
     role: 'assistant',
     content:
-      '你好，我是 RegOps Copilot。你可以直接提问合规/监管问题；我会自动检索已入库的年报片段作答并附页码引用。也可点击 📎 上传临时 PDF，仅在本会话内有效。',
+      '你好，我是 RegOps Copilot。营收/净利润等直读指标走财务事实库，风险/制度等叙述检索年报并附页码。复杂对比以后仍在本对话里拆步，不必换页面。也可 📎 上传仅本会话有效的 PDF。',
   }
 }

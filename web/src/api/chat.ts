@@ -24,7 +24,7 @@ export function getHealth(): Promise<{ status: string }> {
   return apiFetch('/health')
 }
 
-export function getModels(): Promise<{ available: string[] }> {
+export function getModels(): Promise<{ available: string[]; default?: string | null }> {
   return apiFetch('/models')
 }
 

@@ -20,6 +20,17 @@ const displayTokenCount = computed(() => {
   return props.message.tokenCount ?? props.message.totalTokens
 })
 
+const routeLabel = computed(() => {
+  const route = props.message.route
+  if (route === 'metric' || route === 'metric_blocked' || route === 'metric_clarify') {
+    return '问数'
+  }
+  if (route === 'rag' || props.message.ragUsed) {
+    return 'RAG'
+  }
+  return ''
+})
+
 const showUsage = computed(() => {
   if (props.message.id === 'welcome' || props.message.error) {
     return false
@@ -78,8 +89,19 @@ function onContentClick(event: MouseEvent) {
   openPopover(citation, button)
 }
 
-function openViewer(citation: Citation) {
-  void router.push(documentViewerPage(citation.doc_id, citation.page))
+function citationActionLabel(citation: Citation): string {
+  if (citation.kind === 'facts' || citation.href) {
+    return '打开事实库'
+  }
+  return '查看年报页'
+}
+
+function openCitation(citation: Citation) {
+  if (citation.href) {
+    void router.push(citation.href)
+  } else if (citation.doc_id) {
+    void router.push(documentViewerPage(citation.doc_id, citation.page))
+  }
   closePopover()
 }
 </script>
@@ -88,6 +110,7 @@ function openViewer(citation: Citation) {
   <article class="message" :class="message.role" @click="closePopover">
     <div class="avatar">{{ message.role === 'user' ? '你' : 'AI' }}</div>
     <div class="bubble" @click.stop>
+      <p v-if="routeLabel" class="route-tag" :data-route="message.route || ''">{{ routeLabel }}</p>
       <p v-if="message.attachmentName" class="attachment-tag">📎 {{ message.attachmentName }}</p>
       <div
         v-if="htmlContent"
@@ -104,12 +127,15 @@ function openViewer(citation: Citation) {
         @click.stop
       >
         <p class="cite-popover-title">
-          {{ activeCitation.title || activeCitation.doc_id }} · 第 {{ activeCitation.page }} 页
+          {{ activeCitation.title || activeCitation.doc_id }}
+          <template v-if="activeCitation.kind !== 'facts' && activeCitation.page">
+            · 第 {{ activeCitation.page }} 页
+          </template>
         </p>
         <p class="cite-popover-snippet">{{ activeCitation.snippet }}</p>
         <div class="cite-popover-actions">
-          <button type="button" class="cite-open-btn" @click="openViewer(activeCitation)">
-            查看原文
+          <button type="button" class="cite-open-btn" @click="openCitation(activeCitation)">
+            {{ citationActionLabel(activeCitation) }}
           </button>
           <button type="button" class="cite-close-btn" @click="closePopover">关闭</button>
         </div>
@@ -135,6 +161,28 @@ function openViewer(citation: Citation) {
 <style scoped>
 .bubble {
   position: relative;
+}
+
+.route-tag {
+  display: inline-flex;
+  margin: 0 0 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ecfeff;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.route-tag[data-route='metric_blocked'],
+.route-tag[data-route='metric_clarify'] {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.route-tag[data-route='rag'] {
+  background: #eef2ff;
+  color: #4338ca;
 }
 
 .attachment-tag {

@@ -128,7 +128,7 @@ async def test_chat_with_session_pending_docs(client: AsyncClient):
 
         chat = await client.post(
             "/chat",
-            json={"message": "营收多少？", "session_id": session_id, "use_rag": True},
+            json={"message": "请总结这份文档的主要风险", "session_id": session_id, "use_rag": True},
         )
     assert chat.status_code == 200
     assert "解析入库中" in chat.json()["reply"]
@@ -155,12 +155,12 @@ async def test_chat_with_session_rag(client: AsyncClient):
         "app.api.chat.prepare_chat_rag",
         return_value=RagPrepareResult(
             answer=rag,
-            trace=RagTrace(question="营收多少？", outcome="ok", rag_used=True),
+            trace=RagTrace(question="请总结这份文档的主要风险", outcome="ok", rag_used=True),
         ),
     ):
         chat = await client.post(
             "/chat",
-            json={"message": "营收多少？", "session_id": session_id, "use_rag": True},
+            json={"message": "请总结这份文档的主要风险", "session_id": session_id, "use_rag": True},
         )
 
     assert chat.status_code == 200

@@ -22,6 +22,7 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--category", type=str, default="")
     parser.add_argument("--top-k", type=int, default=0)
+    parser.add_argument("--label", type=str, default="", help="可读标签，写入 report.provenance.label")
     parser.add_argument("--out-dir", type=Path, default=None)
     args = parser.parse_args()
 
@@ -30,8 +31,11 @@ def main() -> int:
         limit=args.limit,
         category=args.category,
         top_k=args.top_k,
+        label=args.label,
     )
-    out_dir = args.out_dir or (REPORTS_DIR / "rag_retrieval" / datetime.now().strftime("%Y%m%d_%H%M%S"))
+    label_slug = args.label.strip().replace(" ", "-") if args.label.strip() else None
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_dir = args.out_dir or (REPORTS_DIR / "rag_retrieval" / (f"{ts}_{label_slug}" if label_slug else ts))
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report["summary"], ensure_ascii=False, indent=2))

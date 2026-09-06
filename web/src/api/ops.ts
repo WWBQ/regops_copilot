@@ -36,6 +36,23 @@ export interface RagTraceListResponse {
   limit: number
   offset: number
   items: RagTraceItem[]
+  /** 全库拒答率等汇总（由 /ops/rag-traces 一并返回，无需单独 BFF 路由） */
+  summary?: RagOverview
+}
+
+export interface RagOverview {
+  total: number
+  ok_count: number
+  refusal_count: number
+  no_intent_count: number
+  /** 0–1，有意图检索中的拒答占比（low_score + no_docs） */
+  refusal_rate: number
+  avg_rag_ms: number
+  by_outcome: Record<string, number>
+}
+
+export function fetchRagOverview(): Promise<RagOverview> {
+  return apiFetch<RagOverview>('/ops/rag/overview')
 }
 
 export function listRagTraces(params?: {
@@ -49,6 +66,81 @@ export function listRagTraces(params?: {
   if (params?.outcome) search.set('outcome', params.outcome)
   const qs = search.toString()
   return apiFetch<RagTraceListResponse>(`/ops/rag-traces${qs ? `?${qs}` : ''}`)
+}
+
+export interface AsknumLookupSnapshot {
+  company_code: string
+  concept: string
+  year: number
+  scope: string
+  outcome: string
+  fact_key: string | null
+  doc_id: string | null
+  value_yuan: string | null
+  review_reason: string | null
+}
+
+export interface AsknumTraceItem {
+  id: number
+  request_id: string | null
+  session_id: string | null
+  question: string
+  route: string
+  company_codes: string[]
+  concepts: string[]
+  year: number | null
+  year_defaulted: boolean
+  scope: string | null
+  narrative: boolean
+  lookups: AsknumLookupSnapshot[]
+  total_ms: number
+  created_at: string
+}
+
+export interface AsknumOverview {
+  total: number
+  by_route: Record<string, number>
+  avg_ms: number
+  metric_count: number
+  blocked_count: number
+  clarify_count: number
+  skip_count: number
+}
+
+export interface AsknumTraceListResponse {
+  total: number
+  limit: number
+  offset: number
+  items: AsknumTraceItem[]
+  summary?: AsknumOverview
+}
+
+export function listAsknumTraces(params?: {
+  limit?: number
+  offset?: number
+  route?: string
+}): Promise<AsknumTraceListResponse> {
+  const search = new URLSearchParams()
+  if (params?.limit != null) search.set('limit', String(params.limit))
+  if (params?.offset != null) search.set('offset', String(params.offset))
+  if (params?.route) search.set('route', params.route)
+  const qs = search.toString()
+  return apiFetch<AsknumTraceListResponse>(`/ops/asknum-traces${qs ? `?${qs}` : ''}`)
+}
+
+export const ASKNUM_ROUTE_LABELS: Record<string, string> = {
+  metric: '命中',
+  metric_blocked: '拦截',
+  metric_clarify: '反问',
+  skip: '跳过',
+}
+
+export const ASKNUM_LOOKUP_LABELS: Record<string, string> = {
+  ok: '已过门',
+  human_review: '待复核',
+  missing: '无记录',
+  accepted_conflict: '多值冲突',
+  not_accepted: '未通过',
 }
 
 export const OUTCOME_LABELS: Record<string, string> = {

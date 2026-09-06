@@ -1,0 +1,72 @@
+{
+  "run_id": "20260904_182806_ebdf69",
+  "task_id": "w1_chat",
+  "status": "completed",
+  "started_at": "2026-09-04T10:28:06.327768+00:00",
+  "finished_at": "2026-09-04T10:28:44.783493+00:00",
+  "progress": {
+    "done": 30,
+    "total": 30,
+    "current_id": null
+  },
+  "params": {
+    "limit": 0,
+    "category": null,
+    "top_k": null
+  },
+  "summary": {
+    "total": 30,
+    "passed": 25,
+    "failed": 2,
+    "refused": 3,
+    "accuracy": 0.8333,
+    "refuse_rate": 0.1,
+    "latency_p50_ms": 1250.5,
+    "latency_p95_ms": 1790.4,
+    "by_category": {
+      "clause": {
+        "total": 15,
+        "passed": 13,
+        "refused": 2,
+        "accuracy": 0.8667
+      },
+      "banking": {
+        "total": 2,
+        "passed": 1,
+        "refused": 0,
+        "accuracy": 0.5
+      },
+      "accounting": {
+        "total": 4,
+        "passed": 3,
+        "refused": 0,
+        "accuracy": 0.75
+      },
+      "market": {
+        "total": 4,
+        "passed": 3,
+        "refused": 1,
+        "accuracy": 0.75
+      },
+      "macro": {
+        "total": 2,
+        "passed": 2,
+        "refused": 0,
+        "accuracy": 1.0
+      },
+      "securities": {
+        "total": 2,
+        "passed": 2,
+        "refused": 0,
+        "accuracy": 1.0
+      },
+      "credit": {
+        "total": 1,
+        "passed": 1,
+        "refused": 0,
+        "accuracy": 1.0
+      }
+    }
+  },
+  "error": null
+}

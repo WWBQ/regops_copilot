@@ -58,6 +58,7 @@
 
 - **gold_pages**：可接受证据页列表，命中任一即算 Recall@k 成功
 - **k**：默认 12，与 `rag_top_k` 对齐
+- **页码说明**：`gold_pages` 使用 PDF 解析器物理页码（从文件第 1 页起计），与年报正文脚注/印刷页码可能相差若干页；人工标注请以 `doc_chunks` 内容为准对照 PDF
 
 ## 4. 怎么跑
 
@@ -138,7 +139,7 @@ python eval/run_rag_retrieval.py --category product_enum
 cd python-ai && .venv/bin/python ../eval/scripts/build_rag_retrieval_golden.py
 ```
 
-手工修正：编辑 `MANUAL_GOLD_PAGES`（`build_rag_retrieval_golden.py`）后重新生成。
+手工修正：编辑 `MANUAL_GOLD_PAGES`（`build_rag_retrieval_golden.py`）后重新生成。跨页段落（如长城 p21 节标题 + p22 正文 + p23 续）需按 PDF 物理页码整段标注，不能只看单页正文。
 
 ---
 

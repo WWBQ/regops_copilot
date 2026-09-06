@@ -1,0 +1,549 @@
+{
+  "task_id": "w4_asknum",
+  "generated_at": "2026-09-06T09:42:56.351083+00:00",
+  "golden_version": "w4-asknum-v1",
+  "golden_file": "w4_asknum_20.json",
+  "params": {
+    "limit": 0,
+    "category": null,
+    "categories": null,
+    "item_ids": null
+  },
+  "summary": {
+    "total": 20,
+    "passed": 20,
+    "failed": 0,
+    "accuracy": 1.0,
+    "route_accuracy": 1.0,
+    "leak_count": 0,
+    "leak_rate": 0.0,
+    "by_category": [
+      {
+        "category": "hit",
+        "total": 8,
+        "passed": 8,
+        "failed": 0
+      },
+      {
+        "category": "blocked",
+        "total": 3,
+        "passed": 3,
+        "failed": 0
+      },
+      {
+        "category": "clarify",
+        "total": 2,
+        "passed": 2,
+        "failed": 0
+      },
+      {
+        "category": "compare",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "category": "multi",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "category": "skip",
+        "total": 3,
+        "passed": 3,
+        "failed": 0
+      },
+      {
+        "category": "missing",
+        "total": 2,
+        "passed": 2,
+        "failed": 0
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "ask-001",
+      "category": "hit",
+      "question": "比亚迪2024年营收多少",
+      "expected_route": "metric",
+      "actual_route": "metric",
+      "route_correct": true,
+      "leaked": true,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "002594",
+          "concept": "revenue",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "ok",
+          "fact_key": "revenue|2024-12-31|consolidated|CNY|income",
+          "doc_id": "002594_2024",
+          "value_yuan": "777102455000.0000",
+          "review_reason": null
+        }
+      ],
+      "reply": "比亚迪（002594）2024 年合并报表「营业总收入」为 777,102,455,000.00 元（约 7771.02 亿元）。口径：concept=revenue，status=auto_accepted，来源=eastmoney_f10，doc_id=002594_2024。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-002",
+      "category": "hit",
+      "question": "比亚迪2024年净利润是多少",
+      "expected_route": "metric",
+      "actual_route": "metric",
+      "route_correct": true,
+      "leaked": true,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "002594",
+          "concept": "net_profit",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "ok",
+          "fact_key": "net_profit|2024-12-31|consolidated|CNY|income",
+          "doc_id": "002594_2024",
+          "value_yuan": "41587940000.0000",
+          "review_reason": null
+        }
+      ],
+      "reply": "比亚迪（002594）2024 年合并报表「净利润」为 41,587,940,000.00 元（约 415.88 亿元）。口径：concept=net_profit，status=auto_accepted，来源=eastmoney_f10，doc_id=002594_2024。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-003",
+      "category": "hit",
+      "question": "长城汽车2024年净利润",
+      "expected_route": "metric",
+      "actual_route": "metric",
+      "route_correct": true,
+      "leaked": true,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "601633",
+          "concept": "net_profit",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "ok",
+          "fact_key": "net_profit|2024-12-31|consolidated|CNY|income",
+          "doc_id": "601633_2024",
+          "value_yuan": "12660012515.7800",
+          "review_reason": null
+        }
+      ],
+      "reply": "长城汽车（601633）2024 年合并报表「净利润」为 12,660,012,515.78 元（约 126.60 亿元）。口径：concept=net_profit，status=auto_accepted，来源=eastmoney_f10，doc_id=601633_2024。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-004",
+      "category": "hit",
+      "question": "比亚迪总资产多少",
+      "expected_route": "metric",
+      "actual_route": "metric",
+      "route_correct": true,
+      "leaked": true,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "002594",
+          "concept": "total_assets",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "ok",
+          "fact_key": "total_assets|2024-12-31|consolidated|CNY|balance_sheet",
+          "doc_id": "002594_2024",
+          "value_yuan": "783355855000.0000",
+          "review_reason": null
+        }
+      ],
+      "reply": "比亚迪（002594）2024 年合并报表「资产总计」为 783,355,855,000.00 元（约 7833.56 亿元）（未指定年份，按 2024 年报）。口径：concept=total_assets，status=auto_accepted，来源=eastmoney_f10，doc_id=002594_2024。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-005",
+      "category": "hit",
+      "question": "格力电器2024年净利润",
+      "expected_route": "metric",
+      "actual_route": "metric",
+      "route_correct": true,
+      "leaked": true,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "000651",
+          "concept": "net_profit",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "ok",
+          "fact_key": "net_profit|2024-12-31|consolidated|CNY|income",
+          "doc_id": "000651_2024",
+          "value_yuan": "32371069287.3500",
+          "review_reason": null
+        }
+      ],
+      "reply": "格力电器（000651）2024 年合并报表「净利润」为 32,371,069,287.35 元（约 323.71 亿元）。口径：concept=net_profit，status=auto_accepted，来源=eastmoney_f10，doc_id=000651_2024。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-006",
+      "category": "blocked",
+      "question": "美的2024年营收多少",
+      "expected_route": "metric_blocked",
+      "actual_route": "metric_blocked",
+      "route_correct": true,
+      "leaked": false,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "000333",
+          "concept": "revenue",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "human_review",
+          "fact_key": "revenue|2024-12-31|consolidated|CNY|income",
+          "doc_id": "000333_2024",
+          "value_yuan": null,
+          "review_reason": "critical_amount_mismatch"
+        }
+      ],
+      "reply": "美的集团（000333）2024 年合并报表「营业收入」已入库，但状态为待人工复核（critical_amount_mismatch），按质量门不返回该数字，也不会改用模型估算。请到「财务事实库」查看冲突明细。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-007",
+      "category": "blocked",
+      "question": "格力2024年营业收入",
+      "expected_route": "metric_blocked",
+      "actual_route": "metric_blocked",
+      "route_correct": true,
+      "leaked": false,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "000651",
+          "concept": "revenue",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "human_review",
+          "fact_key": "revenue|2024-12-31|consolidated|CNY|income",
+          "doc_id": "000651_2024",
+          "value_yuan": null,
+          "review_reason": "critical_amount_mismatch"
+        }
+      ],
+      "reply": "格力电器（000651）2024 年合并报表「营业收入」已入库，但状态为待人工复核（critical_amount_mismatch），按质量门不返回该数字，也不会改用模型估算。请到「财务事实库」查看冲突明细。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-008",
+      "category": "blocked",
+      "question": "三一重工2024年营收",
+      "expected_route": "metric_blocked",
+      "actual_route": "metric_blocked",
+      "route_correct": true,
+      "leaked": false,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "600031",
+          "concept": "revenue",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "human_review",
+          "fact_key": "revenue|2024-12-31|consolidated|CNY|income",
+          "doc_id": "600031_2024",
+          "value_yuan": null,
+          "review_reason": "critical_amount_mismatch"
+        }
+      ],
+      "reply": "三一重工（600031）2024 年合并报表「营业收入」已入库，但状态为待人工复核（critical_amount_mismatch），按质量门不返回该数字，也不会改用模型估算。请到「财务事实库」查看冲突明细。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-009",
+      "category": "clarify",
+      "question": "营收多少",
+      "expected_route": "metric_clarify",
+      "actual_route": "metric_clarify",
+      "route_correct": true,
+      "leaked": false,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [],
+      "reply": "请指定公司（如比亚迪 / 002594）后再查询「营业收入」。未指定年份时按 2024 年报、合并报表。当前可查已入库直读指标：营业收入、净利润、资产总计、负债合计、所有者权益合计、经营活动产生的现金流量净额、基本每股收益。毛利率、ROE 等不手算，请改问年报叙述或等待该指标入库。"
+    },
+    {
+      "id": "ask-010",
+      "category": "clarify",
+      "question": "净利润是多少",
+      "expected_route": "metric_clarify",
+      "actual_route": "metric_clarify",
+      "route_correct": true,
+      "leaked": false,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [],
+      "reply": "请指定公司（如比亚迪 / 002594）后再查询「净利润」。未指定年份时按 2024 年报、合并报表。当前可查已入库直读指标：营业收入、净利润、资产总计、负债合计、所有者权益合计、经营活动产生的现金流量净额、基本每股收益。毛利率、ROE 等不手算，请改问年报叙述或等待该指标入库。"
+    },
+    {
+      "id": "ask-011",
+      "category": "compare",
+      "question": "对比比亚迪和长城2024年净利润",
+      "expected_route": "metric",
+      "actual_route": "metric",
+      "route_correct": true,
+      "leaked": true,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "002594",
+          "concept": "net_profit",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "ok",
+          "fact_key": "net_profit|2024-12-31|consolidated|CNY|income",
+          "doc_id": "002594_2024",
+          "value_yuan": "41587940000.0000",
+          "review_reason": null
+        },
+        {
+          "company_code": "601633",
+          "concept": "net_profit",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "ok",
+          "fact_key": "net_profit|2024-12-31|consolidated|CNY|income",
+          "doc_id": "601633_2024",
+          "value_yuan": "12660012515.7800",
+          "review_reason": null
+        }
+      ],
+      "reply": "按财务事实库逐条查询（不手算对比比率）：\n- 比亚迪（002594）2024 年合并报表「净利润」为 41,587,940,000.00 元（约 415.88 亿元）。口径：concept=net_profit，status=auto_accepted，来源=eastmoney_f10，doc_id=002594_2024。\n- 长城汽车（601633）2024 年合并报表「净利润」为 12,660,012,515.78 元（约 126.60 亿元）。口径：concept=net_profit，status=auto_accepted，来源=eastmoney_f10，doc_id=601633_2024。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-012",
+      "category": "multi",
+      "question": "比亚迪2024年营收和净利润",
+      "expected_route": "metric",
+      "actual_route": "metric",
+      "route_correct": true,
+      "leaked": true,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "002594",
+          "concept": "net_profit",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "ok",
+          "fact_key": "net_profit|2024-12-31|consolidated|CNY|income",
+          "doc_id": "002594_2024",
+          "value_yuan": "41587940000.0000",
+          "review_reason": null
+        },
+        {
+          "company_code": "002594",
+          "concept": "revenue",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "ok",
+          "fact_key": "revenue|2024-12-31|consolidated|CNY|income",
+          "doc_id": "002594_2024",
+          "value_yuan": "777102455000.0000",
+          "review_reason": null
+        }
+      ],
+      "reply": "按财务事实库逐条查询（不手算对比比率）：\n- 比亚迪（002594）2024 年合并报表「净利润」为 41,587,940,000.00 元（约 415.88 亿元）。口径：concept=net_profit，status=auto_accepted，来源=eastmoney_f10，doc_id=002594_2024。\n- 比亚迪（002594）2024 年合并报表「营业总收入」为 777,102,455,000.00 元（约 7771.02 亿元）。口径：concept=revenue，status=auto_accepted，来源=eastmoney_f10，doc_id=002594_2024。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-013",
+      "category": "skip",
+      "question": "比亚迪2024年营收为什么增长",
+      "expected_route": "skip",
+      "actual_route": "skip",
+      "route_correct": true,
+      "leaked": false,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [],
+      "reply": null
+    },
+    {
+      "id": "ask-014",
+      "category": "skip",
+      "question": "比亚迪2024年ROE是多少",
+      "expected_route": "skip",
+      "actual_route": "skip",
+      "route_correct": true,
+      "leaked": false,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [],
+      "reply": null
+    },
+    {
+      "id": "ask-015",
+      "category": "missing",
+      "question": "宁德时代2024年净利润多少",
+      "expected_route": "metric_blocked",
+      "actual_route": "metric_blocked",
+      "route_correct": true,
+      "leaked": false,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "300750",
+          "concept": "net_profit",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "missing",
+          "fact_key": null,
+          "doc_id": null,
+          "value_yuan": null,
+          "review_reason": null
+        }
+      ],
+      "reply": "财务事实库中没有 宁德时代（300750）2024 年合并报表「净利润」的记录。未入库数字不会用模型估算；叙述类问题可改问合规问答检索年报。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-016",
+      "category": "missing",
+      "question": "比亚迪2024年母公司营收多少",
+      "expected_route": "metric_blocked",
+      "actual_route": "metric_blocked",
+      "route_correct": true,
+      "leaked": false,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "002594",
+          "concept": "revenue",
+          "year": 2024,
+          "scope": "parent",
+          "outcome": "missing",
+          "fact_key": null,
+          "doc_id": null,
+          "value_yuan": null,
+          "review_reason": null
+        }
+      ],
+      "reply": "财务事实库中没有 比亚迪（002594）2024 年母公司报表「营业收入」的记录。未入库数字不会用模型估算；叙述类问题可改问合规问答检索年报。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-017",
+      "category": "hit",
+      "question": "比亚迪2024年每股收益",
+      "expected_route": "metric",
+      "actual_route": "metric",
+      "route_correct": true,
+      "leaked": true,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "002594",
+          "concept": "eps",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "ok",
+          "fact_key": "eps|2024-12-31|consolidated|CNY|income",
+          "doc_id": "002594_2024",
+          "value_yuan": "4.6100",
+          "review_reason": null
+        }
+      ],
+      "reply": "比亚迪（002594）2024 年合并报表「基本每股收益」为 4.6100 元/股。口径：concept=eps，status=auto_accepted，来源=eastmoney_f10，doc_id=002594_2024。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-018",
+      "category": "hit",
+      "question": "002594 2024年总负债多少",
+      "expected_route": "metric",
+      "actual_route": "metric",
+      "route_correct": true,
+      "leaked": true,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "002594",
+          "concept": "total_liabilities",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "ok",
+          "fact_key": "total_liabilities|2024-12-31|consolidated|CNY|balance_sheet",
+          "doc_id": "002594_2024",
+          "value_yuan": "584667646000.0000",
+          "review_reason": null
+        }
+      ],
+      "reply": "比亚迪（002594）2024 年合并报表「负债合计」为 584,667,646,000.00 元（约 5846.68 亿元）。口径：concept=total_liabilities，status=auto_accepted，来源=eastmoney_f10，doc_id=002594_2024。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    },
+    {
+      "id": "ask-019",
+      "category": "skip",
+      "question": "比亚迪2024年毛利率是多少",
+      "expected_route": "skip",
+      "actual_route": "skip",
+      "route_correct": true,
+      "leaked": false,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [],
+      "reply": null
+    },
+    {
+      "id": "ask-020",
+      "category": "hit",
+      "question": "美的2024年净利润多少",
+      "expected_route": "metric",
+      "actual_route": "metric",
+      "route_correct": true,
+      "leaked": true,
+      "passed": true,
+      "status": "pass",
+      "detail": "通过",
+      "lookups": [
+        {
+          "company_code": "000333",
+          "concept": "net_profit",
+          "year": 2024,
+          "scope": "consolidated",
+          "outcome": "ok",
+          "fact_key": "net_profit|2024-12-31|consolidated|CNY|income",
+          "doc_id": "000333_2024",
+          "value_yuan": "38757214000.0000",
+          "review_reason": null
+        }
+      ],
+      "reply": "美的集团（000333）2024 年合并报表「净利润」为 38,757,214,000.00 元（约 387.57 亿元）。口径：concept=net_profit，status=auto_accepted，来源=eastmoney_f10，doc_id=000333_2024。\n数字来自已过 G1/G2/G3 的财务事实库，不从年报 PDF 估算，不手算 ROE / 毛利率。"
+    }
+  ]
+}

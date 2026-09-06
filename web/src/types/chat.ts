@@ -7,6 +7,10 @@ export interface Citation {
   viewer_url?: string | null
   /** 文档展示标题（非文件名） */
   title?: string | null
+  /** 应用内深链，如财务事实库 */
+  href?: string | null
+  /** document = 年报页；facts = 财务事实库 */
+  kind?: string | null
 }
 
 export interface ChatRequest {
@@ -24,6 +28,7 @@ export interface ChatResponse {
   citations?: Citation[]
   session_id?: string | null
   rag_used?: boolean
+  route?: string
   prompt_tokens?: number
   completion_tokens?: number
   total_tokens?: number
@@ -38,6 +43,7 @@ export interface ChatMessage {
   disclaimer?: string
   citations?: Citation[]
   ragUsed?: boolean
+  route?: string
   attachmentName?: string
   error?: boolean
   /** 本条消息 Token 数（用户为估算，AI 为 completion_tokens） */

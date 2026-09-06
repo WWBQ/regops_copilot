@@ -1,0 +1,604 @@
+{
+  "task_id": "rag_retrieval",
+  "generated_at": "2026-09-04T12:48:51.581079+00:00",
+  "golden_version": "rag-retrieval-v1",
+  "golden_file": "rag_retrieval_100.json",
+  "params": {
+    "limit": 0,
+    "category": null,
+    "categories": null,
+    "item_ids": [
+      "rag-006",
+      "rag-018",
+      "rag-024",
+      "rag-034",
+      "rag-042",
+      "rag-043",
+      "rag-044",
+      "rag-051",
+      "rag-052",
+      "rag-054",
+      "rag-062",
+      "rag-063",
+      "rag-072",
+      "rag-081",
+      "rag-082",
+      "rag-092",
+      "rag-095",
+      "rag-096"
+    ],
+    "top_k": 12
+  },
+  "provenance": {
+    "label": null,
+    "git": {
+      "commit": "425f02065c33eea98feb416685d87d29772fb441",
+      "branch": "main",
+      "describe": "425f020-dirty",
+      "dirty": true
+    },
+    "golden": {
+      "file": "rag_retrieval_100.json",
+      "path": "/Users/chengfeng/Desktop/AI/regops_copilot/eval/golden/rag_retrieval_100.json",
+      "sha256": "f27f699aec190e3a608764d8a02ed1a85fa3a949e1adfc44df25fb6ff441a30d"
+    },
+    "rag_config": {
+      "rag_top_k": 12,
+      "rag_min_score": 0.42,
+      "rag_vector_fetch_k": 80,
+      "rag_keyword_top_k": 30,
+      "rag_rrf_k": 60,
+      "rag_vector_rrf_weight": 2.0,
+      "rag_keyword_rrf_weight": 1.0,
+      "rag_rerank_enabled": true,
+      "rag_rerank_model": "BAAI/bge-reranker-v2-m3",
+      "rag_rerank_candidates": 80,
+      "rag_max_chunks_per_page": 1,
+      "embedding_model": "BAAI/bge-m3"
+    }
+  },
+  "summary": {
+    "count": 18,
+    "recall_at_k": 0.0,
+    "mrr": 0.0,
+    "by_category": {
+      "numeric_ratio": {
+        "recall_at_k": 0.0,
+        "mrr": 0.0,
+        "count": 1
+      },
+      "strategy_outlook": {
+        "recall_at_k": 0.0,
+        "mrr": 0.0,
+        "count": 1
+      },
+      "numeric_financial": {
+        "recall_at_k": 0.0,
+        "mrr": 0.0,
+        "count": 8
+      },
+      "governance": {
+        "recall_at_k": 0.0,
+        "mrr": 0.0,
+        "count": 2
+      },
+      "compliance_risk": {
+        "recall_at_k": 0.0,
+        "mrr": 0.0,
+        "count": 4
+      },
+      "esg_sustainability": {
+        "recall_at_k": 0.0,
+        "mrr": 0.0,
+        "count": 2
+      }
+    }
+  },
+  "results": [
+    {
+      "id": "rag-006",
+      "category": "numeric_ratio",
+      "question": "比亚迪2024年汽车业务毛利率是多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        213,
+        2,
+        3,
+        4,
+        9
+      ],
+      "retrieved_pages": [
+        112,
+        110,
+        111,
+        186,
+        109,
+        185,
+        26,
+        272,
+        137,
+        15,
+        35,
+        70
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-018",
+      "category": "strategy_outlook",
+      "question": "比亚迪2024年发展战略或经营计划",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        33,
+        42,
+        48
+      ],
+      "retrieved_pages": [
+        97,
+        186,
+        67,
+        98,
+        96,
+        1,
+        24,
+        15,
+        68,
+        30,
+        4,
+        122
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-024",
+      "category": "numeric_financial",
+      "question": "长城汽车2024年经营活动现金流量净额是多少",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        26
+      ],
+      "retrieved_pages": [
+        19,
+        24,
+        31,
+        13,
+        21,
+        15,
+        23,
+        145,
+        183,
+        273,
+        240,
+        297
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-034",
+      "category": "governance",
+      "question": "长城汽车2024年股权激励计划情况",
+      "doc_id": "601633_2024",
+      "gold_pages": [
+        17,
+        68,
+        71,
+        76,
+        77
+      ],
+      "retrieved_pages": [
+        300,
+        298,
+        299,
+        146,
+        297,
+        145,
+        57,
+        69,
+        258,
+        93,
+        31,
+        181
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-042",
+      "category": "numeric_financial",
+      "question": "美的集团2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        10
+      ],
+      "retrieved_pages": [
+        2,
+        245,
+        222,
+        20,
+        253,
+        247,
+        243,
+        252,
+        44,
+        279,
+        241,
+        249
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-043",
+      "category": "numeric_financial",
+      "question": "美的集团2024年末总资产是多少",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        267
+      ],
+      "retrieved_pages": [
+        223,
+        284,
+        214,
+        227,
+        247,
+        2,
+        230,
+        241,
+        249,
+        246,
+        222,
+        242
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-044",
+      "category": "numeric_financial",
+      "question": "美的集团2024年经营活动现金流量净额是多少",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        9,
+        53
+      ],
+      "retrieved_pages": [
+        2,
+        247,
+        241,
+        249,
+        44,
+        20,
+        279,
+        229,
+        228,
+        256,
+        165,
+        246
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-051",
+      "category": "compliance_risk",
+      "question": "美的集团2024年内部控制评价结论",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        93,
+        94,
+        95,
+        126,
+        151
+      ],
+      "retrieved_pages": [
+        28,
+        20,
+        44,
+        179,
+        154,
+        196,
+        13,
+        213,
+        150,
+        220,
+        221,
+        218
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-052",
+      "category": "compliance_risk",
+      "question": "美的集团2024年重大诉讼或仲裁",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        126,
+        127
+      ],
+      "retrieved_pages": [
+        277,
+        220,
+        221,
+        214,
+        207,
+        213,
+        190,
+        209,
+        208,
+        218,
+        285,
+        280
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-054",
+      "category": "governance",
+      "question": "美的集团2024年回购股份情况",
+      "doc_id": "000333_2024",
+      "gold_pages": [
+        44,
+        48,
+        85,
+        87,
+        88
+      ],
+      "retrieved_pages": [
+        242,
+        276,
+        245,
+        241,
+        188,
+        139,
+        243,
+        275,
+        228,
+        235,
+        277,
+        213
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-062",
+      "category": "numeric_financial",
+      "question": "格力电器2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        6,
+        10
+      ],
+      "retrieved_pages": [
+        13,
+        59,
+        233,
+        185,
+        25,
+        119,
+        236,
+        198,
+        152,
+        95,
+        123,
+        124
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-063",
+      "category": "numeric_financial",
+      "question": "格力电器2024年经营活动现金流量净额是多少",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        35
+      ],
+      "retrieved_pages": [
+        13,
+        10,
+        185,
+        120,
+        236,
+        124,
+        25,
+        59,
+        123,
+        114,
+        233,
+        119
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-072",
+      "category": "compliance_risk",
+      "question": "格力电器2024年关联交易披露",
+      "doc_id": "000651_2024",
+      "gold_pages": [
+        85,
+        226,
+        227,
+        84,
+        229
+      ],
+      "retrieved_pages": [
+        236,
+        219,
+        95,
+        43,
+        123,
+        124,
+        225,
+        231,
+        233,
+        228,
+        61,
+        45
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-081",
+      "category": "numeric_financial",
+      "question": "三一重工2024年营业收入是多少",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        16,
+        177,
+        238,
+        253
+      ],
+      "retrieved_pages": [
+        10,
+        196,
+        8,
+        85,
+        228,
+        104,
+        67,
+        1,
+        237,
+        90,
+        92,
+        12
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-082",
+      "category": "numeric_financial",
+      "question": "三一重工2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        5,
+        6
+      ],
+      "retrieved_pages": [
+        8,
+        10,
+        196,
+        85,
+        228,
+        1,
+        2,
+        129,
+        96,
+        67,
+        104,
+        238
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-092",
+      "category": "compliance_risk",
+      "question": "三一重工2024年重大风险提示",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        2,
+        8,
+        9,
+        23,
+        29
+      ],
+      "retrieved_pages": [
+        196,
+        67,
+        10,
+        237,
+        129,
+        228,
+        229,
+        130,
+        236,
+        66,
+        85,
+        87
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-095",
+      "category": "esg_sustainability",
+      "question": "三一重工2024年安全生产或职业健康",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        126
+      ],
+      "retrieved_pages": [
+        1,
+        104,
+        10,
+        196,
+        92,
+        85,
+        228,
+        89,
+        90,
+        237,
+        86,
+        84
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    },
+    {
+      "id": "rag-096",
+      "category": "esg_sustainability",
+      "question": "三一重工2024年绿色制造或减排",
+      "doc_id": "600031_2024",
+      "gold_pages": [
+        8,
+        29,
+        30,
+        11,
+        12
+      ],
+      "retrieved_pages": [
+        1,
+        10,
+        104,
+        196,
+        57,
+        130,
+        89,
+        237,
+        92,
+        129,
+        86,
+        85
+      ],
+      "page_hit_at_k": false,
+      "reciprocal_rank": 0.0,
+      "top_k": 12
+    }
+  ]
+}

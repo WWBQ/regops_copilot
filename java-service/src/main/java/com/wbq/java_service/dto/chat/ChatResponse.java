@@ -11,6 +11,7 @@ public record ChatResponse(
         List<Citation> citations,
         @JsonProperty("session_id") String sessionId,
         @JsonProperty("rag_used") boolean ragUsed,
+        String route,
         @JsonProperty("prompt_tokens") int promptTokens,
         @JsonProperty("completion_tokens") int completionTokens,
         @JsonProperty("total_tokens") int totalTokens,
@@ -19,6 +20,9 @@ public record ChatResponse(
     public ChatResponse {
         if (citations == null) {
             citations = List.of();
+        }
+        if (route == null || route.isBlank()) {
+            route = "general";
         }
     }
 }

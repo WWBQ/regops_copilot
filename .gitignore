@@ -41,5 +41,11 @@ data/raw/
 data/labeling/
 data/objects/
 
+# 公开基准原数据（只保留脚本与选型卡）
+eval/.cache/
+
 # Docker 本地数据（若有）
 *.log
+
+# 本地开发编排脚本产物（日志 + pid）
+.dev-logs/

@@ -6,21 +6,7 @@ import re
 
 import psycopg
 
-# 常见简称 → 证券代码（与 titles.COMPANY_DISPLAY_NAMES 对应）
-_COMPANY_ALIASES: dict[str, str] = {
-    "比亚迪": "002594",
-    "美的": "000333",
-    "美的集团": "000333",
-    "格力": "000651",
-    "格力电器": "000651",
-    "长城": "601633",
-    "长城汽车": "601633",
-    "三一": "600031",
-    "三一重工": "600031",
-    "宁德时代": "300750",
-    "贵州茅台": "600519",
-    "茅台": "600519",
-}
+from app.asknum.aliases import company_aliases
 
 _STOCK_CODE_RE = re.compile(r"\b(\d{6})\b")
 _YEAR_RE = re.compile(r"(20\d{2})")
@@ -32,16 +18,17 @@ def _normalize_year_text(question: str) -> str:
     return re.sub(r"024年", "2024年", text)
 
 
-def _mentioned_company_codes(question: str) -> set[str]:
+def mentioned_company_codes(question: str) -> set[str]:
+    """问题中出现的证券代码（简称或 6 位数字）。"""
     codes: set[str] = set(_STOCK_CODE_RE.findall(question))
     lowered = question.casefold()
-    for alias, code in _COMPANY_ALIASES.items():
+    for alias, code in company_aliases().items():
         if alias.casefold() in lowered:
             codes.add(code)
     return codes
 
 
-def _mentioned_year(question: str) -> int | None:
+def mentioned_report_year(question: str) -> int | None:
     normalized = _normalize_year_text(question)
     match = _LOOSE_YEAR_RE.search(normalized) or _YEAR_RE.search(normalized)
     if not match:
@@ -59,8 +46,8 @@ def filter_doc_ids_for_question(
         return doc_ids
 
     normalized = _normalize_year_text(question)
-    codes = _mentioned_company_codes(normalized)
-    year = _mentioned_year(normalized)
+    codes = mentioned_company_codes(normalized)
+    year = mentioned_report_year(normalized)
     if not codes and year is None:
         return doc_ids
 

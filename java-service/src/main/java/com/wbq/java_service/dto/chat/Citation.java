@@ -7,6 +7,8 @@ public record Citation(
         int page,
         String snippet,
         @JsonProperty("viewer_url") String viewerUrl,
-        String title
+        String title,
+        String href,
+        String kind
 ) {
 }

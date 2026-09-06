@@ -7,6 +7,8 @@ class Citation(BaseModel):
     snippet: str
     viewer_url: str | None = None
     title: str | None = None
+    href: str | None = None
+    kind: str | None = None
 
 
 class ChatRequest(BaseModel):
@@ -24,6 +26,7 @@ class ChatResponse(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
     session_id: str | None = None
     rag_used: bool = False
+    route: str = "general"
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0

@@ -13,10 +13,12 @@ GOLDEN_DIR = EVAL_DIR / "golden"
 REPORTS_DIR = EVAL_DIR / "reports"
 TASKS_FILE = EVAL_DIR / "tasks.json"
 
-RUNNERS = ("w1_chat", "rag_retrieval")
+RUNNERS = ("w1_chat", "rag_retrieval", "compliance_schema", "w4_asknum")
 RUNNER_DEFAULT_METRICS: dict[str, tuple[str, ...]] = {
-    "w1_chat": ("accuracy", "number_error_rate", "latency_p50_ms"),
+    "w1_chat": ("accuracy", "refuse_rate", "latency_p50_ms"),
     "rag_retrieval": ("recall_at_k", "mrr"),
+    "compliance_schema": ("accuracy", "false_accept_rate", "false_reject_rate"),
+    "w4_asknum": ("accuracy", "route_accuracy", "leak_rate"),
 }
 _TASK_ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,48}$")
 
@@ -43,7 +45,7 @@ def _default_tasks_payload() -> dict:
             {
                 "id": "w1_chat",
                 "name": "W1 聊天评测",
-                "description": "30 题：15 制度条款理解 + 15 财报数字提取（/chat 端到端）",
+                "description": "30 题闭卷金融能力：监管制度 + 会计/银行/市场概念（/chat，use_rag=false）",
                 "golden_file": "w1_chat_30.json",
                 "runner": "w1_chat",
                 "metrics": list(RUNNER_DEFAULT_METRICS["w1_chat"]),
@@ -56,6 +58,24 @@ def _default_tasks_payload() -> dict:
                 "golden_file": "rag_retrieval_100.json",
                 "runner": "rag_retrieval",
                 "metrics": list(RUNNER_DEFAULT_METRICS["rag_retrieval"]),
+                "builtin": True,
+            },
+            {
+                "id": "compliance_schema",
+                "name": "合规结论 Schema 校验",
+                "description": "20 例：10 合法 + 10 非法，统计误放行/误拒与报错理由命中率",
+                "golden_file": "compliance_schema_20.json",
+                "runner": "compliance_schema",
+                "metrics": list(RUNNER_DEFAULT_METRICS["compliance_schema"]),
+                "builtin": True,
+            },
+            {
+                "id": "w4_asknum",
+                "name": "W4 问数评测",
+                "description": "20 题：命中 / 拦截 / 反问 / 跳过，检查路由与数字泄露（不调 LLM）",
+                "golden_file": "w4_asknum_20.json",
+                "runner": "w4_asknum",
+                "metrics": list(RUNNER_DEFAULT_METRICS["w4_asknum"]),
                 "builtin": True,
             },
         ],
@@ -136,6 +156,32 @@ def list_golden_files() -> list[dict]:
             }
         )
     return rows
+
+
+def preview_golden_set(filename: str) -> dict:
+    _validate_golden_file(filename)
+    path = GOLDEN_DIR / filename
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    items: list[dict] = []
+    for raw in payload.get("items") or []:
+        if not isinstance(raw, dict):
+            continue
+        question = str(raw.get("question") or raw.get("rule") or "").strip()
+        items.append(
+            {
+                "id": str(raw.get("id") or ""),
+                "category": raw.get("category"),
+                "question": question[:240],
+            }
+        )
+    categories = sorted({str(item["category"]) for item in items if item.get("category")})
+    return {
+        "filename": filename,
+        "version": payload.get("version"),
+        "item_count": len(items),
+        "categories": categories,
+        "items": items,
+    }
 
 
 def _validate_golden_file(filename: str) -> None:
@@ -239,6 +285,13 @@ def validate_golden_payload(content: dict, *, runner: str | None = None) -> int:
     for index, item in enumerate(items):
         if not isinstance(item, dict):
             raise ValueError(f"items[{index}] 必须是对象")
+        if runner == "compliance_schema":
+            # Schema 校验集没有 question，改为要求 payload + category
+            if not isinstance(item.get("payload"), dict):
+                raise ValueError(f"items[{index}] 缺少 payload 对象（Schema 校验集必填）")
+            if item.get("category") not in {"valid", "invalid"}:
+                raise ValueError(f"items[{index}] category 须为 valid 或 invalid")
+            continue
         if not str(item.get("question") or "").strip():
             raise ValueError(f"items[{index}] 缺少 question")
         if runner == "rag_retrieval":
@@ -247,6 +300,16 @@ def validate_golden_payload(content: dict, *, runner: str | None = None) -> int:
             gold_pages = item.get("gold_pages")
             if not isinstance(gold_pages, list) or not gold_pages:
                 raise ValueError(f"items[{index}] 缺少 gold_pages（RAG 检索集必填）")
+        if runner == "w4_asknum":
+            if item.get("expected_route") not in {
+                "metric",
+                "metric_blocked",
+                "metric_clarify",
+                "skip",
+            }:
+                raise ValueError(
+                    f"items[{index}] expected_route 须为 metric / metric_blocked / metric_clarify / skip"
+                )
     return len(items)
 
 
@@ -254,7 +317,12 @@ def save_golden_set(*, filename: str, content: dict, runner: str | None = None) 
     name = filename.strip()
     if not _GOLDEN_FILENAME_RE.match(name):
         raise ValueError("文件名须为 .json，仅含字母数字、点、下划线、连字符")
-    if name in {"w1_chat_30.json", "rag_retrieval_100.json"}:
+    if name in {
+        "w1_chat_30.json",
+        "rag_retrieval_100.json",
+        "compliance_schema_20.json",
+        "w4_asknum_20.json",
+    }:
         raise ValueError("内置黄金集不可覆盖，请使用新文件名")
     item_count = validate_golden_payload(content, runner=runner)
     GOLDEN_DIR.mkdir(parents=True, exist_ok=True)

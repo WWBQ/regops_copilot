@@ -1,0 +1,68 @@
+{
+  "run_id": "20260906_174342_c94489",
+  "task_id": "w4_asknum",
+  "status": "completed",
+  "started_at": "2026-09-06T09:43:42.313323+00:00",
+  "finished_at": "2026-09-06T09:43:42.437604+00:00",
+  "progress": {
+    "done": 20,
+    "total": 20,
+    "current_id": null
+  },
+  "params": {
+    "limit": 0,
+    "categories": null,
+    "item_ids": null,
+    "top_k": null,
+    "model": null,
+    "temperature": null,
+    "use_rag": null
+  },
+  "summary": {
+    "total": 20,
+    "passed": 20,
+    "failed": 0,
+    "accuracy": 1.0,
+    "route_accuracy": 1.0,
+    "leak_count": 0,
+    "leak_rate": 0.0,
+    "by_category": {
+      "hit": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0
+      },
+      "blocked": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0
+      },
+      "clarify": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0
+      },
+      "compare": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "multi": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "skip": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0
+      },
+      "missing": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0
+      }
+    }
+  },
+  "error": null
+}

@@ -33,6 +33,11 @@ public class EvalProxyController {
         return pythonAiClient.listEvalGoldenSets();
     }
 
+    @GetMapping("/golden-sets/{filename:.+}")
+    public Map<String, Object> getGoldenSet(@PathVariable String filename) {
+        return pythonAiClient.getEvalGoldenSet(filename);
+    }
+
     @PostMapping("/golden-sets/upload")
     public Map<String, Object> uploadGoldenSet(@RequestBody Map<String, Object> body) {
         return pythonAiClient.uploadEvalGoldenSet(body);

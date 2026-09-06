@@ -7,13 +7,15 @@ import IngestMonitorView from '../views/ops/IngestMonitorView.vue'
 import LogsMonitorView from '../views/ops/LogsMonitorView.vue'
 import EvalReportView from '../views/ops/EvalReportView.vue'
 import RagMonitorView from '../views/ops/RagMonitorView.vue'
+import AsknumMonitorView from '../views/ops/AsknumMonitorView.vue'
 import ProfileView from '../views/account/ProfileView.vue'
 import PlaceholderView from '../views/PlaceholderView.vue'
+import QualityGatesView from '../views/quality/QualityGatesView.vue'
+import FinMetricsView from '../views/quality/FinMetricsView.vue'
 import CreateTaskView from '../views/labeling/CreateTaskView.vue'
 import LabelWorkspaceView from '../views/labeling/LabelWorkspaceView.vue'
 import TaskHallView from '../views/labeling/TaskHallView.vue'
 import TaskItemsView from '../views/labeling/TaskItemsView.vue'
-
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -22,6 +24,10 @@ const router = createRouter({
       name: 'chat',
       component: ChatPanel,
       meta: { title: '合规问答' },
+    },
+    {
+      path: '/agent',
+      redirect: '/',
     },
     {
       path: '/rag',
@@ -52,9 +58,15 @@ const router = createRouter({
       meta: { title: 'RAG 检索监控', pageId: 'rag-monitor', group: 'ops' },
     },
     {
+      path: '/ops/asknum',
+      name: 'asknum-monitor',
+      component: AsknumMonitorView,
+      meta: { title: '问数监控', pageId: 'asknum-monitor', group: 'ops' },
+    },
+    {
       path: '/quality/gates',
       name: 'quality-gates',
-      component: PlaceholderView,
+      component: QualityGatesView,
       meta: { title: '质量门', pageId: 'quality-gates', group: 'quality' },
     },
     {
@@ -84,7 +96,7 @@ const router = createRouter({
     {
       path: '/quality/facts',
       name: 'fin-metrics',
-      component: PlaceholderView,
+      component: FinMetricsView,
       meta: { title: '财务事实库', pageId: 'fin-metrics', group: 'quality' },
     },
     {

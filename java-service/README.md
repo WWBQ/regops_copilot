@@ -15,6 +15,7 @@ RegOps Copilot 的 Java BFF / 业务网关（Spring Boot 3 + Java 21）。
 - `POST /api/chat` — 转发至 python-ai `/chat`
 - `GET /api/models` — 转发至 python-ai `/models`
 - `GET /api/documents/{docId}/viewer-url` — 转发文档预签名（W7 加鉴权）
+- `/api/labeling/**` — 转发 python-ai 数据标注（任务、模板、导出、PDF/HTML）
 - `X-Request-ID` — 全链路关联 ID
 
 ## 本地启动

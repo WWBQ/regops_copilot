@@ -12,9 +12,13 @@ from typing import Any
 from uuid import uuid4
 
 from app.config import get_settings
+from app.eval.asknum_runner import run_asknum_eval
+from app.eval.compliance_schema_runner import run_compliance_schema_eval
 from app.eval.rag_retrieval_runner import run_rag_retrieval_eval
 from app.eval.registry import REPORTS_DIR, get_task, task_to_dict
-from app.eval.w1_chat_runner import run_w1_chat_eval
+from app.eval.selection import normalize_categories, normalize_item_ids, select_items
+from app.eval.w1_chat_runner import resolve_eval_chat_model, run_w1_chat_eval
+from app.models.factory import list_available_models
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +51,33 @@ def list_tasks() -> list[dict[str, Any]]:
     return [task_to_dict(task) for task in load_all_tasks().values()]
 
 
+def _infer_run_model(meta: dict[str, Any], run_dir: Path) -> str | None:
+    params = meta.get("params") or {}
+    raw = params.get("model")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    summary = meta.get("summary") or {}
+    raw = summary.get("model")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    report = _read_json(run_dir / "report.json")
+    if not report:
+        return None
+    raw = (report.get("params") or {}).get("model")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    results = report.get("results") or []
+    if results and isinstance(results[0].get("model"), str) and results[0]["model"].strip():
+        return results[0]["model"].strip()
+    return None
+
+
 def _serialize_run_meta(meta: dict[str, Any], *, include_report: bool = False) -> dict[str, Any]:
+    params = dict(meta.get("params") or {})
+    run_dir = _run_dir(meta["task_id"], meta["run_id"])
+    inferred = _infer_run_model(meta, run_dir)
+    if inferred:
+        params["model"] = inferred
     row = {
         "run_id": meta["run_id"],
         "task_id": meta["task_id"],
@@ -55,7 +85,7 @@ def _serialize_run_meta(meta: dict[str, Any], *, include_report: bool = False) -
         "started_at": meta.get("started_at"),
         "finished_at": meta.get("finished_at"),
         "progress": meta.get("progress") or {"done": 0, "total": 0, "current_id": None},
-        "params": meta.get("params") or {},
+        "params": params,
         "error": meta.get("error"),
         "summary": meta.get("summary"),
     }
@@ -183,14 +213,35 @@ def _execute_run(task_id: str, run_id: str, params: dict[str, Any]) -> None:
                 golden_path=task.golden_path,
                 base_url=base_url,
                 limit=int(params.get("limit") or 0),
+                model=params.get("model") or None,
+                categories=params.get("categories") or None,
+                item_ids=params.get("item_ids") or None,
+                temperature=params.get("temperature"),
                 on_progress=on_progress,
             )
         elif task.runner == "rag_retrieval":
             report = run_rag_retrieval_eval(
                 golden_path=task.golden_path,
                 limit=int(params.get("limit") or 0),
-                category=str(params.get("category") or ""),
+                categories=params.get("categories") or None,
+                item_ids=params.get("item_ids") or None,
                 top_k=int(params.get("top_k") or 0),
+                on_progress=on_progress,
+            )
+        elif task.runner == "compliance_schema":
+            report = run_compliance_schema_eval(
+                golden_path=task.golden_path,
+                limit=int(params.get("limit") or 0),
+                categories=params.get("categories") or None,
+                item_ids=params.get("item_ids") or None,
+                on_progress=on_progress,
+            )
+        elif task.runner == "w4_asknum":
+            report = run_asknum_eval(
+                golden_path=task.golden_path,
+                limit=int(params.get("limit") or 0),
+                categories=params.get("categories") or None,
+                item_ids=params.get("item_ids") or None,
                 on_progress=on_progress,
             )
         else:
@@ -230,11 +281,26 @@ def start_run(
     task_id: str,
     limit: int = 0,
     category: str = "",
+    categories: list[str] | None = None,
+    item_ids: list[str] | None = None,
     top_k: int = 0,
+    model: str = "",
+    temperature: float | None = None,
 ) -> dict[str, Any]:
     task = get_task(task_id)
     if not task.golden_path.is_file():
         raise FileNotFoundError(f"golden set missing: {task.golden_file}")
+
+    resolved_categories = normalize_categories(category, categories)
+    resolved_item_ids = normalize_item_ids(item_ids)
+    resolved_model: str | None = None
+    if task.runner == "w1_chat":
+        settings = get_settings()
+        resolved_model = resolve_eval_chat_model(
+            model,
+            available=list_available_models(settings),
+            default_model=settings.default_model,
+        )
 
     with _lock:
         if len(_active_runs) >= 1:
@@ -243,18 +309,25 @@ def start_run(
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S") + f"_{uuid4().hex[:6]}"
     params = {
         "limit": limit,
-        "category": category or None,
+        "categories": resolved_categories or None,
+        "item_ids": resolved_item_ids or None,
         "top_k": top_k or None,
+        "model": resolved_model,
+        "temperature": temperature,
+        "use_rag": False if task.runner == "w1_chat" else None,
     }
 
     import json as json_lib
 
     golden_payload = json_lib.loads(task.golden_path.read_text(encoding="utf-8"))
-    planned_items = golden_payload.get("items") or []
-    if category and task.runner == "rag_retrieval":
-        planned_items = [item for item in planned_items if item.get("category") == category]
-    if limit > 0:
-        planned_items = planned_items[:limit]
+    planned_items = select_items(
+        golden_payload.get("items") or [],
+        categories=resolved_categories,
+        item_ids=resolved_item_ids,
+        limit=limit,
+    )
+    if not planned_items:
+        raise ValueError("没有匹配的评测题，请检查题型或题号")
     planned_total = len(planned_items)
 
     meta = {

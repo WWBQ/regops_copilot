@@ -3,7 +3,7 @@
 > 专门收集开发过程中遇到的问题：**现象 → 根因 → 修复 → 状态**。  
 > 新 bug 请按文末 [模板](#新增条目模板) 追加，已修复条目保留作复盘参考。
 
-**最后更新：** 2026-08-20
+**最后更新：** 2026-08-21
 
 ---
 
@@ -19,7 +19,11 @@
 | [BUG-006](#bug-006-顶部导航整栏-hover-触发菜单) | 前端 · 导航 | 顶部导航整栏 hover 触发菜单 | ✅ 已修复 |
 | [BUG-007](#bug-007-cleaner-未实现噪声清洗) | Ingest · 清洗 | cleaner 未实现噪声清洗 | ✅ 已修复 |
 | [BUG-008](#bug-008-rag-无公司年份范围过滤) | RAG · 检索 | RAG 无公司/年份范围过滤 | ✅ 已修复 |
-| [BUG-009](#bug-009-车型列举问题未命中第22页) | RAG · 检索 | 车型列举问题未命中第 22 页 | ✅ 已修复 |
+| [BUG-009](#bug-009-车型列举问题未命中第22页) | RAG · 检索 | 车型列举问题未命中第 22 页 | 🟡 回归（Hybrid 架构） |
+| [BUG-010](#bug-010-评测黄金集-gold_pages-自动探测误标) | Eval · 黄金集 | 评测黄金集 gold_pages 自动探测误标 | 🟡 部分修复 |
+| [BUG-011](#bug-011-节标题 buried-在-chunk-末尾) | Ingest · 分块 | 节标题 buried 在 chunk 末尾 | 🔴 待修 |
+| [BUG-012](#bug-012-同页去重导致列举题缺段) | RAG · 检索 | 同页去重导致列举题缺段 | ⏸ 已知限制 |
+| [BUG-013](#bug-013-rag-013-第一节风险-top5-未命中) | Eval · RAG | rag-013 第一节风险 top-5 未命中 | 🟡 部分修复 |
 
 ---
 
@@ -134,32 +138,126 @@
 
 ### BUG-009 · 车型列举问题未命中第 22 页
 
-- **发现时间：** 2026-08-20
-- **模块：** RAG · `python-ai/app/rag/retrieval.py` · `service.py` · `config.py`
-- **现象：** 问「2024年长城新推出的车型」，AI 只答长城灵魂 S2000 摩托车、Hi4-Z 架构，未列出第 22 页的多款 SUV（坦克 700 Hi4-T、坦克 500 Hi4-Z、蓝山高阶智驾版、新一代哈弗 H6、二代哈弗 H9 等）。
-- **根因：**
-  1. 第 22 页车型列举 chunk 纯向量相似度约 **0.54–0.72**，排在 **26–37 名**，`top_k=5` 时进不了 LLM 上下文。
-  2. 向量 top-5 已满时，**关键词 ILIKE 补检结果被丢弃**，无法把含「坦克」「哈弗」的 chunk 合并进来。
-  3. 债券/附注等 chunk 向量分更高，进一步挤占名额。
+- **发现时间：** 2026-08-20（2026-08-21 复盘回归）
+- **模块：** RAG · `python-ai/app/rag/service.py` · `retrieval.py` · `reranker.py` · `config.py`
+- **现象：** 问「2024年长城新推出的车型有哪些」（评测 **rag-027**），gold 页 **21–23**（节标题 + 车型列举 + 灵魂跨页）。检索 top-12 页码为 `20, 126, 19, 21, 13, 22, 23, …`；**top-5 仅命中 p21**，p22（核心答案页）排 **#6**，MRR=0.25。
+- **根因（2026-08-21 pipeline trace）：**
+  1. **分块：** p21 c36 末尾才是「本集团 2024 年新推出的车型」，前面大段出海/芯片/氢能；向量 #2、关键词 #1，RRF 综合 **#1**，但内容主体并非车型列举（见 [BUG-011](#bug-011-节标题-buried-在-chunk-末尾)）。
+  2. **关键词路未召回 p22：** `extract_keyword_terms` 抽出 `新推出/推出/车型有哪些` 等，**不含「上市」「哈弗」「坦克」**；p22 正文用「上市」而非「推出」，**p22/p23 未进关键词 top-30**。
+  3. **向量路 p22 偏低：** 车型列表 chunk（p22 c37）在向量 top-80 仅 **#45**；RRF 融合后排 **#28**。
+  4. **精排：** Cross-Encoder（`bge-reranker-v2-m3`）将 p22 从 #28 拉到 **#6**，但仍落后于 p20（灵魂 S2000）、p126（ESG）、p19、p21。
+  5. **同页去重：** `rag_max_chunks_per_page=1`，p22 的 c37/c38 只能留一条（见 [BUG-012](#bug-012-同页去重导致列举题缺段)）。
+- **历史修复说明（2026-08-20 条目，当前代码已不存在）：** 曾记录 `merge_hits`、`_rerank_hits`、`_ensure_product_category_coverage` 等；现网已改为 **向量 + 关键词 → RRF → Cross-Encoder 精排 → 同页去重**，上述函数 **不在当前仓库**，该次修复视为 **未保留 / 回归**。
+- **RRF / 精排 / 去重各做什么（rag-027 实例）：**
+
+  | 阶段 | 作用 | p21 | p22 | p23 |
+  |------|------|-----|-----|-----|
+  | 向量召回 | embedding 相似度 top-80 | #2 | #45 | #15 |
+  | 关键词召回 | ILIKE OR 匹配 top-30 | #1 | 未进榜 | 未进榜 |
+  | **RRF** | `2×1/(60+向量名次)+1×1/(60+关键词名次)` 合并 | **#1** | **#28** | #20 |
+  | **精排** | 问题+chunk 逐对打分重排（80 候选） | #4 | **#6** | #7 |
+  | **去重** | 同页最多 1 chunk，取 top-12 | 留 c36 | 留 c37 或 c38 | 常留 c42 |
+
+- **验证：**
+  ```bash
+  cd python-ai && .venv/bin/python - <<'PY'
+  from app.rag.service import retrieve_hits_with_trace
+  hits, pipe = retrieve_hits_with_trace(
+      question="2024年长城新推出的车型有哪些",
+      doc_ids=["601633_2024"], top_k=12)
+  for i, h in enumerate(hits, 1):
+      print(i, h.metadata.get("page"), (h.content or "")[:60])
+  print("keyword_terms:", pipe.get("keyword_terms"))
+  PY
+  ```
+- **状态：** 🟡 回归（Hybrid 架构下仍待优化）
+- **建议修复（优先级）：**
+  1. 节标题处切 chunk（[BUG-011](#bug-011-节标题-buried-在-chunk-末尾)）
+  2. 列举类问题关键词补充 `上市、新款、发布` 或车型 probe 词
+  3. 列举题 `rag_max_chunks_per_page=2` 或动态放宽（[BUG-012](#bug-012-同页去重导致列举题缺段)）
+- **相关文件：** `service.py`, `retrieval.py`, `reranker.py`, `config.py`, `eval/golden/rag_retrieval_100.json`（rag-027）
+- **备注：** 评测 gold `[21, 22, 23]` **正确**（跨页连续板块）；Recall@12 可命中，但 top-5 / 答全仍不足。
+
+---
+
+### BUG-010 · 评测黄金集 gold_pages 自动探测误标
+
+- **发现时间：** 2026-08-21
+- **模块：** Eval · `eval/scripts/build_rag_retrieval_golden.py` · `eval/golden/rag_retrieval_100.json`
+- **现象：**
+  - **rag-008**（比亚迪新车型）：自动探测曾标 `[29, 3, 13, 15, 16]`；p29 为研发技术表，p3/13/15 为致辞/行业/战略，**真正列举在 p16–20**。
+  - **rag-027**（长城新车型）：人工 override `[21, 22, 23]` 正确；自动探测若只靠 `推出/上市/发布` 会误吸无关页。
+  - 易与 **印刷页码 / PDF 物理页码** 混淆（脚注「21/393」≠ 误以为 p23 无关）。
+- **根因：** `probe_pages()` 按关键词 ILIKE + 简单打分，**不识别节标题、不处理跨页板块**；`MANUAL_GOLD_PAGES` 覆盖不足时误标。
 - **修复：**
-  1. **始终合并**向量 + 关键词命中（`merge_hits` 扩大候选池后再截断）。
-  2. `_rerank_hits()`：车型类问题对多车型列举片段加分，对债券/附注降权。
-  3. `expand_rag_query` / `extract_keyword_terms` 对车型问题补充「哈弗、坦克、蓝山、Hi4、**灵魂、S2000GL、摩托车**」等同义词。
-  4. `_rerank_hits()` 对 **S2000GL** 片段加分，对含「高新技术企业/所得税」的 OCR 噪声 chunk 降权；`_ensure_product_category_coverage()` 确保 top-8 含摩托车品类。
-  5. `rag_top_k` **5 → 8**；车型类问题 merge 候选池扩大至 **20**。
+  1. rag-008 改为 `MANUAL_GOLD_PAGES` → `[16, 17, 18, 19, 20]`；probe 词改为 `全新车型/正式上市/元UP/秦L`。
+  2. rag-027 保持 `[21, 22, 23]`。
+  3. `docs/eval_rag_retrieval.md` 补充：gold 用 **PDF 物理页码**，跨页段落需整段标注。
+- **验证：** 重新跑 `build_rag_retrieval_golden.py`，对照 PDF 抽检 product_enum 类 10 题。
+- **状态：** 🟡 部分修复（已知题已 override，其余 category 仍建议抽检）
+- **相关文件：** `eval/scripts/build_rag_retrieval_golden.py`, `eval/golden/rag_retrieval_100.json`, `docs/eval_rag_retrieval.md`
+
+---
+
+### BUG-011 · 节标题 buried 在 chunk 末尾
+
+- **发现时间：** 2026-08-21（排查 BUG-009 / rag-027）
+- **模块：** Ingest · 分块策略（`chunker.py` / 会话 pipeline）
+- **现象：** 长城年报 p21 **最后一行**为「本集团 2024 年新推出的车型 21/393」，但该 chunk（c36）主体是出海/GWM 战略（500+ 字）。检索时向量/关键词命中 chunk **前半**，RRF 把 p21 顶到 #1，LLM 上下文却几乎看不到节标题。
+- **根因：** 分块按固定长度/块边界切，**不在 MD 节标题 / 「新推出的车型」类小节边界切分**。
+- **修复：** 待做——入库或 chunk 阶段识别小节标题（正则或 parse 结构），**标题单独成 chunk 或与紧随正文合并**，避免标题落在长 chunk 末尾。
+- **状态：** 🔴 待修
+- **相关文件：** `python-ai/app/ingest/chunker.py`
+- **备注：** 比亚迪 p16「推出多款全新车型」+ 车型名列表同理，p16–20 为连续板块。
+
+---
+
+### BUG-012 · 同页去重导致列举题缺段
+
+- **发现时间：** 2026-08-21（排查 BUG-009）
+- **模块：** RAG · `python-ai/app/rag/retrieval.py` · `config.py`
+- **现象：** p22 有 c37（车型名列表）与 c38（H6/H9 上市详情）两条均高度相关；精排后 `apply_page_diversity(max_per_page=1)` **只留一条**，答「有哪些新车型」时可能缺 H6/H9 细节。p23 的 c39（灵魂跨页顶）与 c42（灵魂详情）同理。
+- **根因：** 设计取舍——`rag_max_chunks_per_page=1` 为避免 top-k 被少数页占满、减重复、控 token；**未区分「列举题需同页多条」**。
+- **修复（可选）：**
+  1. 配置 `rag_max_chunks_per_page: 2`；
+  2. 或检测「有哪些/列举/新车型」时动态放宽；
+  3. 或依赖 [BUG-011](#bug-011-节标题-buried-在-chunk-末尾) 让一页一条即够。
+- **状态：** ⏸ 已知限制（产品/评测目标不同：Recall@k 看页码，答全看 chunk）
+- **相关文件：** `retrieval.py`（`apply_page_diversity`）, `config.py`
+
+---
+
+### BUG-013 · rag-013 第一节风险 top-5 未命中
+
+- **发现时间：** 2026-08-21
+- **模块：** Eval · RAG · `rag_retrieval_runner.py` · `retrieval.py`
+- **评测条目：** **rag-013** —「比亚迪年报第一节披露了哪些主要风险」
+- **现象：** 明细里 gold **p5**，检索前几名 `97, 138, 140, 72, 100`（审计/内控/ESG 等含「风险」字样），**top-5 无 p5**；报告仍标 **page_hit_at_k=是**（因 p5 在 **top-12 第 10 位**，MRR=0.1）。
+- **gold p5 内容（第一节 重要提示）：**
+  - 并非列举经营风险清单，而是声明：**「不存在…严重不利影响的有关风险因素」**；
+  - 并写明：**「可能面临的风险因素，详见本报告第三节管理层讨论与分析…」**。
+  - 故本题 gold **p5 对「第一节说了什么」是对的**；若用户期望的是**风险清单正文**，应在 **p13+（第三节）**，题目与 gold 需区分（见下）。
+- **根因：**
+  1. **指标 vs 观感：** Recall@k（k=12）命中即「是」，前端/明细若只展示 top-5，会像「没命中」。
+  2. **关键词未抽「第一节」：** `extract_keyword_terms` 原先无 `第X节`，问句里的节次信息未参与 ILIKE；「风险」泛匹配到审计报告「信用风险」、内控「缺陷」、ESG 等（p97/138/140/72）。
+  3. **向量：** p5 在向量 top-80 约 **#75**，精排后才进 top-12。
+- **修复：**
+  1. `extract_keyword_terms` 增加 `第[一二…]+节` 抽取（已合入 `retrieval.py`）。
+  2. 黄金集 probe 词改为 `第一节/风险因素/可能面临`；`MANUAL_GOLD_PAGES` 保持 `[5]` 并加注释。
+  3. **待产品确认：** 是否另增一题「第三节经营面临的主要风险」gold **p13+**，与本题（第一节表述）拆开。
 - **验证：**
   ```bash
   cd python-ai && .venv/bin/python - <<'PY'
   from app.rag.service import retrieve_hits_for_docs
-  hits = retrieve_hits_for_docs(question="2024年长城新推出的车型", doc_ids=["601633_2024"], top_k=8)
-  for h in hits[:3]: print(h.metadata.get("page"), h.content[:80])
-  assert any(h.metadata.get("page") == 22 for h in hits)
+  hits = retrieve_hits_for_docs(
+      question="比亚迪年报第一节披露了哪些主要风险",
+      doc_ids=["002594_2024"], top_k=12)
+  pages = [h.metadata.get("page") for h in hits]
+  print(pages[:5], "p5@", pages.index(5)+1 if 5 in pages else None)
   PY
   ```
-  预期 top-1 为第 **22** 页（SUV 列举），top-8 含第 **23** 页「长城灵魂 **S2000GL**」（chunk 42）及第 20 页 S2000 上市信息。
-- **状态：** ✅ 已修复
-- **相关文件：** `retrieval.py`, `service.py`, `config.py`, `tests/test_rag_retrieval.py`
-- **备注：** 需 **重新提问**（旧对话缓存不会自动更新）；若 Python 未 `--reload`，需重启 `uvicorn`。
+- **状态：** 🟡 部分修复（关键词已补「第一节」；精排/top-5 仍待观察）
+- **相关文件：** `retrieval.py`, `eval/golden/rag_retrieval_100.json`, `eval/scripts/build_rag_retrieval_golden.py`
 
 ---
 
@@ -181,9 +279,22 @@
 
 1. 文档是否 `ingest_status=ready`？`SELECT doc_id, page_count FROM pdf_document WHERE doc_id LIKE '%代码%';`
 2. 答案是否在 chunk 里？`SELECT chunk_index, metadata->>'page', left(content,120) FROM doc_chunks WHERE content LIKE '%关键词%';`
-3. 检索 top-k 命中什么？见 BUG-003 验证脚本。
-4. 是否被页眉 chunk 挤占？`SELECT COUNT(*) FROM doc_chunks WHERE content LIKE '%年度报告全文%';`
-5. 改 ingest 后是否 **re-ingest**？`python scripts/ingest_pdf_to_vectors.py ../data/raw/xxx.pdf`
+3. 检索 top-k 命中什么？见 BUG-003 / BUG-009 验证脚本。
+4. **Hybrid pipeline 分阶段查什么？**（2026-08-21）
+   - `pipeline["keyword_terms"]`：关键词是否漏「上市/车型名」？
+   - `pipeline["vector_top"]` / `keyword_top`：gold 页在哪一路、第几名？
+   - RRF 后候选序 → 精排是否拉升 gold 页？同页去重丢了哪条 chunk？
+   - 评测明细：`eval/reports/.../report.json` 中 `retrieved_pages` vs `gold_pages`（Recall@k 看页码，不等于 context 答全）。
+5. 是否被页眉 chunk 挤占？`SELECT COUNT(*) FROM doc_chunks WHERE content LIKE '%年度报告全文%';`
+6. 改 ingest 后是否 **re-ingest**？`python scripts/ingest_pdf_to_vectors.py ../data/raw/xxx.pdf`
+
+### 评测黄金集 gold_pages 抽检
+
+1. product_enum / 列举题优先 **人工对照 PDF**（自动 `probe_pages` 易误标，见 BUG-010）。
+2. 长城 rag-027 正确 gold：**[21, 22, 23]**（p21 节标题 + p22 车型 + p23 灵魂跨页）。
+3. 比亚迪 rag-008 正确 gold：**[16, 17, 18, 19, 20]**（非 p29 研发表）。
+4. 页码 = **PDF 物理页**（从文件第 1 页计），与脚注印刷页码可能差若干页。
+5. 重生成：`cd python-ai && .venv/bin/python ../eval/scripts/build_rag_retrieval_golden.py`
 
 ### 服务起不来
 
@@ -222,6 +333,10 @@
 - [ ] `NOISE_PATTERNS.md` 中双栏换行、跨页表头 dedupe 仍未实现
 - [ ] 会话 PDF 与会司语料库检索仍为同一套 top-k，未对会话文档加权
 - [ ] 旧 localStorage 缓存消息可能仍带错误 `totalTokens` 数字，重新提问即正常
+- [ ] **BUG-009** 车型列举在 Hybrid（RRF + Cross-Encoder）下回归；top-12 可命中 p22，top-5 仍不足
+- [ ] **BUG-012** `rag_max_chunks_per_page=1`：列举题同页多条 relevant chunk 时故意只留 1 条
+- [ ] 评测 **Recall@k**（页码命中）与线上 **答全**（chunk 内容完整）目标不一致
+- [ ] 黄金集 100 题中 product_enum 等仍建议按 PDF 抽检（BUG-010）
 
 ---
 

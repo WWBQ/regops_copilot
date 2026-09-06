@@ -12,10 +12,18 @@ export interface EvalTask {
   builtin?: boolean
 }
 
-export interface GoldenSetOption {
+export interface GoldenItemPreview {
+  id: string
+  category?: string | null
+  question: string
+}
+
+export interface GoldenSetPreview {
   filename: string
-  item_count: number
   version: string | null
+  item_count: number
+  categories: string[]
+  items: GoldenItemPreview[]
 }
 
 export interface EvalProgress {
@@ -30,12 +38,35 @@ export interface EvalRunSummary {
   failed?: number
   refused?: number
   accuracy?: number
+  refuse_rate?: number
   number_error_rate?: number
   latency_p50_ms?: number
+  model?: string
   count?: number
   recall_at_k?: number
   mrr?: number
-  by_category?: Record<string, { recall_at_k?: number; mrr?: number; count?: number }>
+  by_category?: Record<
+    string,
+    {
+      recall_at_k?: number
+      mrr?: number
+      count?: number
+      total?: number
+      passed?: number
+      refused?: number
+      accuracy?: number
+    }
+  >
+  // compliance_schema
+  valid_total?: number
+  invalid_total?: number
+  false_accept?: number
+  false_accept_rate?: number
+  false_reject?: number
+  false_reject_rate?: number
+  rule_hit_rate?: number
+  strict_pass_rate?: number
+  by_rule?: Array<{ rule: string | null; total: number; passed: number; failed: number }>
 }
 
 export interface EvalRunItem {
@@ -65,6 +96,10 @@ export function listEvalTasks(): Promise<{ items: EvalTask[] }> {
 
 export function listGoldenSets(): Promise<{ items: GoldenSetOption[]; runners: string[] }> {
   return apiFetch<{ items: GoldenSetOption[]; runners: string[] }>('/ops/eval/golden-sets')
+}
+
+export function getGoldenSet(filename: string): Promise<GoldenSetPreview> {
+  return apiFetch<GoldenSetPreview>(`/ops/eval/golden-sets/${encodeURIComponent(filename)}`)
 }
 
 export function uploadGoldenSet(body: {
@@ -122,7 +157,11 @@ export function startEvalRun(body: {
   task_id: string
   limit?: number
   category?: string
+  categories?: string[]
+  item_ids?: string[]
   top_k?: number
+  model?: string
+  temperature?: number
 }): Promise<EvalRunItem> {
   return apiFetch<EvalRunItem>('/ops/eval/runs', {
     method: 'POST',
@@ -140,4 +179,6 @@ export const EVAL_STATUS_LABELS: Record<string, string> = {
 export const RUNNER_LABELS: Record<string, string> = {
   w1_chat: 'W1 聊天（/chat）',
   rag_retrieval: 'RAG 检索（page Recall@k）',
+  compliance_schema: '合规结论 Schema 校验（误放行率）',
+  w4_asknum: 'W4 问数（受控 lookup）',
 }

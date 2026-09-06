@@ -79,9 +79,9 @@ const CHECKS=[
   {id:"d3-run",sec:"day3",label:"uvicorn 启动；curl /health /chat；/docs 可打开"},
   {id:"d3-must",sec:"day3",label:"pytest 全绿；主系统勾选 w1-3"},
   {id:"d4-dir",sec:"day4",label:"Step 0：建好 eval/golden eval/reports eval/scripts 目录"},
-  {id:"d4-golden",sec:"day4",label:"Step 1：30 条黄金集 JSON（15 条款 + 15 数字）带来源日期"},
+  {id:"d4-golden",sec:"day4",label:"Step 1：30 条闭卷金融概念黄金集 JSON（制度 + 会计/银行/市场）"},
   {id:"d4-script",sec:"day4",label:"Step 2：eval/run_w1_chat.py 可复跑，固定 temperature=0"},
-  {id:"d4-report",sec:"day4",label:"Step 3：报告含正确/错误/拒答/数字错误率/P50/P95/Token"},
+  {id:"d4-report",sec:"day4",label:"Step 3：报告含正确/错误/拒答率/P50/P95"},
   {id:"d4-doc",sec:"day4",label:"Step 4：docs/eval_w1_baseline.md 说明与公开基准分工"},
   {id:"d4-must",sec:"day4",label:"主系统勾选 w1-4"},
   {id:"d5-data",sec:"day5",label:"docs/DATA_SOURCES.md 公开数据源与使用边界"},
@@ -447,41 +447,41 @@ touch eval/run_w1_chat.py</div>
   </div></details>
 
   <details class="step"><summary><span class="num">1</span>黄金集 w1_chat_30.json（1.5h）</summary><div class="body">
-    <p><b>30 条 = 15 制度条款理解 + 15 财报数字提取。</b>全部来自<b>公开基准发布之后</b>的近期披露（巨潮年报/公告），避免数据污染。</p>
+    <p><b>30 条 = 闭卷金融能力题</b>（监管制度 + 会计 / 银行 / 市场概念）。<b>不要写年报数字提取题</b>——那是 RAG / 问数的事，库里没有对应年报时测的是瞎编而不是金融知识。评测固定 <code>use_rag=false</code>。</p>
     <div class="tablewrap"><table>
       <thead><tr><th>字段</th><th>说明</th></tr></thead>
       <tbody>
         <tr><td><code>id</code></td><td>w1-001 … w1-030</td></tr>
-        <tr><td><code>category</code></td><td><code>clause</code> 或 <code>number</code></td></tr>
+        <tr><td><code>category</code></td><td><code>clause</code> / <code>accounting</code> / <code>banking</code> / <code>market</code> 等</td></tr>
         <tr><td><code>question</code></td><td>发给 /chat 的问题</td></tr>
-        <tr><td><code>expected</code></td><td>标准答案（数字题写单位）</td></tr>
-        <tr><td><code>source_doc</code></td><td>来源文件 + 披露日期</td></tr>
-        <tr><td><code>grading</code></td><td><code>exact</code> / <code>contains</code> / <code>numeric_tolerance</code></td></tr>
-        <tr><td><code>why_clean</code></td><td>一句话：为何在基准发布日之后</td></tr>
+        <tr><td><code>expected</code></td><td>关键词，用 <code>|</code> 分隔</td></tr>
+        <tr><td><code>source_doc</code></td><td>口径来源（公开教材 / 监管框架）</td></tr>
+        <tr><td><code>grading</code></td><td><code>contains</code>（命中至少一半关键词）</td></tr>
+        <tr><td><code>why_clean</code></td><td>一句话：为何不依赖特定年报</td></tr>
       </tbody>
     </table></div>
     <div class="code"># 示例（clause）
 {
   "id": "w1-001",
   "category": "clause",
-  "question": "商业银行资本充足率监管要求的核心指标有哪些？",
-  "expected": "核心一级、一级、总资本充足率",
-  "source_doc": "某监管文件 2024-XX-XX",
+  "question": "商业银行资本充足率监管通常关注哪三个层次指标？",
+  "expected": "核心一级资本充足率|一级资本充足率|总资本充足率",
+  "source_doc": "《商业银行资本管理办法》公开监管框架",
   "grading": "contains",
-  "why_clean": "CFLUE 发布于 2023，本题来源在其后"
+  "why_clean": "制度概念题，不依赖特定财报"
 }
 
-# 示例（number）
+# 示例（accounting，不是取数）
 {
-  "id": "w1-016",
-  "category": "number",
-  "question": "XX银行2024年报归母净利润是多少（亿元）？",
-  "expected": "123.45",
-  "source_doc": "巨潮 600XXX 2024年报 2025-03-28",
-  "grading": "numeric_tolerance",
-  "why_clean": "FinQA 截止 2021，本题 2024 披露"
+  "id": "w1-019",
+  "category": "accounting",
+  "question": "ROE 和 ROA 分别用什么做分母？为什么同一家公司 ROE 往往高于 ROA？",
+  "expected": "净资产|总资产|净利润|杠杆",
+  "source_doc": "杜邦分析公开口径",
+  "grading": "contains",
+  "why_clean": "财务分析常识，闭卷可答"
 }</div>
-    <p class="small"><b>选题技巧：</b>数字题优先「直读报表」字段；条款题要能指出来源段落。先凑 10 条跑通脚本，再补满 30 条。</p>
+    <p class="small"><b>选题技巧：</b>问口径、定义、传导机制，不要问某家公司某年的具体数字。先凑 10 条跑通脚本，再补满 30 条。</p>
   </div></details>
 
   <details class="step"><summary><span class="num">2</span>eval/run_w1_chat.py（1.5h）</summary><div class="body">
@@ -489,7 +489,7 @@ touch eval/run_w1_chat.py</div>
       <li>读 <code>eval/golden/w1_chat_30.json</code></li>
       <li>对每条调 <code>POST /chat</code>（或复用 <code>LLMClient</code>，二选一；HTTP 更贴近真实）</li>
       <li><b>固定参数：</b><code>temperature=0</code>、记录 <code>model</code> 版本、Prompt 版本号</li>
-      <li>按 <code>grading</code> 规则判对错；数字题单独统计<b>数字错误率</b></li>
+      <li>按 <code>grading</code> 规则判对错；统计准确率与<b>拒答率</b>（不要数字错误率）</li>
       <li>输出 JSON + Markdown 到 <code>eval/reports/YYYYMMDD_HHMM/</code></li>
     </ul>
     <div class="code"># 验收（需 uvicorn 或脚本内直接调 client）
@@ -498,9 +498,8 @@ python ../eval/run_w1_chat.py --base-url http://localhost:8000
 
 # 报告至少含：
 # correct / wrong / refuse 计数
-# number_error_rate（仅 category=number）
-# latency P50 / P95
-# total_tokens / 估算成本</div>
+# refuse_rate
+# latency P50 / P95</div>
     <p class="small"><b>面试点：</b>为什么要自建集？→ 公开榜可能被模型训练过；近期披露是「干净留出集」。</p>
   </div></details>
 
@@ -611,7 +610,7 @@ function day6(){return `
       <tbody>
         <tr><td><code>CFLUE.md</code></td><td>中文金融知识理解</td><td>对照 w1-1 模型选型</td></tr>
         <tr><td><code>FinEval.md</code></td><td>中文金融评测集</td><td>同上</td></tr>
-        <tr><td><code>FinQA_TATQA.md</code></td><td>表格+文本数字推理</td><td>对照 w1-4 数字题</td></tr>
+        <tr><td><code>FinQA_TATQA.md</code></td><td>表格+文本数字推理</td><td>对照 W3 检索 / W4 问数，不是 w1-4 闭卷题</td></tr>
         <tr><td><code>FinanceBench.md</code></td><td>长文档金融 QA</td><td>W3 外部对标</td></tr>
         <tr><td><code>FinMTEB.md</code></td><td>金融 Embedding / 检索</td><td>W3 Embedding 选型</td></tr>
       </tbody>
@@ -656,7 +655,7 @@ function stuck(){return `
       <tr><td>httpx 超时</td><td>网络 / 代理</td><td>异常类型</td></tr>
       <tr><td>pytest 失败</td><td>Schema 还是 API</td><td><code>pytest -v</code> 输出</td></tr>
       <tr><td>eval 全错</td><td>uvicorn 是否启动；Key 是否有效</td><td>单条 curl + 一条 golden 对照</td></tr>
-      <tr><td>数字题判分</td><td>单位万元/亿元是否统一</td><td>expected 与 grading 规则</td></tr>
+      <tr><td>概念题全错</td><td>是否误开 RAG；expected 关键词是否过严</td><td>单条 curl + 一条 golden 对照</td></tr>
       <tr><td>基准许可搞不清</td><td>先读官方 LICENSE</td><td>选型卡「许可」章节草稿</td></tr>
     </tbody>
   </table></div>

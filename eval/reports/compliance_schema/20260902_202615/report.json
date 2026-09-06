@@ -1,0 +1,501 @@
+{
+  "task_id": "compliance_schema",
+  "generated_at": "2026-09-02T12:26:15.515469+00:00",
+  "golden_version": "compliance-schema-v1",
+  "golden_file": "compliance_schema_20.json",
+  "schema_target": "app.schemas.compliance.ComplianceConclusion",
+  "params": {
+    "limit": 0,
+    "category": null
+  },
+  "summary": {
+    "total": 20,
+    "valid_total": 10,
+    "invalid_total": 10,
+    "decision_correct": 20,
+    "accuracy": 1.0,
+    "false_accept": 0,
+    "false_accept_rate": 0.0,
+    "false_reject": 0,
+    "false_reject_rate": 0.0,
+    "rule_hit_rate": 1.0,
+    "normalization_checked": 2,
+    "normalization_passed": 2,
+    "strict_passed": 20,
+    "strict_pass_rate": 1.0,
+    "by_rule": [
+      {
+        "rule": "baseline_low_risk",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "baseline_multi_clause",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "high_risk_confidence_boundary",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "confidence_lower_boundary",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "confidence_upper_boundary",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "optional_field_default",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "clause_refs_strip",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "conclusion_max_len_boundary",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "high_risk_low_confidence",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "baseline_multi_evidence",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "clause_refs_min_len",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "clause_refs_blank_only",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "risk_level_enum",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "confidence_gt_one",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "confidence_lt_zero",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "high_risk_confidence_cap",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "conclusion_empty",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "conclusion_too_long",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "conclusion_missing",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "confidence_not_numeric",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "cs-001",
+      "category": "valid",
+      "rule": "baseline_low_risk",
+      "note": "低风险常规结论，各字段均在约束内",
+      "expected": "accept",
+      "actual": "accept",
+      "decision_correct": true,
+      "rule_matched": null,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [],
+      "detail": "结构校验通过"
+    },
+    {
+      "id": "cs-002",
+      "category": "valid",
+      "rule": "baseline_multi_clause",
+      "note": "中风险，多条条款引用",
+      "expected": "accept",
+      "actual": "accept",
+      "decision_correct": true,
+      "rule_matched": null,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [],
+      "detail": "结构校验通过"
+    },
+    {
+      "id": "cs-003",
+      "category": "valid",
+      "rule": "high_risk_confidence_boundary",
+      "note": "边界：高风险 + confidence 恰好 0.95，规则为「不应超过」，故应放行",
+      "expected": "accept",
+      "actual": "accept",
+      "decision_correct": true,
+      "rule_matched": null,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [],
+      "detail": "结构校验通过"
+    },
+    {
+      "id": "cs-004",
+      "category": "valid",
+      "rule": "confidence_lower_boundary",
+      "note": "边界：confidence 下界 0.0（ge=0.0 应放行）",
+      "expected": "accept",
+      "actual": "accept",
+      "decision_correct": true,
+      "rule_matched": null,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [],
+      "detail": "结构校验通过"
+    },
+    {
+      "id": "cs-005",
+      "category": "valid",
+      "rule": "confidence_upper_boundary",
+      "note": "边界：非高风险时 confidence 上界 1.0 应放行",
+      "expected": "accept",
+      "actual": "accept",
+      "decision_correct": true,
+      "rule_matched": null,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [],
+      "detail": "结构校验通过"
+    },
+    {
+      "id": "cs-006",
+      "category": "valid",
+      "rule": "optional_field_default",
+      "note": "evidence_quotes 缺省，应回落为空列表而非报错",
+      "expected": "accept",
+      "actual": "accept",
+      "decision_correct": true,
+      "rule_matched": null,
+      "normalized_ok": true,
+      "passed": true,
+      "errors": [],
+      "detail": "字段清洗符合预期"
+    },
+    {
+      "id": "cs-007",
+      "category": "valid",
+      "rule": "clause_refs_strip",
+      "note": "条款编号含首尾空白与空串，应被清洗后保留有效项",
+      "expected": "accept",
+      "actual": "accept",
+      "decision_correct": true,
+      "rule_matched": null,
+      "normalized_ok": true,
+      "passed": true,
+      "errors": [],
+      "detail": "字段清洗符合预期"
+    },
+    {
+      "id": "cs-008",
+      "category": "valid",
+      "rule": "conclusion_max_len_boundary",
+      "note": "边界：conclusion 恰好 500 字（max_length=500 应放行）",
+      "expected": "accept",
+      "actual": "accept",
+      "decision_correct": true,
+      "rule_matched": null,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [],
+      "detail": "结构校验通过"
+    },
+    {
+      "id": "cs-009",
+      "category": "valid",
+      "rule": "high_risk_low_confidence",
+      "note": "高风险但置信度低，属于应当放行的谨慎结论",
+      "expected": "accept",
+      "actual": "accept",
+      "decision_correct": true,
+      "rule_matched": null,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [],
+      "detail": "结构校验通过"
+    },
+    {
+      "id": "cs-010",
+      "category": "valid",
+      "rule": "baseline_multi_evidence",
+      "note": "多条证据引用",
+      "expected": "accept",
+      "actual": "accept",
+      "decision_correct": true,
+      "rule_matched": null,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [],
+      "detail": "结构校验通过"
+    },
+    {
+      "id": "cs-011",
+      "category": "invalid",
+      "rule": "clause_refs_min_len",
+      "note": "clause_refs 为空数组，违反 min_length=1",
+      "expected": "reject",
+      "actual": "reject",
+      "decision_correct": true,
+      "rule_matched": true,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [
+        {
+          "loc": "clause_refs",
+          "field": "clause_refs",
+          "type": "too_short",
+          "msg": "List should have at least 1 item after validation, not 0"
+        }
+      ],
+      "detail": "报错理由命中预期规则"
+    },
+    {
+      "id": "cs-012",
+      "category": "invalid",
+      "rule": "clause_refs_blank_only",
+      "note": "条款编号全为空白，Field 约束放行但自定义 validator 应拦下",
+      "expected": "reject",
+      "actual": "reject",
+      "decision_correct": true,
+      "rule_matched": true,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [
+        {
+          "loc": "clause_refs",
+          "field": "clause_refs",
+          "type": "value_error",
+          "msg": "Value error, 至少提供一条有效条款编号"
+        }
+      ],
+      "detail": "报错理由命中预期规则"
+    },
+    {
+      "id": "cs-013",
+      "category": "invalid",
+      "rule": "risk_level_enum",
+      "note": "risk_level 超出 低/中/高 枚举",
+      "expected": "reject",
+      "actual": "reject",
+      "decision_correct": true,
+      "rule_matched": true,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [
+        {
+          "loc": "risk_level",
+          "field": "risk_level",
+          "type": "literal_error",
+          "msg": "Input should be '低', '中' or '高'"
+        }
+      ],
+      "detail": "报错理由命中预期规则"
+    },
+    {
+      "id": "cs-014",
+      "category": "invalid",
+      "rule": "confidence_gt_one",
+      "note": "confidence 超过上界 1.0",
+      "expected": "reject",
+      "actual": "reject",
+      "decision_correct": true,
+      "rule_matched": true,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [
+        {
+          "loc": "confidence",
+          "field": "confidence",
+          "type": "less_than_equal",
+          "msg": "Input should be less than or equal to 1"
+        }
+      ],
+      "detail": "报错理由命中预期规则"
+    },
+    {
+      "id": "cs-015",
+      "category": "invalid",
+      "rule": "confidence_lt_zero",
+      "note": "confidence 低于下界 0.0",
+      "expected": "reject",
+      "actual": "reject",
+      "decision_correct": true,
+      "rule_matched": true,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [
+        {
+          "loc": "confidence",
+          "field": "confidence",
+          "type": "greater_than_equal",
+          "msg": "Input should be greater than or equal to 0"
+        }
+      ],
+      "detail": "报错理由命中预期规则"
+    },
+    {
+      "id": "cs-016",
+      "category": "invalid",
+      "rule": "high_risk_confidence_cap",
+      "note": "高风险结论置信度过高，应由 model_validator 拦下（跨字段规则）",
+      "expected": "reject",
+      "actual": "reject",
+      "decision_correct": true,
+      "rule_matched": true,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [
+        {
+          "loc": "",
+          "field": "",
+          "type": "value_error",
+          "msg": "Value error, 高风险结论的置信度不应超过 0.95"
+        }
+      ],
+      "detail": "报错理由命中预期规则"
+    },
+    {
+      "id": "cs-017",
+      "category": "invalid",
+      "rule": "conclusion_empty",
+      "note": "conclusion 为空串，违反 min_length=1",
+      "expected": "reject",
+      "actual": "reject",
+      "decision_correct": true,
+      "rule_matched": true,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [
+        {
+          "loc": "conclusion",
+          "field": "conclusion",
+          "type": "string_too_short",
+          "msg": "String should have at least 1 character"
+        }
+      ],
+      "detail": "报错理由命中预期规则"
+    },
+    {
+      "id": "cs-018",
+      "category": "invalid",
+      "rule": "conclusion_too_long",
+      "note": "conclusion 501 字，越过 max_length=500 一位",
+      "expected": "reject",
+      "actual": "reject",
+      "decision_correct": true,
+      "rule_matched": true,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [
+        {
+          "loc": "conclusion",
+          "field": "conclusion",
+          "type": "string_too_long",
+          "msg": "String should have at most 500 characters"
+        }
+      ],
+      "detail": "报错理由命中预期规则"
+    },
+    {
+      "id": "cs-019",
+      "category": "invalid",
+      "rule": "conclusion_missing",
+      "note": "缺失必填字段 conclusion（LLM 漏字段的典型形态）",
+      "expected": "reject",
+      "actual": "reject",
+      "decision_correct": true,
+      "rule_matched": true,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [
+        {
+          "loc": "conclusion",
+          "field": "conclusion",
+          "type": "missing",
+          "msg": "Field required"
+        }
+      ],
+      "detail": "报错理由命中预期规则"
+    },
+    {
+      "id": "cs-020",
+      "category": "invalid",
+      "rule": "confidence_not_numeric",
+      "note": "confidence 为不可转数字的文本（LLM 输出「很高」这类词）",
+      "expected": "reject",
+      "actual": "reject",
+      "decision_correct": true,
+      "rule_matched": true,
+      "normalized_ok": null,
+      "passed": true,
+      "errors": [
+        {
+          "loc": "confidence",
+          "field": "confidence",
+          "type": "float_parsing",
+          "msg": "Input should be a valid number, unable to parse string as a number"
+        }
+      ],
+      "detail": "报错理由命中预期规则"
+    }
+  ]
+}

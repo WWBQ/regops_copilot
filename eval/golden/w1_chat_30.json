@@ -1,6 +1,6 @@
 {
-  "version": "w1-v1",
-  "description": "W1 聊天评测黄金集：15 制度条款理解 + 15 财报数字提取。数字题来源均为 2024 年报（2025 年披露），晚于 FinQA/CFLUE 等公开基准主要构造期。",
+  "version": "w1-v2",
+  "description": "W1 聊天评测黄金集：30 道闭卷金融能力题（15 监管制度 + 15 会计/银行/市场概念）。不测年报数字提取——那是 RAG/问数的事，原生模型没有文档答不出才正常。评测请求固定 use_rag=false。",
   "default_params": {
     "temperature": 0.0,
     "prompt_version": "w1-default"
@@ -49,7 +49,7 @@
       "expected": "贷款损失准备|不良贷款|覆盖",
       "grading": "contains",
       "source_doc": "银行监管指标公开定义",
-      "why_clean": "与 w1-016 等数字题配套的口径理解"
+      "why_clean": "银行监管指标口径理解，闭卷可答"
     },
     {
       "id": "w1-006",
@@ -134,177 +134,147 @@
     },
     {
       "id": "w1-015",
-      "category": "clause",
-      "question": "FinQA/TAT-QA 类 benchmark 主要评测模型的什么能力？和纯知识选择题有何不同？",
-      "expected": "表格|数字|推理|证据",
+      "category": "banking",
+      "question": "贷款风险分类通常说的「五级分类」是哪五类？其中哪几类计入不良贷款？",
+      "expected": "正常|关注|次级|可疑|损失|不良",
       "grading": "contains",
-      "source_doc": "FinQA/TAT-QA 公开论文任务定义",
-      "why_clean": "衔接 Day 6 基准调研与 Day 4 数字题设计"
+      "source_doc": "贷款风险分类公开监管口径",
+      "why_clean": "银行资产质量常识，闭卷可答"
     },
     {
       "id": "w1-016",
-      "category": "number",
-      "question": "工商银行（601398）2024 年归属于母公司股东的净利润是多少亿元？只回答数字，保留两位小数。",
-      "expected": "3658.63",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.05,
-      "unit": "亿元",
-      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
-      "why_clean": "FinQA 主要截止 2021 年前数据，2024 年报为干净留出"
+      "category": "accounting",
+      "question": "利润表上「营业收入」和「营业利润」通常差在哪几类项目？各举一类即可。",
+      "expected": "成本|费用|税金|减值|投资收益",
+      "grading": "contains",
+      "source_doc": "企业会计准则——利润表公开列报口径",
+      "why_clean": "会计概念，不依赖某一年报数字"
     },
     {
       "id": "w1-017",
-      "category": "number",
-      "question": "工商银行 2024 年末不良贷款率是多少？只回答百分比数字，保留两位小数，不要带百分号。",
-      "expected": "1.34",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.02,
-      "unit": "%",
-      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
-      "why_clean": "2024 披露，晚于多数公开金融 QA 集"
+      "category": "accounting",
+      "question": "权责发生制和收付实现制的核心差别是什么？各用一句话。",
+      "expected": "权责|发生|收付|现金|确认",
+      "grading": "contains",
+      "source_doc": "会计基础公开教材",
+      "why_clean": "基础会计，闭卷可答"
     },
     {
       "id": "w1-018",
-      "category": "number",
-      "question": "工商银行 2024 年末资本充足率（总资本充足率）是多少？只回答数字，保留两位小数。",
-      "expected": "19.39",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.05,
-      "unit": "%",
-      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
-      "why_clean": "同上"
+      "category": "accounting",
+      "question": "合并报表里的「商誉」一般在什么交易中产生？后续通常如何处理？",
+      "expected": "并购|合并|溢价|减值",
+      "grading": "contains",
+      "source_doc": "企业会计准则第20号/商誉减值公开规则",
+      "why_clean": "年报阅读高频概念，不是取数"
     },
     {
       "id": "w1-019",
-      "category": "number",
-      "question": "工商银行 2024 年营业收入是多少亿元？只回答数字，保留两位小数。",
-      "expected": "8218.03",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.1,
-      "unit": "亿元",
-      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
-      "why_clean": "同上"
+      "category": "accounting",
+      "question": "ROE 和 ROA 分别用什么做分母？为什么同一家公司 ROE 往往高于 ROA？",
+      "expected": "净资产|总资产|净利润|杠杆",
+      "grading": "contains",
+      "source_doc": "杜邦分析公开口径",
+      "why_clean": "财务分析常识"
     },
     {
       "id": "w1-020",
-      "category": "number",
-      "question": "工商银行 2024 年末核心一级资本充足率是多少？只回答数字，保留两位小数。",
-      "expected": "14.10",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.05,
-      "unit": "%",
-      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
-      "why_clean": "同上"
+      "category": "market",
+      "question": "市盈率（PE）和市净率（PB）分别用股价去除以什么？各自更适合观察哪类公司？",
+      "expected": "每股收益|每股净资产|盈利|净资产|估值",
+      "grading": "contains",
+      "source_doc": "证券投资公开教材",
+      "why_clean": "估值术语，非具体报价"
     },
     {
       "id": "w1-021",
-      "category": "number",
-      "question": "工商银行 2024 年末拨备覆盖率是多少？只回答数字，保留两位小数。",
-      "expected": "214.91",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.1,
-      "unit": "%",
-      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
-      "why_clean": "同上"
+      "category": "banking",
+      "question": "商业银行「净息差（NIM）」大致怎么理解？主要受哪两端影响？",
+      "expected": "利息收入|利息支出|生息资产|净利息",
+      "grading": "contains",
+      "source_doc": "银行年报常用指标公开定义",
+      "why_clean": "银行分析高频，不要求某行当年数字"
     },
     {
       "id": "w1-022",
-      "category": "number",
-      "question": "工商银行 2024 年加权平均净资产收益率（ROE）是多少？只回答数字，保留两位小数。",
-      "expected": "9.88",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.05,
-      "unit": "%",
-      "source_doc": "工商银行2024年度报告，披露日 2025-03-28",
-      "why_clean": "比率类指标，测模型是否乱算"
+      "category": "macro",
+      "question": "央行上调存款准备金率，通常希望对银行体系和信贷产生什么方向的影响？",
+      "expected": "收缩|流动性|放贷|货币",
+      "grading": "contains",
+      "source_doc": "央行货币政策工具公开说明",
+      "why_clean": "宏观金融常识"
     },
     {
       "id": "w1-023",
-      "category": "number",
-      "question": "招商银行（600036）2024 年营业收入是多少亿元？只回答数字，保留两位小数。",
-      "expected": "3374.88",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.1,
-      "unit": "亿元",
-      "source_doc": "招商银行2024年度报告，披露日 2025-03-25",
-      "why_clean": "2024 披露，跨行验证"
+      "category": "market",
+      "question": "债券「久期」大致衡量什么？利率上升时，久期更长的债券价格通常怎么变？",
+      "expected": "利率|敏感|价格|下跌|期限",
+      "grading": "contains",
+      "source_doc": "固定收益公开教材",
+      "why_clean": "利率风险概念"
     },
     {
       "id": "w1-024",
-      "category": "number",
-      "question": "招商银行 2024 年归属于本行股东的净利润是多少亿元？只回答数字，保留两位小数。",
-      "expected": "1483.91",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.05,
-      "unit": "亿元",
-      "source_doc": "招商银行2024年度报告，披露日 2025-03-25",
-      "why_clean": "同上"
+      "category": "securities",
+      "question": "证券法意义上的「内幕信息」通常要同时满足哪两个特征？为什么禁止内幕交易？",
+      "expected": "未公开|重大|公平|禁止",
+      "grading": "contains",
+      "source_doc": "《证券法》内幕交易公开要点",
+      "why_clean": "证券合规常识"
     },
     {
       "id": "w1-025",
-      "category": "number",
-      "question": "招商银行 2024 年末不良贷款率是多少？只回答数字，保留两位小数。",
-      "expected": "0.95",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.02,
-      "unit": "%",
-      "source_doc": "招商银行2024年度报告，披露日 2025-03-25",
-      "why_clean": "同上"
+      "category": "securities",
+      "question": "上市公司收购中的「一致行动人」大致指什么关系？监管为什么要求合并计算持股？",
+      "expected": "共同|表决|控制|持股|披露",
+      "grading": "contains",
+      "source_doc": "收购管理办法公开要点",
+      "why_clean": "权益披露概念"
     },
     {
       "id": "w1-026",
-      "category": "number",
-      "question": "招商银行 2024 年末拨备覆盖率是多少？只回答数字，保留两位小数。",
-      "expected": "411.98",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.1,
-      "unit": "%",
-      "source_doc": "招商银行2024年度报告，披露日 2025-03-25",
-      "why_clean": "同上"
+      "category": "market",
+      "question": "证券市场中的「做市商」主要通过什么方式提供流动性？",
+      "expected": "双边报价|买卖|流动性|价差",
+      "grading": "contains",
+      "source_doc": "市场微观结构公开说明",
+      "why_clean": "交易机制常识"
     },
     {
       "id": "w1-027",
-      "category": "number",
-      "question": "招商银行 2024 年净利息收入是多少亿元？只回答数字，保留两位小数。",
-      "expected": "2112.77",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.1,
-      "unit": "亿元",
-      "source_doc": "招商银行2024年度报告，披露日 2025-03-25",
-      "why_clean": "同上"
+      "category": "credit",
+      "question": "信用债发生实质违约后，债权人常见的几类处置手段有哪些？列出两类即可。",
+      "expected": "重组|展期|担保|诉讼|破产|清偿",
+      "grading": "contains",
+      "source_doc": "债券违约处置公开实践",
+      "why_clean": "信用风险概念，非某只债券的违约数字"
     },
     {
       "id": "w1-028",
-      "category": "number",
-      "question": "建设银行 2024 年归属于本行股东的净利润是多少亿元？只回答数字，保留两位小数。",
-      "expected": "3355.77",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.1,
-      "unit": "亿元",
-      "source_doc": "建设银行2024年度报告摘要（对比2025年报披露数据）",
-      "why_clean": "2024 业绩，晚于 FinQA 构造期"
+      "category": "clause",
+      "question": "资管产品「穿透式监管」主要想看清什么？针对的是哪类嵌套风险？",
+      "expected": "底层|实际|嵌套|穿透",
+      "grading": "contains",
+      "source_doc": "资管新规公开要点",
+      "why_clean": "资管合规概念"
     },
     {
       "id": "w1-029",
-      "category": "number",
-      "question": "建设银行 2024 年营业收入是多少亿元？只回答数字，保留两位小数。",
-      "expected": "7469.70",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 0.1,
-      "unit": "亿元",
-      "source_doc": "建设银行2024年度报告摘要",
-      "why_clean": "同上"
+      "category": "macro",
+      "question": "央行「再贷款」和「再贴现」的操作对象有何不同？各用一句话。",
+      "expected": "再贷款|再贴现|票据|金融机构",
+      "grading": "contains",
+      "source_doc": "央行公开市场与结构性工具说明",
+      "why_clean": "货币政策工具辨析"
     },
     {
       "id": "w1-030",
-      "category": "number",
-      "question": "招商银行 2024 年末资产总额是多少亿元？只回答数字，保留两位小数。",
-      "expected": "121520.36",
-      "grading": "numeric_tolerance",
-      "numeric_tolerance": 1.0,
-      "unit": "亿元",
-      "source_doc": "招商银行2024年度报告，披露日 2025-03-25",
-      "why_clean": "大数提取，测单位/量级是否搞错"
+      "category": "market",
+      "question": "投资组合里「系统性风险」和「非系统性风险」的关键差别是什么？哪一类更难靠分散投资消除？",
+      "expected": "系统|个别|分散|市场",
+      "grading": "contains",
+      "source_doc": "投资学公开教材",
+      "why_clean": "风险分类常识"
     }
   ]
 }

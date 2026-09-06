@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import { listRagTraces, OUTCOME_LABELS, type RagTraceItem } from '../../api/ops'
+import {
+  listRagTraces,
+  OUTCOME_LABELS,
+  type RagOverview,
+  type RagTraceItem,
+} from '../../api/ops'
 
 const items = ref<RagTraceItem[]>([])
 const total = ref(0)
+const overview = ref<RagOverview | null>(null)
 const loading = ref(true)
 const error = ref('')
 const outcomeFilter = ref('')
@@ -22,12 +28,13 @@ async function refresh() {
   loading.value = true
   error.value = ''
   try {
-    const response = await listRagTraces({
+    const traceResponse = await listRagTraces({
       limit: 50,
       outcome: outcomeFilter.value || undefined,
     })
-    items.value = response.items
-    total.value = response.total
+    items.value = traceResponse.items
+    total.value = traceResponse.total
+    overview.value = traceResponse.summary ?? null
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载失败'
   } finally {
@@ -63,14 +70,22 @@ function pagesFromHits(trace: RagTraceItem) {
 }
 
 const stats = computed(() => {
-  const ok = items.value.filter((item) => item.outcome === 'ok').length
+  const ok = overview.value?.ok_count ?? items.value.filter((item) => item.outcome === 'ok').length
   const low = items.value.filter((item) => item.outcome === 'low_score').length
+  const refusalRate = overview.value?.refusal_rate ?? 0
+  const refusalCount = overview.value?.refusal_count ?? 0
+  const traceTotal = overview.value?.total ?? total.value
   const avgMs =
-    items.value.length === 0
+    overview.value?.avg_rag_ms ??
+    (items.value.length === 0
       ? 0
-      : Math.round(items.value.reduce((sum, item) => sum + item.total_rag_ms, 0) / items.value.length)
-  return { ok, low, avgMs }
+      : Math.round(items.value.reduce((sum, item) => sum + item.total_rag_ms, 0) / items.value.length))
+  return { ok, low, refusalRate, refusalCount, traceTotal, avgMs }
 })
+
+function formatPercent(rate: number) {
+  return `${(rate * 100).toFixed(1)}%`
+}
 
 onMounted(refresh)
 </script>
@@ -86,6 +101,8 @@ onMounted(refresh)
         </p>
         <p class="head-link">
           <router-link to="/ops/eval">→ 跑 100 题 RAG 检索评测、查看完整报告</router-link>
+          ·
+          <router-link to="/ops/asknum">问数监控</router-link>
         </p>
       </div>
       <div class="head-actions">
@@ -100,20 +117,25 @@ onMounted(refresh)
 
     <div class="stats">
       <article class="stat-card">
-        <p class="stat-label">本页记录</p>
-        <p class="stat-value">{{ items.length }} / {{ total }}</p>
+        <p class="stat-label">Trace 总数</p>
+        <p class="stat-value">{{ stats.traceTotal }}</p>
       </article>
       <article class="stat-card">
         <p class="stat-label">成功检索</p>
         <p class="stat-value">{{ stats.ok }}</p>
       </article>
+      <article class="stat-card" title="拒答 = 分数过低 + 无文档；分母为排除寒暄（无意图）后的检索次数">
+        <p class="stat-label">拒答率</p>
+        <p class="stat-value">{{ formatPercent(stats.refusalRate) }}</p>
+        <p class="stat-sub">{{ stats.refusalCount }} 次拒答</p>
+      </article>
       <article class="stat-card">
-        <p class="stat-label">分数过低</p>
+        <p class="stat-label">本页 · 分数过低</p>
         <p class="stat-value">{{ stats.low }}</p>
       </article>
       <article class="stat-card">
         <p class="stat-label">平均 RAG 耗时</p>
-        <p class="stat-value">{{ stats.avgMs }} ms</p>
+        <p class="stat-value">{{ Math.round(stats.avgMs) }} ms</p>
       </article>
     </div>
 
@@ -240,7 +262,7 @@ onMounted(refresh)
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -263,6 +285,12 @@ onMounted(refresh)
   font-size: 20px;
   font-weight: 600;
   color: var(--text-strong);
+}
+
+.stat-sub {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .table-wrap {

@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.eval import job_service
-from app.eval.registry import RUNNERS, list_golden_files
+from app.eval.registry import RUNNERS, list_golden_files, preview_golden_set
 
 router = APIRouter(prefix="/ops/eval", tags=["ops-eval"])
 
@@ -16,8 +16,16 @@ router = APIRouter(prefix="/ops/eval", tags=["ops-eval"])
 class StartEvalRunRequest(BaseModel):
     task_id: str = Field(..., description="评测任务 ID")
     limit: int = Field(0, ge=0, le=500, description="只跑前 N 题，0 表示全量")
-    category: str = Field("", description="RAG 评测可按题型过滤")
+    category: str = Field("", description="兼容旧字段：单个题型")
+    categories: list[str] = Field(default_factory=list, description="按题型筛选，可多选")
+    item_ids: list[str] = Field(default_factory=list, max_length=500, description="指定题号")
     top_k: int = Field(0, ge=0, le=50, description="RAG top_k 覆盖，0 用黄金集默认")
+    model: str = Field(
+        "",
+        max_length=32,
+        description="w1_chat 选用的模型（deepseek/qwen）；空则用 DEFAULT_MODEL",
+    )
+    temperature: float | None = Field(None, ge=0.0, le=2.0, description="w1_chat 覆盖温度")
 
 
 class CreateEvalTaskRequest(BaseModel):
@@ -43,6 +51,16 @@ class UploadGoldenSetRequest(BaseModel):
     filename: str = Field(..., description="保存到 eval/golden/ 的文件名，如 my_rag_20.json")
     content: dict[str, Any] = Field(..., description="黄金集 JSON 内容，须含 items 数组")
     runner: str | None = Field(None, description="可选：rag_retrieval 时校验 doc_id / gold_pages")
+
+
+@router.get("/golden-sets/{filename}")
+def get_eval_golden_set(filename: str) -> dict[str, Any]:
+    try:
+        return preview_golden_set(filename)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/golden-sets/upload")
@@ -126,11 +144,17 @@ def start_eval_run(body: StartEvalRunRequest) -> dict[str, Any]:
             task_id=body.task_id,
             limit=body.limit,
             category=body.category,
+            categories=body.categories,
+            item_ids=body.item_ids,
             top_k=body.top_k,
+            model=body.model,
+            temperature=body.temperature,
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc

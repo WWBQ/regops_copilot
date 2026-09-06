@@ -90,6 +90,7 @@ def extract_keyword_terms(question: str) -> list[str]:
     terms: list[str] = []
     terms.extend(re.findall(r"\b\d{6}\b", normalized))
     terms.extend(re.findall(r"[A-Za-z][A-Za-z0-9\-]{1,}", normalized))
+    terms.extend(re.findall(r"第[一二三四五六七八九十百]+节", normalized))
 
     chinese_text = re.sub(r"20\d{2}年?", " ", normalized)
     chinese_text = re.sub(r"[\d\s]+", "", chinese_text)

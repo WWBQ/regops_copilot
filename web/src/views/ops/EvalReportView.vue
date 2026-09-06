@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
+import { getModels } from '../../api/chat'
 import {
   EVAL_STATUS_LABELS,
   RUNNER_LABELS,
@@ -8,6 +9,7 @@ import {
   deleteEvalRun,
   deleteEvalTask,
   getEvalRun,
+  getGoldenSet,
   listEvalRuns,
   listEvalTasks,
   listGoldenSets,
@@ -15,8 +17,10 @@ import {
   uploadGoldenSet,
   type EvalRunItem,
   type EvalTask,
+  type GoldenItemPreview,
   type GoldenSetOption,
 } from '../../api/eval'
+import { modelLabel } from '../../utils/models'
 
 const tasks = ref<EvalTask[]>([])
 const goldenSets = ref<GoldenSetOption[]>([])
@@ -28,6 +32,24 @@ const loading = ref(true)
 const running = ref(false)
 const error = ref('')
 const debugLimit = ref(0)
+const availableModels = ref<string[]>([])
+const selectedModel = ref('')
+const selectedCategories = ref<string[]>([])
+const selectedItemIds = ref<string[]>([])
+const goldenItems = ref<GoldenItemPreview[]>([])
+const goldenCategories = ref<string[]>([])
+const itemQuery = ref('')
+const showItemPicker = ref(false)
+const temperature = ref(0)
+const ragTopK = ref(0)
+const resultStatusFilter = ref<'all' | 'pass' | 'fail' | 'refuse' | 'miss'>('all')
+const resultQuery = ref('')
+const resultCategoryFilter = ref('')
+const compareLeftId = ref('')
+const compareRightId = ref('')
+const compareLeft = ref<EvalRunItem | null>(null)
+const compareRight = ref<EvalRunItem | null>(null)
+const compareLoading = ref(false)
 const showTaskManager = ref(false)
 const uploadFilename = ref('')
 const uploadRunner = ref('rag_retrieval')
@@ -44,6 +66,56 @@ const newTask = ref({
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const selectedTask = computed(() => tasks.value.find((t) => t.id === selectedTaskId.value))
+
+const isW1ChatTask = computed(() => selectedTask.value?.runner === 'w1_chat')
+const isRagTask = computed(() => selectedTask.value?.runner === 'rag_retrieval')
+
+const completedRuns = computed(() => runs.value.filter((run) => run.status === 'completed'))
+
+const canCompare = computed(
+  () => isW1ChatTask.value && completedRuns.value.length >= 2,
+)
+
+const filteredGoldenItems = computed(() => {
+  const query = itemQuery.value.trim().toLowerCase()
+  return goldenItems.value.filter((item) => {
+    if (selectedCategories.value.length && !selectedCategories.value.includes(String(item.category))) {
+      return false
+    }
+    if (!query) return true
+    return (
+      item.id.toLowerCase().includes(query) ||
+      item.question.toLowerCase().includes(query) ||
+      String(item.category ?? '').toLowerCase().includes(query)
+    )
+  })
+})
+
+const plannedCount = computed(() => {
+  let pool = goldenItems.value
+  if (selectedCategories.value.length) {
+    pool = pool.filter((item) => selectedCategories.value.includes(String(item.category)))
+  }
+  if (selectedItemIds.value.length) {
+    const wanted = new Set(selectedItemIds.value)
+    pool = pool.filter((item) => wanted.has(item.id))
+  }
+  const count = pool.length
+  if (debugLimit.value > 0) return Math.min(count, debugLimit.value)
+  return count
+})
+
+const failedItemIds = computed(() => {
+  const rows = activeRun.value?.report?.results ?? []
+  return rows
+    .filter((row) => {
+      if (isRagReport.value) return row.page_hit_at_k !== true
+      if (row.status) return row.status !== 'pass'
+      return row.passed === false
+    })
+    .map((row) => String(row.id))
+    .filter(Boolean)
+})
 
 const canDeleteSelectedTask = computed(
   () => selectedTask.value != null && !selectedTask.value.builtin,
@@ -76,6 +148,21 @@ function formatPercent(value: number | undefined) {
   return `${(value * 100).toFixed(1)}%`
 }
 
+function runModel(run: EvalRunItem | null | undefined): string {
+  if (!run) return ''
+  const fromParams = run.params?.model
+  if (typeof fromParams === 'string' && fromParams.trim()) return fromParams.trim()
+  const fromSummary = run.summary?.model
+  if (fromSummary) return fromSummary
+  const fromResult = run.report?.results?.[0]?.model
+  return typeof fromResult === 'string' ? fromResult : ''
+}
+
+function runModelLabel(run: EvalRunItem | null | undefined): string {
+  const name = runModel(run)
+  return name ? modelLabel(name) : '默认模型'
+}
+
 async function loadTasks() {
   const response = await listEvalTasks()
   tasks.value = response.items
@@ -96,6 +183,94 @@ async function loadGoldenSets() {
   }
 }
 
+async function loadGoldenPreview() {
+  const filename = selectedTask.value?.golden_file
+  selectedCategories.value = []
+  selectedItemIds.value = []
+  itemQuery.value = ''
+  showItemPicker.value = false
+  resultStatusFilter.value = 'all'
+  resultQuery.value = ''
+  resultCategoryFilter.value = ''
+  if (!filename) {
+    goldenItems.value = []
+    goldenCategories.value = []
+    return
+  }
+  try {
+    const preview = await getGoldenSet(filename)
+    goldenItems.value = preview.items
+    goldenCategories.value = preview.categories
+  } catch {
+    goldenItems.value = []
+    goldenCategories.value = []
+  }
+}
+
+function toggleCategory(category: string) {
+  if (selectedCategories.value.includes(category)) {
+    selectedCategories.value = selectedCategories.value.filter((item) => item !== category)
+  } else {
+    selectedCategories.value = [...selectedCategories.value, category]
+  }
+}
+
+function toggleItem(id: string) {
+  if (selectedItemIds.value.includes(id)) {
+    selectedItemIds.value = selectedItemIds.value.filter((item) => item !== id)
+  } else {
+    selectedItemIds.value = [...selectedItemIds.value, id]
+  }
+}
+
+function selectVisibleItems() {
+  const ids = filteredGoldenItems.value.map((item) => item.id)
+  selectedItemIds.value = [...new Set([...selectedItemIds.value, ...ids])]
+}
+
+function clearSelectedItems() {
+  selectedItemIds.value = []
+}
+
+function selectFailedItems() {
+  selectedItemIds.value = [...failedItemIds.value]
+  showItemPicker.value = true
+}
+
+async function loadModels() {
+  try {
+    const response = await getModels()
+    availableModels.value = response.available
+    const preferred = response.default || availableModels.value[0] || ''
+    if (!selectedModel.value || !availableModels.value.includes(selectedModel.value)) {
+      selectedModel.value = preferred
+    }
+  } catch {
+    availableModels.value = []
+  }
+}
+
+function pickCompareDefaults() {
+  const done = completedRuns.value
+  if (done.length < 2) {
+    compareLeftId.value = ''
+    compareRightId.value = ''
+    return
+  }
+  if (
+    compareLeftId.value &&
+    compareRightId.value &&
+    done.some((run) => run.run_id === compareLeftId.value) &&
+    done.some((run) => run.run_id === compareRightId.value)
+  ) {
+    return
+  }
+  compareLeftId.value = done[0].run_id
+  const other =
+    done.find((run) => runModel(run) && runModel(run) !== runModel(done[0])) ?? done[1]
+  compareRightId.value = other.run_id
+}
+
 async function loadRuns() {
   if (!selectedTaskId.value) {
     runs.value = []
@@ -106,11 +281,15 @@ async function loadRuns() {
   runs.value = response.items.filter((run) => run.task_id === selectedTaskId.value)
   const currentStillVisible = activeRun.value && runs.value.some((r) => r.run_id === activeRun.value?.run_id)
   if (!currentStillVisible) {
-    activeRun.value = runs.value[0] ?? null
-    if (activeRun.value?.status === 'running') {
-      await refreshActiveRun(activeRun.value.run_id)
+    const next = runs.value[0] ?? null
+    activeRun.value = next
+    // 列表接口只返回 summary，不含 results 明细；自动选中后必须再拉一次详情，
+    // 否则已完成的报告会显示「报告无明细数据」。
+    if (next) {
+      await refreshActiveRun(next.run_id)
     }
   }
+  pickCompareDefaults()
 }
 
 async function refreshActiveRun(runId: string) {
@@ -121,7 +300,8 @@ async function refreshAll() {
   loading.value = true
   error.value = ''
   try {
-    await Promise.all([loadTasks(), loadGoldenSets()])
+    await Promise.all([loadTasks(), loadGoldenSets(), loadModels()])
+    await loadGoldenPreview()
     await loadRuns()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载失败'
@@ -257,12 +437,21 @@ function startPolling(runId: string) {
 
 async function onRunEval() {
   if (!selectedTaskId.value || running.value) return
+  if (plannedCount.value === 0) {
+    error.value = '没有可跑的题目，请调整题型或勾选题号'
+    return
+  }
   running.value = true
   error.value = ''
   try {
     const row = await startEvalRun({
       task_id: selectedTaskId.value,
       limit: debugLimit.value > 0 ? debugLimit.value : 0,
+      model: isW1ChatTask.value ? selectedModel.value : undefined,
+      categories: selectedCategories.value,
+      item_ids: selectedItemIds.value,
+      top_k: isRagTask.value && ragTopK.value > 0 ? ragTopK.value : undefined,
+      temperature: isW1ChatTask.value ? temperature.value : undefined,
     })
     activeRun.value = row
     await loadRuns()
@@ -271,6 +460,14 @@ async function onRunEval() {
     running.value = false
     error.value = err instanceof Error ? err.message : '启动评测失败'
   }
+}
+
+async function onRetryFailed() {
+  if (!failedItemIds.value.length) return
+  selectedItemIds.value = [...failedItemIds.value]
+  selectedCategories.value = []
+  debugLimit.value = 0
+  await onRunEval()
 }
 
 async function selectRun(run: EvalRunItem) {
@@ -285,6 +482,18 @@ async function selectRun(run: EvalRunItem) {
   }
 }
 
+const isComplianceSchemaReport = computed(
+  () =>
+    selectedTask.value?.runner === 'compliance_schema' ||
+    tasks.value.find((t) => t.id === activeRun.value?.task_id)?.runner === 'compliance_schema',
+)
+
+const isAsknumReport = computed(
+  () =>
+    selectedTask.value?.runner === 'w4_asknum' ||
+    tasks.value.find((t) => t.id === activeRun.value?.task_id)?.runner === 'w4_asknum',
+)
+
 const summaryCards = computed(() => {
   const summary = activeRun.value?.summary
   if (!summary) return []
@@ -295,14 +504,73 @@ const summaryCards = computed(() => {
       { label: '样本数', value: String(summary.count ?? '—') },
     ]
   }
+  if (isComplianceSchemaReport.value) {
+    return [
+      { label: '准确率', value: formatPercent(summary.accuracy) },
+      { label: '误放行率', value: formatPercent(summary.false_accept_rate) },
+      { label: '误拒率', value: formatPercent(summary.false_reject_rate) },
+      { label: '理由命中率', value: formatPercent(summary.rule_hit_rate) },
+    ]
+  }
+  if (isAsknumReport.value) {
+    return [
+      { label: '准确率', value: formatPercent(summary.accuracy) },
+      { label: '路由准确率', value: formatPercent(summary.route_accuracy) },
+      { label: '数字泄露率', value: formatPercent(summary.leak_rate) },
+      { label: '样本数', value: String(summary.total ?? '—') },
+    ]
+  }
   return [
+    { label: '模型', value: runModelLabel(activeRun.value) },
     { label: '准确率', value: formatPercent(summary.accuracy) },
-    { label: '数字错误率', value: formatPercent(summary.number_error_rate) },
+    { label: '拒答率', value: formatPercent(summary.refuse_rate) },
     { label: 'P50 延迟', value: summary.latency_p50_ms != null ? `${summary.latency_p50_ms} ms` : '—' },
   ]
 })
 
 const resultRows = computed(() => activeRun.value?.report?.results ?? [])
+
+const filteredResultRows = computed(() => {
+  const query = resultQuery.value.trim().toLowerCase()
+  return resultRows.value.filter((row) => {
+    if (resultCategoryFilter.value && String(row.category ?? '') !== resultCategoryFilter.value) {
+      return false
+    }
+    if (resultStatusFilter.value === 'pass') {
+      if (isRagReport.value) {
+        if (row.page_hit_at_k !== true) return false
+      } else if (row.status) {
+        if (row.status !== 'pass') return false
+      } else if (row.passed !== true) {
+        return false
+      }
+    }
+    if (resultStatusFilter.value === 'fail') {
+      if (isRagReport.value) {
+        if (row.page_hit_at_k !== false) return false
+      } else if (row.status) {
+        if (row.status !== 'fail') return false
+      } else if (row.passed !== false) {
+        return false
+      }
+    }
+    if (resultStatusFilter.value === 'refuse' && row.status !== 'refuse') return false
+    if (resultStatusFilter.value === 'miss') {
+      const failed = isRagReport.value
+        ? row.page_hit_at_k !== true
+        : row.status
+          ? row.status !== 'pass'
+          : row.passed === false
+      if (!failed) return false
+    }
+    if (!query) return true
+    return (
+      String(row.id ?? '').toLowerCase().includes(query) ||
+      String(row.question ?? '').toLowerCase().includes(query) ||
+      String(row.detail ?? '').toLowerCase().includes(query)
+    )
+  })
+})
 
 const resultTotal = computed(() => {
   const summary = activeRun.value?.summary
@@ -317,12 +585,67 @@ const isRagReport = computed(
     tasks.value.find((t) => t.id === activeRun.value?.task_id)?.runner === 'rag_retrieval',
 )
 
+const isW1ChatReport = computed(
+  () =>
+    selectedTask.value?.runner === 'w1_chat' ||
+    tasks.value.find((t) => t.id === activeRun.value?.task_id)?.runner === 'w1_chat',
+)
+
+const compareRows = computed(() => {
+  const leftResults = compareLeft.value?.report?.results ?? []
+  const rightResults = compareRight.value?.report?.results ?? []
+  if (!leftResults.length || !rightResults.length) return []
+  const rightById = new Map(rightResults.map((row) => [String(row.id), row]))
+  return leftResults.map((left) => {
+    const right = rightById.get(String(left.id))
+    const leftStatus = String(left.status ?? '')
+    const rightStatus = right ? String(right.status ?? '') : ''
+    return {
+      id: String(left.id),
+      question: String(left.question ?? ''),
+      category: String(left.category ?? ''),
+      leftStatus,
+      rightStatus,
+      agree: Boolean(right) && leftStatus === rightStatus,
+    }
+  })
+})
+
+const compareDisagreeCount = computed(
+  () => compareRows.value.filter((row) => !row.agree).length,
+)
+
 watch(selectedTaskId, async () => {
   stopPolling()
   running.value = false
   activeRun.value = null
   runs.value = []
+  compareLeftId.value = ''
+  compareRightId.value = ''
+  compareLeft.value = null
+  compareRight.value = null
+  await loadGoldenPreview()
   await loadRuns()
+})
+
+watch([compareLeftId, compareRightId], async ([left, right]) => {
+  if (!left || !right || left === right) {
+    compareLeft.value = null
+    compareRight.value = null
+    return
+  }
+  compareLoading.value = true
+  try {
+    const [a, b] = await Promise.all([getEvalRun(left, true), getEvalRun(right, true)])
+    compareLeft.value = a
+    compareRight.value = b
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '加载对比报告失败'
+    compareLeft.value = null
+    compareRight.value = null
+  } finally {
+    compareLoading.value = false
+  }
 })
 
 onMounted(refreshAll)
@@ -334,7 +657,7 @@ onBeforeUnmount(stopPolling)
     <header class="head">
       <div>
         <h1>评估报告</h1>
-        <p>选择评测任务与黄金集，一键运行并在本页查看 Recall@k、准确率等指标。</p>
+        <p>按题型、单题或失败项开跑，不必每次全量。两份报告仍可对照。</p>
       </div>
       <div class="head-actions">
         <button type="button" class="ghost-btn" :disabled="loading" @click="refreshAll">刷新</button>
@@ -420,19 +743,195 @@ onBeforeUnmount(stopPolling)
             </option>
           </select>
         </label>
+        <label v-if="isW1ChatTask" class="field field-sm">
+          <span>模型</span>
+          <select v-model="selectedModel" class="select" :disabled="running || !availableModels.length">
+            <option v-if="!availableModels.length" value="">无可用模型</option>
+            <option v-for="name in availableModels" :key="name" :value="name">
+              {{ modelLabel(name) }}
+            </option>
+          </select>
+        </label>
+        <label v-if="isW1ChatTask" class="field field-sm">
+          <span>温度</span>
+          <input
+            v-model.number="temperature"
+            class="input"
+            type="number"
+            min="0"
+            max="2"
+            step="0.1"
+            :disabled="running"
+          />
+        </label>
+        <label v-if="isRagTask" class="field field-sm">
+          <span>top_k（0=默认）</span>
+          <input v-model.number="ragTopK" class="input" type="number" min="0" max="50" :disabled="running" />
+        </label>
         <label class="field field-sm">
-          <span>调试 limit（0=全量）</span>
+          <span>最多 N 题（0=不截）</span>
           <input v-model.number="debugLimit" class="input" type="number" min="0" :disabled="running" />
         </label>
-        <button type="button" class="send-btn" :disabled="running || !selectedTaskId" @click="onRunEval">
-          {{ running ? '评测运行中…' : '运行评测' }}
+        <button
+          type="button"
+          class="send-btn"
+          :disabled="running || !selectedTaskId || plannedCount === 0 || (isW1ChatTask && !selectedModel)"
+          @click="onRunEval"
+        >
+          {{ running ? '评测运行中…' : `运行 ${plannedCount} 题` }}
         </button>
       </div>
       <p v-if="selectedTask" class="task-desc">{{ selectedTask.description }}</p>
       <p v-if="selectedTask" class="task-meta">
         黄金集：<code>{{ selectedTask.golden_file }}</code>
         <span v-if="selectedTask.golden_version"> · {{ selectedTask.golden_version }}</span>
+        <span v-if="isW1ChatTask && selectedModel"> · {{ modelLabel(selectedModel) }} · 温度 {{ temperature }}</span>
       </p>
+
+      <div v-if="goldenCategories.length" class="chip-row">
+        <span class="chip-label">题型</span>
+        <button
+          type="button"
+          class="chip"
+          :class="{ on: selectedCategories.length === 0 }"
+          :disabled="running"
+          @click="selectedCategories = []"
+        >
+          全部
+        </button>
+        <button
+          v-for="cat in goldenCategories"
+          :key="cat"
+          type="button"
+          class="chip"
+          :class="{ on: selectedCategories.includes(cat) }"
+          :disabled="running"
+          @click="toggleCategory(cat)"
+        >
+          {{ cat }}
+        </button>
+      </div>
+
+      <div class="picker-toolbar">
+        <button type="button" class="ghost-btn" :disabled="running" @click="showItemPicker = !showItemPicker">
+          {{ showItemPicker ? '收起选题' : '选题 / 搜索' }}
+        </button>
+        <button
+          v-if="failedItemIds.length"
+          type="button"
+          class="ghost-btn"
+          :disabled="running"
+          @click="onRetryFailed"
+        >
+          重跑未通过（{{ failedItemIds.length }}）
+        </button>
+        <span class="hint">未选题号时按题型筛选后全跑；勾选后只跑勾中的题。</span>
+      </div>
+
+      <div v-if="showItemPicker" class="item-picker">
+        <div class="control-row">
+          <label class="field">
+            <span>搜索题号 / 题面</span>
+            <input v-model="itemQuery" class="input" placeholder="例如 ROE、w1-019、不良" :disabled="running" />
+          </label>
+          <button type="button" class="ghost-btn" :disabled="running" @click="selectVisibleItems">勾选当前筛选</button>
+          <button type="button" class="ghost-btn" :disabled="running || !selectedItemIds.length" @click="clearSelectedItems">
+            清空勾选
+          </button>
+        </div>
+        <div class="item-list">
+          <label v-for="item in filteredGoldenItems" :key="item.id" class="item-row">
+            <input
+              type="checkbox"
+              :checked="selectedItemIds.includes(item.id)"
+              :disabled="running"
+              @change="toggleItem(item.id)"
+            />
+            <span class="mono">{{ item.id }}</span>
+            <span class="item-cat">{{ item.category }}</span>
+            <span class="item-q">{{ item.question }}</span>
+          </label>
+          <p v-if="!filteredGoldenItems.length" class="hint">没有匹配的题目。</p>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="canCompare" class="control-card">
+      <h2 class="panel-title">对比两份报告</h2>
+      <div class="control-row">
+        <label class="field">
+          <span>报告 A</span>
+          <select v-model="compareLeftId" class="select">
+            <option v-for="run in completedRuns" :key="run.run_id" :value="run.run_id">
+              {{ runModelLabel(run) }} · {{ formatTime(run.started_at) }}
+              <template v-if="run.summary?.accuracy != null">
+                · 准确率 {{ formatPercent(run.summary.accuracy) }}
+              </template>
+            </option>
+          </select>
+        </label>
+        <label class="field">
+          <span>报告 B</span>
+          <select v-model="compareRightId" class="select">
+            <option v-for="run in completedRuns" :key="run.run_id" :value="run.run_id">
+              {{ runModelLabel(run) }} · {{ formatTime(run.started_at) }}
+              <template v-if="run.summary?.accuracy != null">
+                · 准确率 {{ formatPercent(run.summary.accuracy) }}
+              </template>
+            </option>
+          </select>
+        </label>
+      </div>
+      <p v-if="compareLeftId && compareLeftId === compareRightId" class="hint">请选两份不同的报告。</p>
+      <p v-else-if="compareLoading" class="hint">正在加载对照明细…</p>
+      <div v-else-if="compareRows.length" class="compare-block">
+        <div class="stats compare-stats">
+          <article class="stat-card">
+            <p class="stat-label">{{ runModelLabel(compareLeft) }} 准确率</p>
+            <p class="stat-value">{{ formatPercent(compareLeft?.summary?.accuracy) }}</p>
+          </article>
+          <article class="stat-card">
+            <p class="stat-label">{{ runModelLabel(compareRight) }} 准确率</p>
+            <p class="stat-value">{{ formatPercent(compareRight?.summary?.accuracy) }}</p>
+          </article>
+          <article class="stat-card">
+            <p class="stat-label">{{ runModelLabel(compareLeft) }} 拒答率</p>
+            <p class="stat-value">{{ formatPercent(compareLeft?.summary?.refuse_rate) }}</p>
+          </article>
+          <article class="stat-card">
+            <p class="stat-label">{{ runModelLabel(compareRight) }} 拒答率</p>
+            <p class="stat-value">{{ formatPercent(compareRight?.summary?.refuse_rate) }}</p>
+          </article>
+          <article class="stat-card">
+            <p class="stat-label">逐题不一致</p>
+            <p class="stat-value">{{ compareDisagreeCount }} / {{ compareRows.length }}</p>
+          </article>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>题型</th>
+                <th>问题</th>
+                <th>{{ runModelLabel(compareLeft) }}</th>
+                <th>{{ runModelLabel(compareRight) }}</th>
+                <th>对照</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in compareRows" :key="row.id" :class="{ disagree: !row.agree }">
+                <td class="mono">{{ row.id }}</td>
+                <td>{{ row.category }}</td>
+                <td class="question">{{ row.question }}</td>
+                <td><span :class="row.leftStatus === 'pass' ? 'tag ok' : row.leftStatus === 'refuse' ? 'tag muted' : 'tag fail'">{{ row.leftStatus || '—' }}</span></td>
+                <td><span :class="row.rightStatus === 'pass' ? 'tag ok' : row.rightStatus === 'refuse' ? 'tag muted' : 'tag fail'">{{ row.rightStatus || '—' }}</span></td>
+                <td>{{ row.agree ? '一致' : '不一致' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <p v-if="loading" class="hint">加载中…</p>
@@ -474,6 +973,7 @@ onBeforeUnmount(stopPolling)
               </div>
             </div>
             <p class="run-time">{{ formatTime(run.started_at) }}</p>
+            <p v-if="runModel(run)" class="run-metric">{{ runModelLabel(run) }}</p>
             <p v-if="run.summary?.accuracy != null" class="run-metric">准确率 {{ formatPercent(run.summary.accuracy) }}</p>
             <p v-else-if="run.summary?.recall_at_k != null" class="run-metric">
               Recall@k {{ formatPercent(run.summary.recall_at_k) }}
@@ -485,7 +985,18 @@ onBeforeUnmount(stopPolling)
       <main v-if="activeRun" class="report">
         <header class="report-head">
           <h2>{{ selectedTask?.name ?? activeRun.task_id }}</h2>
-          <span :class="statusClass(activeRun.status)">{{ EVAL_STATUS_LABELS[activeRun.status] }}</span>
+          <div class="report-head-actions">
+            <button
+              v-if="failedItemIds.length && activeRun.status === 'completed'"
+              type="button"
+              class="ghost-btn"
+              :disabled="running"
+              @click="onRetryFailed"
+            >
+              重跑未通过（{{ failedItemIds.length }}）
+            </button>
+            <span :class="statusClass(activeRun.status)">{{ EVAL_STATUS_LABELS[activeRun.status] }}</span>
+          </div>
         </header>
 
         <p v-if="activeRun.error" class="error">{{ activeRun.error }}</p>
@@ -510,7 +1021,12 @@ onBeforeUnmount(stopPolling)
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(metrics, cat) in activeRun.summary.by_category" :key="cat">
+                <tr
+                  v-for="(metrics, cat) in activeRun.summary.by_category"
+                  :key="cat"
+                  class="clickable"
+                  @click="resultCategoryFilter = resultCategoryFilter === String(cat) ? '' : String(cat)"
+                >
                   <td>{{ cat }}</td>
                   <td>{{ metrics.count }}</td>
                   <td>{{ formatPercent(metrics.recall_at_k) }}</td>
@@ -521,37 +1037,154 @@ onBeforeUnmount(stopPolling)
           </div>
         </section>
 
+        <section v-if="activeRun.summary?.by_category && isAsknumReport" class="section">
+          <h3>分题型</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>题型</th>
+                  <th>数量</th>
+                  <th>通过</th>
+                  <th>失败</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(metrics, cat) in activeRun.summary.by_category"
+                  :key="cat"
+                  class="clickable"
+                  @click="resultCategoryFilter = resultCategoryFilter === String(cat) ? '' : String(cat)"
+                >
+                  <td>{{ cat }}</td>
+                  <td>{{ metrics.total }}</td>
+                  <td>{{ metrics.passed }}</td>
+                  <td>{{ metrics.failed }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section v-if="activeRun.summary?.by_category && isW1ChatReport" class="section">
+          <h3>分题型</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>题型</th>
+                  <th>数量</th>
+                  <th>准确率</th>
+                  <th>拒答</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(metrics, cat) in activeRun.summary.by_category"
+                  :key="cat"
+                  class="clickable"
+                  @click="resultCategoryFilter = resultCategoryFilter === String(cat) ? '' : String(cat)"
+                >
+                  <td>{{ cat }}</td>
+                  <td>{{ metrics.total ?? metrics.count }}</td>
+                  <td>{{ formatPercent(metrics.accuracy) }}</td>
+                  <td>{{ metrics.refused ?? '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section v-if="resultRows.length" class="section">
-          <h3>明细（共 {{ resultTotal }} 条，已全部展示）</h3>
+          <h3>明细（{{ filteredResultRows.length }} / {{ resultRows.length }}）</h3>
+          <div class="control-row result-filters">
+            <label class="field field-sm">
+              <span>结果</span>
+              <select v-model="resultStatusFilter" class="select">
+                <option value="all">全部</option>
+                <option value="miss">未通过</option>
+                <option value="pass">通过</option>
+                <option value="fail">失败</option>
+                <option v-if="isW1ChatReport" value="refuse">拒答</option>
+              </select>
+            </label>
+            <label class="field field-sm">
+              <span>题型</span>
+              <select v-model="resultCategoryFilter" class="select">
+                <option value="">全部</option>
+                <option v-for="cat in Object.keys(activeRun.summary?.by_category ?? {})" :key="cat" :value="cat">
+                  {{ cat }}
+                </option>
+              </select>
+            </label>
+            <label class="field">
+              <span>搜索</span>
+              <input v-model="resultQuery" class="input" placeholder="题号 / 题面 / 判分说明" />
+            </label>
+          </div>
           <div class="table-wrap">
             <table class="data-table">
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>问题</th>
-                  <th v-if="isRagReport">Gold 页</th>
-                  <th v-if="isRagReport">命中页</th>
-                  <th v-if="isRagReport">命中</th>
-                  <th v-if="!isRagReport">状态</th>
-                  <th v-if="!isRagReport">说明</th>
+                  <template v-if="isComplianceSchemaReport">
+                    <th>规则</th>
+                    <th>期望</th>
+                    <th>实际</th>
+                    <th>结果</th>
+                    <th>说明</th>
+                  </template>
+                  <template v-else>
+                    <th>问题</th>
+                    <th v-if="isW1ChatReport || isAsknumReport">题型</th>
+                    <th v-if="isRagReport">Gold 页</th>
+                    <th v-if="isRagReport">命中页</th>
+                    <th v-if="isRagReport">命中</th>
+                    <th v-if="!isRagReport">状态</th>
+                    <th v-if="!isRagReport">说明</th>
+                  </template>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in resultRows" :key="String(row.id)">
+                <tr v-for="row in filteredResultRows" :key="String(row.id)">
                   <td class="mono">{{ row.id }}</td>
-                  <td class="question">{{ row.question }}</td>
-                  <template v-if="isRagReport">
-                    <td class="mono">{{ (row.gold_pages as number[])?.join(', ') }}</td>
-                    <td class="mono">{{ (row.retrieved_pages as number[])?.slice(0, 5).join(', ') }}</td>
+                  <template v-if="isComplianceSchemaReport">
+                    <td class="mono">{{ row.rule }}</td>
+                    <td>{{ row.expected === 'accept' ? '放行' : '拒绝' }}</td>
+                    <td>{{ row.actual === 'accept' ? '放行' : '拒绝' }}</td>
                     <td>
-                      <span :class="row.page_hit_at_k ? 'tag ok' : 'tag fail'">
-                        {{ row.page_hit_at_k ? '是' : '否' }}
+                      <span :class="row.passed ? 'tag ok' : 'tag fail'">
+                        {{ row.passed ? '通过' : '失败' }}
                       </span>
                     </td>
+                    <td class="detail">{{ row.detail }}</td>
                   </template>
                   <template v-else>
-                    <td><span :class="row.status === 'pass' ? 'tag ok' : 'tag fail'">{{ row.status }}</span></td>
-                    <td class="detail">{{ row.detail }}</td>
+                    <td class="question">{{ row.question }}</td>
+                    <td v-if="isW1ChatReport || isAsknumReport">{{ row.category }}</td>
+                    <template v-if="isRagReport">
+                      <td class="mono">{{ (row.gold_pages as number[])?.join(', ') }}</td>
+                      <td class="mono">{{ (row.retrieved_pages as number[])?.slice(0, 5).join(', ') }}</td>
+                      <td>
+                        <span :class="row.page_hit_at_k ? 'tag ok' : 'tag fail'">
+                          {{ row.page_hit_at_k ? '是' : '否' }}
+                        </span>
+                      </td>
+                    </template>
+                    <template v-else>
+                      <td>
+                        <span
+                          :class="
+                            row.status === 'pass'
+                              ? 'tag ok'
+                              : row.status === 'refuse'
+                                ? 'tag muted'
+                                : 'tag fail'
+                          "
+                        >{{ row.status }}</span>
+                      </td>
+                      <td class="detail">{{ row.detail }}</td>
+                    </template>
                   </template>
                 </tr>
               </tbody>
@@ -790,18 +1423,115 @@ onBeforeUnmount(stopPolling)
   color: var(--text-muted);
 }
 
-.report-head {
+.report-head-actions {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.chip-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chip.on {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.picker-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.item-picker {
+  margin-top: 10px;
+}
+
+.item-list {
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.item-row {
+  display: grid;
+  grid-template-columns: auto 88px 120px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.item-cat {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.item-q {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover td {
+  background: #f8fafc;
+}
+
+.result-filters {
+  margin-bottom: 8px;
 }
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.compare-block {
+  margin-top: 12px;
+}
+
+.compare-stats {
+  margin-bottom: 12px;
+}
+
+tr.disagree td {
+  background: #fff7ed;
 }
 
 .stat-card {

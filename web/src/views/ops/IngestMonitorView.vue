@@ -130,6 +130,7 @@ onMounted(refresh)
     <nav class="quick-links">
       <router-link to="/ops/health" class="quick-link">系统健康</router-link>
       <router-link to="/ops/rag" class="quick-link">RAG 检索监控</router-link>
+      <router-link to="/ops/asknum" class="quick-link">问数监控</router-link>
       <router-link to="/ops/logs" class="quick-link">日志监控</router-link>
     </nav>
 

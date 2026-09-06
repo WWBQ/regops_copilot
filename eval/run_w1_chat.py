@@ -22,12 +22,18 @@ def main() -> int:
     parser.add_argument("--golden", type=Path, default=GOLDEN_DIR / "w1_chat_30.json")
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument(
+        "--model",
+        default="",
+        help="发给 /chat 的模型名（deepseek / qwen）；空则用服务 DEFAULT_MODEL",
+    )
     args = parser.parse_args()
 
     report = run_w1_chat_eval(
         golden_path=args.golden,
         base_url=args.base_url,
         limit=args.limit,
+        model=args.model or None,
     )
     out_dir = args.out or (REPORTS_DIR / "w1_chat" / datetime.now().strftime("%Y%m%d_%H%M%S"))
     out_dir.mkdir(parents=True, exist_ok=True)

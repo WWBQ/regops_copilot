@@ -26,9 +26,9 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'quality',
     label: '数据质量',
     items: [
-      { id: 'quality-gates', label: '质量门 G1/G2/G3', path: '/quality/gates', phase: 'W2-2' },
+      { id: 'quality-gates', label: '质量门 G1/G2/G3', path: '/quality/gates', phase: 'W2-2', enabled: true },
       { id: 'human-review', label: '数据标注', path: '/quality/review', enabled: true },
-      { id: 'fin-metrics', label: '财务事实库', path: '/quality/facts', phase: 'W2-4' },
+      { id: 'fin-metrics', label: '财务事实库', path: '/quality/facts', phase: 'W2-4', enabled: true },
     ],
   },
   {
@@ -46,6 +46,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'ingest-monitor', label: '解析监控', path: '/ops/ingest', phase: 'W2-5', enabled: true },
       { id: 'rag-monitor', label: 'RAG 检索监控', path: '/ops/rag', phase: 'W3', enabled: true },
+      { id: 'asknum-monitor', label: '问数监控', path: '/ops/asknum', phase: 'W4', enabled: true },
       { id: 'logs', label: '日志监控', path: '/ops/logs', phase: 'W2+', enabled: true },
       { id: 'health', label: '系统健康', path: '/ops/health', phase: 'W1', enabled: true },
       { id: 'eval', label: '评估报告', path: '/ops/eval', phase: 'W1-4', enabled: true },
@@ -73,14 +74,21 @@ export const PLACEHOLDER_PAGES: Record<
   'rag-monitor': {
     title: 'RAG 检索监控',
     summary:
-      '每次问答的 Hybrid 检索 trace：关键词、向量/关键词召回、RRF、精排、最终 top-k 片段与 skip 原因。',
-    backend: 'GET /api/ops/rag-traces',
+      '每次问答的 Hybrid 检索 trace：关键词、向量/关键词召回、RRF、精排、最终 top-k 片段与拒答率。',
+    backend: 'GET /api/ops/rag-traces（含 summary 拒答率）',
     phase: 'W3',
+  },
+  'asknum-monitor': {
+    title: '问数监控',
+    summary:
+      '首页问数 lookup 的 trace：路由、公司/指标槽位、lookup 结果与是否拦截数字。评测不写此表。',
+    backend: 'GET /api/ops/asknum-traces',
+    phase: 'W4',
   },
   'quality-gates': {
     title: '质量门 G1/G2/G3',
-    summary: '金额一致性、财务勾稽、证据坐标（page + bbox）拦截看板。',
-    backend: 'docs/INGEST_VALIDATION.md',
+    summary: 'G1 金额一致性、G2 勾稽（R01–R03）、G3 结构化溯源；F10 JSON 写入 fin_metric。',
+    backend: 'GET /api/ops/quality/gates · POST /api/ops/quality/ingest',
     phase: 'W2-2',
   },
   'human-review': {
@@ -92,7 +100,8 @@ export const PLACEHOLDER_PAGES: Record<
   'fin-metrics': {
     title: '财务事实库',
     summary: 'Financial Fact / fin_metric 浏览与导出。',
-    phase: 'W2-4',
+    backend: 'GET /api/ops/quality/facts',
+    phase: 'W2-2',
   },
   review: {
     title: '合规复核',
@@ -127,6 +136,13 @@ export const PLACEHOLDER_PAGES: Record<
     summary: '选择评测任务（W1 聊天 / RAG 检索），一键运行并查看 Recall@k、准确率与明细。',
     backend: 'POST /api/ops/eval/runs',
     phase: 'W1-4',
+  },
+  agent: {
+    title: '合规问答（多步）',
+    summary:
+      'W6 多步编排接在同一助手里：对比 + 核对口径走任务 Checkpoint，不另开对话页。工具仍是 lookup_metric / RAG。',
+    backend: 'python-ai/app/agents/（规划，入口为 /）',
+    phase: 'W6',
   },
   settings: {
     title: '设置',

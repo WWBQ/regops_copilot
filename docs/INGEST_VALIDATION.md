@@ -304,7 +304,7 @@ def validate_cell_source(document, table, cell) -> tuple[bool, str | dict]:
 
 | 项 | 标准 |
 |----|------|
-| 范围 | 所有 `CRITICAL_CONCEPTS` 对应 fact 必须有 `page_no` + 有效 `bbox` |
+| 范围 | PDF 关键 fact 必须有 `page_no` + 有效 `bbox`；**F10/web** 用 `content_hash` 代替 bbox（见 §7） |
 | 金样本 | 5 家公司：**100%** 关键 fact 通过 G3，或进 review 队列 |
 | 测试 | fixture 缺 bbox → 必须 fail |
 
@@ -381,33 +381,36 @@ app/ingest/
 
 ### G1 金额一致性
 
-- [ ] `CRITICAL_CONCEPTS` + `ALIASES` 落地（代码或配置）
-- [ ] `normalize_amount` 单元测试通过
-- [ ] 多 parser 同事实比对逻辑可跑（可先 Standard vs 手工 gold）
+- [x] `CRITICAL_CONCEPTS` + `ALIASES` 落地（代码或配置）
+- [x] `normalize_amount` 单元测试通过
+- [x] 多 parser 同事实比对逻辑可跑（可先 Standard vs 手工 gold）
 
 ### G2 财务勾稽
 
-- [ ] ≥3 条等式程序校验
-- [ ] 5 家金样本勾稽报告可导出
+- [x] ≥3 条等式程序校验
+- [x] 5 家金样本勾稽报告可导出
 
 ### G3 证据坐标
 
-- [ ] 关键 fact 的 page_no + bbox 校验
-- [ ] 5 家金样本关键科目坐标覆盖率 100% 或全进 review
+- [x] 关键 fact 的 page_no + bbox 校验（PDF）；F10 用 content_hash
+- [x] 5 家金样本关键科目坐标覆盖率 100% 或全进 review
 
 ### 金样本
 
-- [ ] **5 家公司**年报抽取跑通；无 **静默错误入库**
-- [ ] 故意错例测试（单位/勾稽/bbox）均能拦下
+- [x] **5 家公司**年报抽取跑通；无 **静默错误入库**
+- [x] 故意错例测试（单位/勾稽/bbox）均能拦下
 
 ---
 
-## 7. 与 PDF / XBRL 的关系
+## 7. 与 PDF / XBRL / F10 的关系
 
 | 数据源 | 在三道门中的角色 |
 |--------|------------------|
-| **PDF 解析** | 产生 fact + bbox；G1–G3 主战场 |
+| **PDF 解析** | 产生 fact + bbox；G1–G3 主战场（表格抽取仍可后补） |
+| **F10 JSON**（W2-2 原型） | 直读三表写入 `fin_metric`；G1 同 fact_key 冲突、G2 R01–R03、G3=`content_hash` |
 | **XBRL**（可选 W4+） | fact 的 concept/period/scope 可对齐 XBRL context；数字冲突时 **结构化源优先** |
+
+W2-2 落地：`python-ai/scripts/download_xbrl.py` 拉 F10，`scripts/ingest_fin_metric.py` 过门入库；看板 `/quality/gates`、`/quality/facts`。
 
 见 [NOISE_PATTERNS.md §2](./NOISE_PATTERNS.md) · 面试笔记 Q26。
 

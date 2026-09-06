@@ -122,6 +122,7 @@ onMounted(refresh)
     <nav class="quick-links">
       <router-link to="/ops/ingest" class="quick-link">解析监控</router-link>
       <router-link to="/ops/rag" class="quick-link">RAG 检索监控</router-link>
+      <router-link to="/ops/asknum" class="quick-link">问数监控</router-link>
       <router-link to="/ops/health" class="quick-link">系统健康</router-link>
     </nav>
 
@@ -176,6 +177,8 @@ onMounted(refresh)
     <p class="footer-note">
       RAG 成功记录请见
       <router-link to="/ops/rag">RAG 检索监控</router-link>；
+      问数 lookup 请见
+      <router-link to="/ops/asknum">问数监控</router-link>；
       入库进度请见
       <router-link to="/ops/ingest">解析监控</router-link>。
     </p>

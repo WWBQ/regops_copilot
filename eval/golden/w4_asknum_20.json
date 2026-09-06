@@ -1,0 +1,332 @@
+{
+  "version": "w4-asknum-v1",
+  "description": "W4 问数 20 题：命中 auto_accepted、质量门拦截、缺公司反问、叙述跳过、ROE/毛利率拦截不回落 RAG、库外公司与母公司缺失。金额以当前 fin_metric 入库为准；评测不写 asknum_query_log。",
+  "items": [
+    {
+      "id": "ask-001",
+      "category": "hit",
+      "question": "比亚迪2024年营收多少",
+      "expected_route": "metric",
+      "expected_companies": ["002594"],
+      "expected_concepts": ["revenue"],
+      "expected_year": 2024,
+      "expected_scope": "consolidated",
+      "expected_lookups": [
+        {
+          "company_code": "002594",
+          "concept": "revenue",
+          "outcome": "ok",
+          "value_yuan": "777102455000"
+        }
+      ]
+    },
+    {
+      "id": "ask-002",
+      "category": "hit",
+      "question": "比亚迪2024年净利润是多少",
+      "expected_route": "metric",
+      "expected_companies": ["002594"],
+      "expected_concepts": ["net_profit"],
+      "expected_year": 2024,
+      "expected_lookups": [
+        {
+          "company_code": "002594",
+          "concept": "net_profit",
+          "outcome": "ok",
+          "value_yuan": "41587940000"
+        }
+      ]
+    },
+    {
+      "id": "ask-003",
+      "category": "hit",
+      "question": "长城汽车2024年净利润",
+      "expected_route": "metric",
+      "expected_companies": ["601633"],
+      "expected_concepts": ["net_profit"],
+      "expected_lookups": [
+        {
+          "company_code": "601633",
+          "concept": "net_profit",
+          "outcome": "ok",
+          "value_yuan": "12660012515.78"
+        }
+      ]
+    },
+    {
+      "id": "ask-004",
+      "category": "hit",
+      "question": "比亚迪总资产多少",
+      "note": "未写年份，默认 2024",
+      "expected_route": "metric",
+      "expected_companies": ["002594"],
+      "expected_concepts": ["total_assets"],
+      "expected_year": 2024,
+      "expected_lookups": [
+        {
+          "company_code": "002594",
+          "concept": "total_assets",
+          "outcome": "ok",
+          "value_yuan": "783355855000"
+        }
+      ]
+    },
+    {
+      "id": "ask-005",
+      "category": "hit",
+      "question": "格力电器2024年净利润",
+      "expected_route": "metric",
+      "expected_companies": ["000651"],
+      "expected_concepts": ["net_profit"],
+      "expected_lookups": [
+        {
+          "company_code": "000651",
+          "concept": "net_profit",
+          "outcome": "ok",
+          "value_yuan": "32371069287.35"
+        }
+      ]
+    },
+    {
+      "id": "ask-006",
+      "category": "blocked",
+      "question": "美的2024年营收多少",
+      "expected_route": "metric_blocked",
+      "expected_companies": ["000333"],
+      "expected_concepts": ["revenue"],
+      "expect_no_amount": true,
+      "expected_lookups": [
+        {
+          "company_code": "000333",
+          "concept": "revenue",
+          "outcome": "human_review"
+        }
+      ]
+    },
+    {
+      "id": "ask-007",
+      "category": "blocked",
+      "question": "格力2024年营业收入",
+      "expected_route": "metric_blocked",
+      "expected_companies": ["000651"],
+      "expected_concepts": ["revenue"],
+      "expect_no_amount": true,
+      "expected_lookups": [
+        {
+          "company_code": "000651",
+          "concept": "revenue",
+          "outcome": "human_review"
+        }
+      ]
+    },
+    {
+      "id": "ask-008",
+      "category": "blocked",
+      "question": "三一重工2024年营收",
+      "expected_route": "metric_blocked",
+      "expected_companies": ["600031"],
+      "expected_concepts": ["revenue"],
+      "expect_no_amount": true,
+      "expected_lookups": [
+        {
+          "company_code": "600031",
+          "concept": "revenue",
+          "outcome": "human_review"
+        }
+      ]
+    },
+    {
+      "id": "ask-009",
+      "category": "clarify",
+      "question": "营收多少",
+      "expected_route": "metric_clarify",
+      "expected_companies": [],
+      "expected_concepts": ["revenue"],
+      "expect_no_amount": true
+    },
+    {
+      "id": "ask-010",
+      "category": "clarify",
+      "question": "净利润是多少",
+      "expected_route": "metric_clarify",
+      "expected_companies": [],
+      "expected_concepts": ["net_profit"],
+      "expect_no_amount": true
+    },
+    {
+      "id": "ask-011",
+      "category": "compare",
+      "question": "对比比亚迪和长城2024年净利润",
+      "expected_route": "metric",
+      "expected_companies": ["002594", "601633"],
+      "expected_concepts": ["net_profit"],
+      "expected_lookups": [
+        {
+          "company_code": "002594",
+          "concept": "net_profit",
+          "outcome": "ok",
+          "value_yuan": "41587940000"
+        },
+        {
+          "company_code": "601633",
+          "concept": "net_profit",
+          "outcome": "ok",
+          "value_yuan": "12660012515.78"
+        }
+      ]
+    },
+    {
+      "id": "ask-012",
+      "category": "multi",
+      "question": "比亚迪2024年营收和净利润",
+      "expected_route": "metric",
+      "expected_companies": ["002594"],
+      "expected_concepts": ["revenue", "net_profit"],
+      "expected_lookups": [
+        {
+          "company_code": "002594",
+          "concept": "revenue",
+          "outcome": "ok",
+          "value_yuan": "777102455000"
+        },
+        {
+          "company_code": "002594",
+          "concept": "net_profit",
+          "outcome": "ok",
+          "value_yuan": "41587940000"
+        }
+      ]
+    },
+    {
+      "id": "ask-013",
+      "category": "skip",
+      "question": "比亚迪2024年营收为什么增长",
+      "expected_route": "skip",
+      "expected_companies": ["002594"],
+      "expected_concepts": ["revenue"],
+      "expect_no_amount": true
+    },
+    {
+      "id": "ask-014",
+      "category": "blocked",
+      "question": "比亚迪2024年ROE是多少",
+      "note": "先查净利润和净资产，缺加权平均净资产则数据不完整，不回落 RAG",
+      "expected_route": "metric_blocked",
+      "expected_companies": ["002594"],
+      "expected_concepts": [],
+      "expect_no_amount": true,
+      "expected_lookups": [
+        {
+          "company_code": "002594",
+          "concept": "net_profit",
+          "outcome": "ok"
+        },
+        {
+          "company_code": "002594",
+          "concept": "total_equity",
+          "outcome": "ok"
+        }
+      ]
+    },
+    {
+      "id": "ask-015",
+      "category": "missing",
+      "question": "宁德时代2024年净利润多少",
+      "expected_route": "metric_blocked",
+      "expected_companies": ["300750"],
+      "expected_concepts": ["net_profit"],
+      "expect_no_amount": true,
+      "expected_lookups": [
+        {
+          "company_code": "300750",
+          "concept": "net_profit",
+          "outcome": "missing"
+        }
+      ]
+    },
+    {
+      "id": "ask-016",
+      "category": "missing",
+      "question": "比亚迪2024年母公司营收多少",
+      "expected_route": "metric_blocked",
+      "expected_companies": ["002594"],
+      "expected_concepts": ["revenue"],
+      "expected_scope": "parent",
+      "expect_no_amount": true,
+      "expected_lookups": [
+        {
+          "company_code": "002594",
+          "concept": "revenue",
+          "scope": "parent",
+          "outcome": "missing"
+        }
+      ]
+    },
+    {
+      "id": "ask-017",
+      "category": "hit",
+      "question": "比亚迪2024年每股收益",
+      "expected_route": "metric",
+      "expected_companies": ["002594"],
+      "expected_concepts": ["eps"],
+      "expected_lookups": [
+        {
+          "company_code": "002594",
+          "concept": "eps",
+          "outcome": "ok",
+          "value_yuan": "4.61"
+        }
+      ]
+    },
+    {
+      "id": "ask-018",
+      "category": "hit",
+      "question": "002594 2024年总负债多少",
+      "expected_route": "metric",
+      "expected_companies": ["002594"],
+      "expected_concepts": ["total_liabilities"],
+      "expected_lookups": [
+        {
+          "company_code": "002594",
+          "concept": "total_liabilities",
+          "outcome": "ok",
+          "value_yuan": "584667646000"
+        }
+      ]
+    },
+    {
+      "id": "ask-019",
+      "category": "blocked",
+      "question": "比亚迪2024年毛利率是多少",
+      "note": "先查营业收入，营业成本未入库则数据不完整，不回落 RAG",
+      "expected_route": "metric_blocked",
+      "expected_companies": ["002594"],
+      "expected_concepts": [],
+      "expect_no_amount": true,
+      "expected_lookups": [
+        {
+          "company_code": "002594",
+          "concept": "revenue",
+          "outcome": "ok"
+        }
+      ]
+    },
+    {
+      "id": "ask-020",
+      "category": "hit",
+      "question": "美的2024年净利润多少",
+      "note": "同公司营收被 G1 拦住，净利润已 auto_accepted，对照 ask-006",
+      "expected_route": "metric",
+      "expected_companies": ["000333"],
+      "expected_concepts": ["net_profit"],
+      "expected_lookups": [
+        {
+          "company_code": "000333",
+          "concept": "net_profit",
+          "outcome": "ok",
+          "value_yuan": "38757214000"
+        }
+      ]
+    }
+  ]
+}

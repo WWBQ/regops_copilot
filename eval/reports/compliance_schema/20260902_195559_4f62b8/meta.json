@@ -1,0 +1,156 @@
+{
+  "run_id": "20260902_195559_4f62b8",
+  "task_id": "compliance_schema",
+  "status": "completed",
+  "started_at": "2026-09-02T11:55:59.030398+00:00",
+  "finished_at": "2026-09-02T11:55:59.034295+00:00",
+  "progress": {
+    "done": 20,
+    "total": 20,
+    "current_id": null
+  },
+  "params": {
+    "limit": 0,
+    "category": null,
+    "top_k": null
+  },
+  "summary": {
+    "total": 20,
+    "valid_total": 10,
+    "invalid_total": 10,
+    "decision_correct": 20,
+    "accuracy": 1.0,
+    "false_accept": 0,
+    "false_accept_rate": 0.0,
+    "false_reject": 0,
+    "false_reject_rate": 0.0,
+    "rule_hit_rate": 1.0,
+    "normalization_checked": 2,
+    "normalization_passed": 2,
+    "strict_passed": 20,
+    "strict_pass_rate": 1.0,
+    "by_rule": [
+      {
+        "rule": "baseline_low_risk",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "baseline_multi_clause",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "high_risk_confidence_boundary",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "confidence_lower_boundary",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "confidence_upper_boundary",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "optional_field_default",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "clause_refs_strip",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "conclusion_max_len_boundary",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "high_risk_low_confidence",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "baseline_multi_evidence",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "clause_refs_min_len",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "clause_refs_blank_only",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "risk_level_enum",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "confidence_gt_one",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "confidence_lt_zero",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "high_risk_confidence_cap",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "conclusion_empty",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "conclusion_too_long",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "conclusion_missing",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "rule": "confidence_not_numeric",
+        "total": 1,
+        "passed": 1,
+        "failed": 0
+      }
+    ]
+  },
+  "error": null
+}

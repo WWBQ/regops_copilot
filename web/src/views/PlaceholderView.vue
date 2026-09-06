@@ -14,12 +14,20 @@ const links = computed(() => {
     items.push(
       { label: '解析监控', path: '/ops/ingest' },
       { label: 'RAG 检索监控', path: '/ops/rag' },
+      { label: '问数监控', path: '/ops/asknum' },
       { label: '评估报告', path: '/ops/eval' },
       { label: '系统健康', path: '/ops/health' },
     )
   }
   if (route.meta.group === 'quality') {
-    items.push({ label: '数据标注', path: '/quality/review' })
+    items.push(
+      { label: '质量门 G1/G2/G3', path: '/quality/gates' },
+      { label: '财务事实库', path: '/quality/facts' },
+      { label: '数据标注', path: '/quality/review' },
+    )
+  }
+  if (route.meta.group === 'qa') {
+    items.push({ label: '合规问答', path: '/' })
   }
   return items.filter((item) => item.path !== route.path).slice(0, 3)
 })

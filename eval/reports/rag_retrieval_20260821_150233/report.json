@@ -1,0 +1,103 @@
+{
+  "generated_at": "2026-08-21T07:02:33.634468+00:00",
+  "golden_version": "rag-retrieval-v1",
+  "summary": {
+    "count": 3,
+    "recall_at_k": 1.0,
+    "mrr": 0.2004,
+    "by_category": {
+      "numeric_financial": {
+        "recall_at_k": 1.0,
+        "mrr": 0.2004,
+        "count": 3
+      }
+    }
+  },
+  "results": [
+    {
+      "id": "rag-001",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年营业收入是多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        10,
+        11,
+        24,
+        25,
+        34
+      ],
+      "retrieved_pages": [
+        137,
+        110,
+        112,
+        109,
+        111,
+        199,
+        10,
+        273,
+        269,
+        272,
+        287,
+        223
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.1429,
+      "top_k": 12
+    },
+    {
+      "id": "rag-002",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年归属于上市公司股东的净利润是多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        11
+      ],
+      "retrieved_pages": [
+        248,
+        110,
+        11,
+        111,
+        112,
+        236,
+        269,
+        109,
+        227,
+        147,
+        125,
+        144
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.3333,
+      "top_k": 12
+    },
+    {
+      "id": "rag-003",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年末总资产是多少",
+      "doc_id": "002594_2024",
+      "gold_pages": [
+        11,
+        41,
+        138,
+        277
+      ],
+      "retrieved_pages": [
+        110,
+        112,
+        109,
+        137,
+        248,
+        199,
+        223,
+        138,
+        265,
+        111,
+        269,
+        11
+      ],
+      "page_hit_at_k": true,
+      "reciprocal_rank": 0.125,
+      "top_k": 12
+    }
+  ]
+}

@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException
 
 from app.api.deps import get_document_service, get_settings_dep
+from app.asknum import try_answer
 from app.config import Settings
 from app.db.connection import get_connection
 from app.db.session_repository import list_session_documents, session_exists
@@ -33,6 +34,29 @@ def _valid_session_id(session_id: str | None) -> str | None:
         raise HTTPException(status_code=400, detail="invalid session_id") from exc
 
 
+def _asknum_citations(asknum, document_service: DocumentService) -> list[Citation]:
+    citations: list[Citation] = []
+    for item in asknum.citations:
+        viewer_url = None
+        if item.kind == "document" and item.doc_id:
+            try:
+                viewer_url = document_service.viewer_url(item.doc_id, page=item.page)
+            except Exception:
+                logger.warning("asknum viewer_url failed doc_id=%s", item.doc_id)
+        citations.append(
+            Citation(
+                doc_id=item.doc_id,
+                page=item.page,
+                snippet=item.snippet,
+                viewer_url=viewer_url,
+                title=item.title,
+                href=item.href,
+                kind=item.kind,
+            )
+        )
+    return citations
+
+
 def _resolve_model(body: ChatRequest, settings: Settings) -> str:
     available = list_available_models(settings)
     if not available:
@@ -59,9 +83,38 @@ async def chat(
 
     citations: list[Citation] = []
     rag_used = False
+    route = "general"
     messages: list[dict[str, str]]
 
     if body.use_rag:
+        try:
+            asknum = try_answer(
+                body.message,
+                persist_trace=True,
+                request_id=x_request_id,
+                session_id=session_id,
+            )
+        except Exception:
+            logger.exception("asknum failed, falling through to RAG")
+            asknum = None
+        if asknum is not None:
+            citations = _asknum_citations(asknum, document_service)
+            logger.info(
+                "POST /chat asknum route=%s model=%s session_id=%s citations=%d",
+                asknum.route,
+                model_name,
+                session_id,
+                len(citations),
+            )
+            return ChatResponse(
+                reply=asknum.reply,
+                model=model_name,
+                citations=citations,
+                session_id=session_id,
+                rag_used=False,
+                route=asknum.route,
+            )
+
         pending: list = []
         if session_id:
             with get_connection() as conn:
@@ -83,6 +136,7 @@ async def chat(
                 model=model_name,
                 session_id=session_id,
                 rag_used=False,
+                route="general",
             )
 
         rag_result = prepare_chat_rag(
@@ -105,7 +159,9 @@ async def chat(
                 for item in rag.citations
             ]
             rag_used = bool(citations)
+            route = "rag" if rag_used else "general"
         else:
+            route = "chitchat" if rag_result.trace.outcome == "no_intent" else "general"
             messages = [
                 {"role": "system", "content": GENERAL_CHAT_SYSTEM},
                 {"role": "user", "content": body.message},
@@ -126,9 +182,10 @@ async def chat(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     logger.info(
-        "POST /chat ok model=%s session_id=%s rag_used=%s citations=%d tokens=%d latency_ms=%.0f",
+        "POST /chat ok model=%s session_id=%s route=%s rag_used=%s citations=%d tokens=%d latency_ms=%.0f",
         model_name,
         session_id,
+        route,
         rag_used,
         len(citations),
         result.total_tokens,
@@ -140,6 +197,7 @@ async def chat(
         citations=citations,
         session_id=session_id,
         rag_used=rag_used,
+        route=route,
         prompt_tokens=result.prompt_tokens,
         completion_tokens=result.completion_tokens,
         total_tokens=result.total_tokens,

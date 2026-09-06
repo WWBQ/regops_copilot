@@ -1,5 +1,6 @@
 package com.wbq.java_service.client;
 
+import java.util.List;
 import java.util.Map;
 
 import com.wbq.java_service.dto.chat.ChatRequest;
@@ -15,7 +16,10 @@ import com.wbq.java_service.filter.RequestIdFilter;
 import org.slf4j.MDC;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -27,6 +31,10 @@ import org.springframework.web.multipart.MultipartFile;
 public class PythonAiClient {
 
     private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
+
+    private static final ParameterizedTypeReference<List<Map<String, Object>>> LIST_MAP_TYPE =
             new ParameterizedTypeReference<>() {
             };
 
@@ -143,6 +151,14 @@ public class PythonAiClient {
         }
     }
 
+    public Map<String, Object> getRagOverview() {
+        return exchange(() -> restClient.get()
+                .uri("/ops/rag/overview")
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
     public Map<String, Object> listRagTraces(int limit, int offset, String outcome) {
         return exchange(() -> restClient.get()
                 .uri(uriBuilder -> {
@@ -162,6 +178,30 @@ public class PythonAiClient {
     public Map<String, Object> getRagTrace(int traceId) {
         return exchange(() -> restClient.get()
                 .uri("/ops/rag-traces/{traceId}", traceId)
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> listAsknumTraces(int limit, int offset, String route) {
+        return exchange(() -> restClient.get()
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/ops/asknum-traces")
+                            .queryParam("limit", limit)
+                            .queryParam("offset", offset);
+                    if (route != null && !route.isBlank()) {
+                        builder.queryParam("route", route);
+                    }
+                    return builder.build();
+                })
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> getAsknumTrace(int traceId) {
+        return exchange(() -> restClient.get()
+                .uri("/ops/asknum-traces/{traceId}", traceId)
                 .headers(this::forwardRequestId)
                 .retrieve()
                 .body(MAP_TYPE));
@@ -213,6 +253,14 @@ public class PythonAiClient {
     public Map<String, Object> listEvalGoldenSets() {
         return exchange(() -> restClient.get()
                 .uri("/ops/eval/golden-sets")
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> getEvalGoldenSet(String filename) {
+        return exchange(() -> restClient.get()
+                .uri("/ops/eval/golden-sets/{filename}", filename)
                 .headers(this::forwardRequestId)
                 .retrieve()
                 .body(MAP_TYPE));
@@ -313,6 +361,148 @@ public class PythonAiClient {
                 .body(MAP_TYPE));
     }
 
+    public Map<String, Object> getQualityGates() {
+        return exchange(() -> restClient.get()
+                .uri("/ops/quality/gates")
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> listQualityFacts(
+            Integer limit,
+            Integer offset,
+            String companyCode,
+            String status,
+            String statement,
+            String concept,
+            String docId
+    ) {
+        return exchange(() -> restClient.get()
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/ops/quality/facts");
+                    if (limit != null) {
+                        builder.queryParam("limit", limit);
+                    }
+                    if (offset != null) {
+                        builder.queryParam("offset", offset);
+                    }
+                    if (companyCode != null && !companyCode.isBlank()) {
+                        builder.queryParam("company_code", companyCode);
+                    }
+                    if (status != null && !status.isBlank()) {
+                        builder.queryParam("status", status);
+                    }
+                    if (statement != null && !statement.isBlank()) {
+                        builder.queryParam("statement", statement);
+                    }
+                    if (concept != null && !concept.isBlank()) {
+                        builder.queryParam("concept", concept);
+                    }
+                    if (docId != null && !docId.isBlank()) {
+                        builder.queryParam("doc_id", docId);
+                    }
+                    return builder.build();
+                })
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> ingestQualityFacts(Map<String, Object> body) {
+        return exchange(() -> restClient.post()
+                .uri("/ops/quality/ingest")
+                .headers(this::forwardRequestId)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public List<Map<String, Object>> listLabelTasks() {
+        return exchange(() -> restClient.get()
+                .uri("/labeling/tasks")
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(LIST_MAP_TYPE));
+    }
+
+    public Map<String, Object> createLabelTask(
+            String name,
+            String desc,
+            String urlType,
+            String labelOptions,
+            MultipartFile file
+    ) {
+        try {
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("name", name);
+            body.add("desc", desc != null ? desc : "");
+            body.add("url_type", urlType != null ? urlType : "pdf");
+            body.add("label_options", labelOptions != null ? labelOptions : "");
+            String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "data.xlsx";
+            body.add("file", new ByteArrayResource(file.getBytes()) {
+                @Override
+                public String getFilename() {
+                    return filename;
+                }
+            });
+            return exchange(() -> restClient.post()
+                    .uri("/labeling/tasks")
+                    .headers(this::forwardRequestId)
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(body)
+                    .retrieve()
+                    .body(MAP_TYPE));
+        } catch (PythonAiException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new PythonAiException(502, "upload failed: " + ex.getMessage());
+        }
+    }
+
+    public Map<String, Object> getLabelTask(String taskId) {
+        return exchange(() -> restClient.get()
+                .uri("/labeling/tasks/{taskId}", taskId)
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> getLabelItem(String taskId, int idx) {
+        return exchange(() -> restClient.get()
+                .uri("/labeling/tasks/{taskId}/items/{idx}", taskId, idx)
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> saveLabelItem(String taskId, int idx, Map<String, Object> body) {
+        return exchange(() -> restClient.post()
+                .uri("/labeling/tasks/{taskId}/items/{idx}", taskId, idx)
+                .headers(this::forwardRequestId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public ResponseEntity<byte[]> labelingTemplate() {
+        return proxyGetBytes("/labeling/template");
+    }
+
+    public ResponseEntity<byte[]> exportLabelTask(String taskId) {
+        return proxyGetBytes("/labeling/tasks/{taskId}/export", taskId);
+    }
+
+    public ResponseEntity<byte[]> labelingPdf(String taskId, String filename) {
+        return proxyGetBytes("/labeling/tasks/{taskId}/pdf/{filename}", taskId, filename);
+    }
+
+    public ResponseEntity<byte[]> labelingHtml(String taskId, int idx) {
+        return proxyGetBytes("/labeling/tasks/{taskId}/html/{idx}", taskId, idx);
+    }
+
     public Map<String, Object> listLogEvents(Integer limit, Integer offset, String source, String level) {
         return exchange(() -> restClient.get()
                 .uri(uriBuilder -> {
@@ -334,6 +524,26 @@ public class PythonAiClient {
                 .headers(this::forwardRequestId)
                 .retrieve()
                 .body(MAP_TYPE));
+    }
+
+    private ResponseEntity<byte[]> proxyGetBytes(String path, Object... uriVars) {
+        ResponseEntity<byte[]> downstream = exchange(() -> restClient.get()
+                .uri(path, uriVars)
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .toEntity(byte[].class));
+        byte[] body = downstream.getBody();
+        if (body == null) {
+            throw new PythonAiException(502, "python-ai returned empty body");
+        }
+        HttpHeaders headers = new HttpHeaders();
+        MediaType contentType = downstream.getHeaders().getContentType();
+        headers.setContentType(contentType != null ? contentType : MediaType.APPLICATION_OCTET_STREAM);
+        String disposition = downstream.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
+        if (disposition != null && !disposition.isBlank()) {
+            headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition);
+        }
+        return new ResponseEntity<>(body, headers, HttpStatus.OK);
     }
 
     private static String stringValue(Object value) {

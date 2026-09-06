@@ -4,12 +4,12 @@
     {
       "id": "w1_chat",
       "name": "W1 聊天评测",
-      "description": "30 题：15 制度条款理解 + 15 财报数字提取（/chat 端到端）",
+      "description": "30 题闭卷金融能力：监管制度 + 会计/银行/市场概念（/chat，use_rag=false）",
       "golden_file": "w1_chat_30.json",
       "runner": "w1_chat",
       "metrics": [
         "accuracy",
-        "number_error_rate",
+        "refuse_rate",
         "latency_p50_ms"
       ],
       "builtin": true
@@ -23,6 +23,32 @@
       "metrics": [
         "recall_at_k",
         "mrr"
+      ],
+      "builtin": true
+    },
+    {
+      "id": "compliance_schema",
+      "name": "合规结论 Schema 校验",
+      "description": "20 例：10 合法 + 10 非法，统计误放行/误拒与报错理由命中率",
+      "golden_file": "compliance_schema_20.json",
+      "runner": "compliance_schema",
+      "metrics": [
+        "accuracy",
+        "false_accept_rate",
+        "false_reject_rate"
+      ],
+      "builtin": true
+    },
+    {
+      "id": "w4_asknum",
+      "name": "W4 问数评测",
+      "description": "20 题：命中 / 拦截 / 反问 / 跳过，检查路由与数字泄露（不调 LLM）",
+      "golden_file": "w4_asknum_20.json",
+      "runner": "w4_asknum",
+      "metrics": [
+        "accuracy",
+        "route_accuracy",
+        "leak_rate"
       ],
       "builtin": true
     }

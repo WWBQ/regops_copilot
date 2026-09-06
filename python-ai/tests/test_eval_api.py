@@ -23,6 +23,12 @@ async def test_list_eval_tasks():
     ids = {item["id"] for item in body["items"]}
     assert "w1_chat" in ids
     assert "rag_retrieval" in ids
+    assert "w4_asknum" in ids
+    asknum = next(item for item in body["items"] if item["id"] == "w4_asknum")
+    assert "leak_rate" in asknum["metrics"]
+    w1 = next(item for item in body["items"] if item["id"] == "w1_chat")
+    assert "refuse_rate" in w1["metrics"]
+    assert "number_error_rate" not in w1["metrics"]
 
 
 @pytest.mark.anyio
@@ -92,7 +98,55 @@ async def test_upload_golden_set():
 
 
 @pytest.mark.anyio
-async def test_delete_run_not_found():
+async def test_preview_w1_golden_set():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/ops/eval/golden-sets/w1_chat_30.json")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["item_count"] == 30
+    assert "accounting" in body["categories"]
+    assert body["items"][0]["id"] == "w1-001"
+    assert body["items"][0]["question"]
+
+
+@pytest.mark.anyio
+async def test_start_w1_chat_rejects_empty_selection(monkeypatch):
+    monkeypatch.setattr(
+        "app.eval.job_service.list_available_models",
+        lambda settings=None: ["deepseek", "qwen"],
+    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/ops/eval/runs",
+            json={"task_id": "w1_chat", "model": "deepseek", "categories": ["not-a-category"]},
+        )
+    assert response.status_code == 400
+    assert "没有匹配的评测题" in response.json()["detail"]
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.delete("/ops/eval/runs/does-not-exist")
     assert response.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_start_w1_chat_rejects_unknown_model(monkeypatch):
+    monkeypatch.setattr(
+        "app.eval.job_service.list_available_models",
+        lambda settings=None: ["deepseek", "qwen"],
+    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/ops/eval/runs",
+            json={"task_id": "w1_chat", "model": "not-a-model", "limit": 1},
+        )
+    assert response.status_code == 400
+    assert "unsupported model" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_models_includes_default():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/models")
+    assert response.status_code == 200
+    body = response.json()
+    assert "available" in body
+    assert "default" in body

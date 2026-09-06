@@ -375,8 +375,9 @@ async function handleSend(text: string) {
       tokenCount,
       promptTokenCount: promptTokenCount > 0 ? promptTokenCount : undefined,
       latencyMs,
-      ...(response.rag_used && response.citations?.length
-        ? { citations: response.citations, ragUsed: true }
+      route: response.route,
+      ...(response.citations?.length
+        ? { citations: response.citations, ragUsed: Boolean(response.rag_used) }
         : {}),
     })
     emit('connected', response.model)
@@ -436,7 +437,8 @@ watch(
       <div>
         <h1>合规问答</h1>
         <p>
-          通用合规对话 + 年报 RAG 检索；📎 上传 PDF 可追加本会话文档。
+          一个助手：数字走问数，叙述走年报 RAG。多步对比（W6）也在本页升级成任务，不另开对话。
+          📎 可上传仅本会话有效的 PDF。
           <span v-if="sessionId" class="session-tag">会话 {{ sessionId.slice(0, 8) }}…</span>
         </p>
         <p v-if="sessionDocs.length" class="doc-strip">

@@ -1,0 +1,346 @@
+{
+  "version": "compliance-schema-v1",
+  "description": "ComplianceConclusion Schema 校验黄金集：10 合法 + 10 非法。合法样例覆盖三档风险、置信度上下边界、可选字段缺省与条款编号清洗；非法样例每条绑定一个 rule，并声明期望的报错字段/文案，以便区分「拒对了」与「拒对了但理由不对」。",
+  "items": [
+    {
+      "id": "cs-001",
+      "category": "valid",
+      "rule": "baseline_low_risk",
+      "note": "低风险常规结论，各字段均在约束内",
+      "payload": {
+        "conclusion": "客户身份资料完整，近一年交易与申报经营范围一致，无需升级尽调。",
+        "risk_level": "低",
+        "clause_refs": [
+          "AML-12-3"
+        ],
+        "evidence_quotes": [
+          "第 3 章第 2 节：客户身份识别要求"
+        ],
+        "confidence": 0.88
+      }
+    },
+    {
+      "id": "cs-002",
+      "category": "valid",
+      "rule": "baseline_multi_clause",
+      "note": "中风险，多条条款引用",
+      "payload": {
+        "conclusion": "大额交易报送存在延迟，需在两个工作日内补报并说明原因。",
+        "risk_level": "中",
+        "clause_refs": [
+          "AML-12-3",
+          "AML-20-1",
+          "CSRC-2024-17"
+        ],
+        "evidence_quotes": [
+          "交易流水第 118 笔",
+          "报送日志 2024-11-03"
+        ],
+        "confidence": 0.74
+      }
+    },
+    {
+      "id": "cs-003",
+      "category": "valid",
+      "rule": "high_risk_confidence_boundary",
+      "note": "边界：高风险 + confidence 恰好 0.95，规则为「不应超过」，故应放行",
+      "payload": {
+        "conclusion": "存在疑似分拆转账规避大额报送阈值的行为，建议提交可疑交易报告。",
+        "risk_level": "高",
+        "clause_refs": [
+          "AML-31-2"
+        ],
+        "evidence_quotes": [
+          "同一对手方 9 笔 49,500 元连续转入"
+        ],
+        "confidence": 0.95
+      }
+    },
+    {
+      "id": "cs-004",
+      "category": "valid",
+      "rule": "confidence_lower_boundary",
+      "note": "边界：confidence 下界 0.0（ge=0.0 应放行）",
+      "payload": {
+        "conclusion": "现有材料不足以判断资金用途，建议转人工复核。",
+        "risk_level": "中",
+        "clause_refs": [
+          "AML-12-3"
+        ],
+        "evidence_quotes": [],
+        "confidence": 0.0
+      }
+    },
+    {
+      "id": "cs-005",
+      "category": "valid",
+      "rule": "confidence_upper_boundary",
+      "note": "边界：非高风险时 confidence 上界 1.0 应放行",
+      "payload": {
+        "conclusion": "客户已完成身份重新识别，资料齐备。",
+        "risk_level": "低",
+        "clause_refs": [
+          "AML-12-3"
+        ],
+        "evidence_quotes": [
+          "身份证明影像件 2024-12-01 归档"
+        ],
+        "confidence": 1.0
+      }
+    },
+    {
+      "id": "cs-006",
+      "category": "valid",
+      "rule": "optional_field_default",
+      "note": "evidence_quotes 缺省，应回落为空列表而非报错",
+      "payload": {
+        "conclusion": "账户长期休眠后突发高频交易，建议监控。",
+        "risk_level": "中",
+        "clause_refs": [
+          "AML-25-4"
+        ],
+        "confidence": 0.61
+      },
+      "expect_normalized": {
+        "evidence_quotes": []
+      }
+    },
+    {
+      "id": "cs-007",
+      "category": "valid",
+      "rule": "clause_refs_strip",
+      "note": "条款编号含首尾空白与空串，应被清洗后保留有效项",
+      "payload": {
+        "conclusion": "受益所有人信息与工商登记不一致，需补充穿透材料。",
+        "risk_level": "中",
+        "clause_refs": [
+          "  AML-12-3 ",
+          "",
+          "   ",
+          " CSRC-2024-17"
+        ],
+        "evidence_quotes": [
+          "工商登记回执"
+        ],
+        "confidence": 0.7
+      },
+      "expect_normalized": {
+        "clause_refs": [
+          "AML-12-3",
+          "CSRC-2024-17"
+        ]
+      }
+    },
+    {
+      "id": "cs-008",
+      "category": "valid",
+      "rule": "conclusion_max_len_boundary",
+      "note": "边界：conclusion 恰好 500 字（max_length=500 应放行）",
+      "payload": {
+        "conclusion": "该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模",
+        "risk_level": "中",
+        "clause_refs": [
+          "AML-12-3"
+        ],
+        "evidence_quotes": [],
+        "confidence": 0.55
+      }
+    },
+    {
+      "id": "cs-009",
+      "category": "valid",
+      "rule": "high_risk_low_confidence",
+      "note": "高风险但置信度低，属于应当放行的谨慎结论",
+      "payload": {
+        "conclusion": "疑似为他人代持账户，证据链尚不完整，建议提交可疑交易报告并继续监控。",
+        "risk_level": "高",
+        "clause_refs": [
+          "AML-31-2",
+          "AML-33-1"
+        ],
+        "evidence_quotes": [
+          "设备指纹与另一客户重合"
+        ],
+        "confidence": 0.42
+      }
+    },
+    {
+      "id": "cs-010",
+      "category": "valid",
+      "rule": "baseline_multi_evidence",
+      "note": "多条证据引用",
+      "payload": {
+        "conclusion": "跨境汇款用途申报与合同金额不符，需要求客户补充贸易背景材料。",
+        "risk_level": "高",
+        "clause_refs": [
+          "FX-08-2"
+        ],
+        "evidence_quotes": [
+          "购销合同金额 120 万美元",
+          "实际汇出 260 万美元",
+          "报关单缺失"
+        ],
+        "confidence": 0.9
+      }
+    },
+    {
+      "id": "cs-011",
+      "category": "invalid",
+      "rule": "clause_refs_min_len",
+      "note": "clause_refs 为空数组，违反 min_length=1",
+      "expect_error_field": "clause_refs",
+      "payload": {
+        "conclusion": "存在合规瑕疵。",
+        "risk_level": "低",
+        "clause_refs": [],
+        "evidence_quotes": [],
+        "confidence": 0.5
+      }
+    },
+    {
+      "id": "cs-012",
+      "category": "invalid",
+      "rule": "clause_refs_blank_only",
+      "note": "条款编号全为空白，Field 约束放行但自定义 validator 应拦下",
+      "expect_error_field": "clause_refs",
+      "expect_error_contains": "至少提供一条有效条款编号",
+      "payload": {
+        "conclusion": "存在合规瑕疵。",
+        "risk_level": "低",
+        "clause_refs": [
+          "   ",
+          ""
+        ],
+        "evidence_quotes": [],
+        "confidence": 0.5
+      }
+    },
+    {
+      "id": "cs-013",
+      "category": "invalid",
+      "rule": "risk_level_enum",
+      "note": "risk_level 超出 低/中/高 枚举",
+      "expect_error_field": "risk_level",
+      "payload": {
+        "conclusion": "存在合规瑕疵。",
+        "risk_level": "未知",
+        "clause_refs": [
+          "AML-12-3"
+        ],
+        "evidence_quotes": [],
+        "confidence": 0.5
+      }
+    },
+    {
+      "id": "cs-014",
+      "category": "invalid",
+      "rule": "confidence_gt_one",
+      "note": "confidence 超过上界 1.0",
+      "expect_error_field": "confidence",
+      "payload": {
+        "conclusion": "存在合规瑕疵。",
+        "risk_level": "中",
+        "clause_refs": [
+          "AML-12-3"
+        ],
+        "evidence_quotes": [],
+        "confidence": 1.2
+      }
+    },
+    {
+      "id": "cs-015",
+      "category": "invalid",
+      "rule": "confidence_lt_zero",
+      "note": "confidence 低于下界 0.0",
+      "expect_error_field": "confidence",
+      "payload": {
+        "conclusion": "存在合规瑕疵。",
+        "risk_level": "中",
+        "clause_refs": [
+          "AML-12-3"
+        ],
+        "evidence_quotes": [],
+        "confidence": -0.1
+      }
+    },
+    {
+      "id": "cs-016",
+      "category": "invalid",
+      "rule": "high_risk_confidence_cap",
+      "note": "高风险结论置信度过高，应由 model_validator 拦下（跨字段规则）",
+      "expect_error_contains": "置信度不应超过 0.95",
+      "payload": {
+        "conclusion": "确认存在洗钱行为。",
+        "risk_level": "高",
+        "clause_refs": [
+          "AML-31-2"
+        ],
+        "evidence_quotes": [],
+        "confidence": 0.99
+      }
+    },
+    {
+      "id": "cs-017",
+      "category": "invalid",
+      "rule": "conclusion_empty",
+      "note": "conclusion 为空串，违反 min_length=1",
+      "expect_error_field": "conclusion",
+      "payload": {
+        "conclusion": "",
+        "risk_level": "低",
+        "clause_refs": [
+          "AML-12-3"
+        ],
+        "evidence_quotes": [],
+        "confidence": 0.5
+      }
+    },
+    {
+      "id": "cs-018",
+      "category": "invalid",
+      "rule": "conclusion_too_long",
+      "note": "conclusion 501 字，越过 max_length=500 一位",
+      "expect_error_field": "conclusion",
+      "payload": {
+        "conclusion": "该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式与其申报经营范围存在偏离，需补充受益所有人资料并复核资金来源。该客户交易模式",
+        "risk_level": "低",
+        "clause_refs": [
+          "AML-12-3"
+        ],
+        "evidence_quotes": [],
+        "confidence": 0.5
+      }
+    },
+    {
+      "id": "cs-019",
+      "category": "invalid",
+      "rule": "conclusion_missing",
+      "note": "缺失必填字段 conclusion（LLM 漏字段的典型形态）",
+      "expect_error_field": "conclusion",
+      "payload": {
+        "risk_level": "低",
+        "clause_refs": [
+          "AML-12-3"
+        ],
+        "evidence_quotes": [],
+        "confidence": 0.5
+      }
+    },
+    {
+      "id": "cs-020",
+      "category": "invalid",
+      "rule": "confidence_not_numeric",
+      "note": "confidence 为不可转数字的文本（LLM 输出「很高」这类词）",
+      "expect_error_field": "confidence",
+      "payload": {
+        "conclusion": "存在合规瑕疵。",
+        "risk_level": "中",
+        "clause_refs": [
+          "AML-12-3"
+        ],
+        "evidence_quotes": [],
+        "confidence": "很高"
+      }
+    }
+  ]
+}

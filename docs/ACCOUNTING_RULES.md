@@ -17,9 +17,9 @@
 
 | ID | 规则名 | 公式 | 适用 scope | 会计依据 | 代码 | 状态 |
 |----|--------|------|------------|----------|------|------|
-| R01 | 资产负债表恒等式 | `total_assets = total_liabilities + total_equity` | consolidated, parent | 会计恒等式：资产 = 负债 + 所有者权益 | `reconciliation.py` | 待实现 |
-| R02 | 现金期末余额 | `cash_end = cash_begin + net_cash_change` | consolidated | 现金流量表直接法/间接法期末调节 | `reconciliation.py` | 待实现 |
-| R03 | 净利润 | `net_profit = profit_before_tax - income_tax` | consolidated | 利润表行次勾稽 | `reconciliation.py` | 待实现 |
+| R01 | 资产负债表恒等式 | `total_assets = total_liabilities + total_equity` | consolidated, parent | 会计恒等式：资产 = 负债 + 所有者权益 | `reconciliation.py` | 已实现 |
+| R02 | 现金期末余额 | `cash_end = cash_begin + net_cash_change` | consolidated | 现金流量表直接法/间接法期末调节 | `reconciliation.py` | 已实现 |
+| R03 | 净利润 | `net_profit = profit_before_tax - income_tax` | consolidated | 利润表行次勾稽 | `reconciliation.py` | 已实现 |
 | R04 | 归母 vs 净利润（可选） | 披露附注中两者差异可解释 | consolidated | 少数股东损益 | — | 可选 |
 
 ---
@@ -76,8 +76,8 @@
 
 ## 验收
 
-- [ ] 上表 R01–R03 状态改为「已实现」  
-- [ ] `tests/test_financial.py` 含勾稽 pass + fail 用例  
-- [ ] 5 家金样本勾稽报告归档（可与 ingest_job 日志合并）  
+- [x] 上表 R01–R03 状态改为「已实现」
+- [x] `tests/test_financial.py` 含勾稽 pass + fail 用例
+- [x] 5 家金样本勾稽报告可导出（`GET /ops/quality/gates` + CLI `ingest_fin_metric.py`）
 
 详见 [INGEST_VALIDATION.md §6 W2-2 总验收](./INGEST_VALIDATION.md#6-w2-2-总验收清单)。

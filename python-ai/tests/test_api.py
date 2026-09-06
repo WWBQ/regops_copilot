@@ -48,6 +48,44 @@ async def test_chat(client: AsyncClient):
     assert "disclaimer" in body
     assert body["total_tokens"] == 20
     assert body["latency_ms"] == 256.0
+    assert body["route"] == "chitchat"
+
+
+@pytest.mark.anyio
+async def test_chat_asknum_skips_llm(client: AsyncClient, monkeypatch):
+    from app.asknum.lookup import AsknumResult
+
+    from app.asknum.citations import AsknumCite
+
+    monkeypatch.setattr(
+        "app.api.chat.try_answer",
+        lambda _question, **_kwargs: AsknumResult(
+            route="metric",
+            reply="比亚迪 2024 年营业收入为 1.00 元 [1]。",
+            citations=(
+                AsknumCite(
+                    doc_id="002594_2024",
+                    page=1,
+                    snippet="财务事实库",
+                    title="财务事实库 · 比亚迪 营业收入",
+                    href="/quality/facts?company_code=002594&concept=revenue",
+                    kind="facts",
+                ),
+            ),
+        ),
+    )
+    response = await client.post(
+        "/chat",
+        json={"message": "比亚迪2024年营收多少", "use_rag": True},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "[1]" in body["reply"]
+    assert body["route"] == "metric"
+    assert body["rag_used"] is False
+    assert body["total_tokens"] == 0
+    assert body["citations"][0]["kind"] == "facts"
+    assert body["citations"][0]["href"] == "/quality/facts?company_code=002594&concept=revenue"
 
 
 @pytest.mark.anyio

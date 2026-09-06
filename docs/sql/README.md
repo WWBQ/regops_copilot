@@ -8,6 +8,8 @@
 | `w2_tables.sql` | W2：`pdf_document` / `web_document` / `ingest_job` / `fin_metric` + `doc_chunks` 补丁 |
 | `w3_chat_sessions.sql` | W3：`chat_session` / `session_document` |
 | `w4_rag_query_log.sql` | W3：RAG 检索 trace 日志 `rag_query_log` |
+| `w4_asknum_query_log.sql` | W4：问数 trace 日志 `asknum_query_log` |
+| `w4_asknum_alias.sql` | W4：问数/检索别名 `asknum_alias`（近义词 → 指标或证券代码） |
 
 ## 新库（Docker 首次启动）
 
@@ -20,6 +22,8 @@ docker compose exec db psql -U regops -d regops_db -f /docker-entrypoint-initdb.
 # 或本机：
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w2_tables.sql
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w4_rag_query_log.sql
+psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w4_asknum_query_log.sql
+psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w4_asknum_alias.sql
 ```
 
 ## 验证
@@ -28,7 +32,7 @@ psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w4_rag_q
 docker compose exec db psql -U regops -d regops_db -c "\dt"
 ```
 
-应看到：`doc_chunks` `pdf_document` `web_document` `ingest_job` `fin_metric`
+应看到：`doc_chunks` `pdf_document` `web_document` `ingest_job` `fin_metric` `rag_query_log` `asknum_query_log` `asknum_alias`
 
 ## 解析 JSON 回溯
 

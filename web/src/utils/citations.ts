@@ -14,6 +14,9 @@ function escapeAttr(text: string): string {
 /** 引用标记 hover 提示：文档标题 + 页码 */
 export function citationHoverLabel(citation: Citation): string {
   const docTitle = citation.title?.trim() || citation.doc_id
+  if (citation.kind === 'facts') {
+    return docTitle
+  }
   return `${docTitle} · 第 ${citation.page} 页`
 }
 

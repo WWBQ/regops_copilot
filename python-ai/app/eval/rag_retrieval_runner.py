@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from app.eval.selection import normalize_categories, select_items
+
 ProgressCallback = Callable[[int, int, str], None]
 
 
@@ -94,15 +96,22 @@ def run_rag_retrieval_eval(
     golden_path: Path,
     limit: int = 0,
     category: str = "",
+    categories: list[str] | None = None,
+    item_ids: list[str] | None = None,
     top_k: int = 0,
+    label: str = "",
     on_progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     golden = load_golden(golden_path)
-    items = golden["items"]
-    if category:
-        items = [item for item in items if item["category"] == category]
-    if limit > 0:
-        items = items[:limit]
+    resolved_categories = normalize_categories(category, categories)
+    items = select_items(
+        golden["items"],
+        categories=resolved_categories,
+        item_ids=item_ids,
+        limit=limit,
+    )
+    if not items:
+        raise ValueError("没有匹配的评测题，请检查题型或题号")
     resolved_top_k = top_k or int(golden.get("default_params", {}).get("top_k", 12))
 
     results: list[dict[str, Any]] = []
@@ -113,12 +122,21 @@ def run_rag_retrieval_eval(
         results.append(run_item(item, top_k=resolved_top_k))
 
     summary = summarize(results)
+    from app.eval.provenance import build_provenance
+
     return {
         "task_id": "rag_retrieval",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "golden_version": golden.get("version"),
         "golden_file": golden_path.name,
-        "params": {"limit": limit, "category": category or None, "top_k": resolved_top_k},
+        "params": {
+            "limit": limit,
+            "category": resolved_categories[0] if len(resolved_categories) == 1 else None,
+            "categories": resolved_categories or None,
+            "item_ids": item_ids or None,
+            "top_k": resolved_top_k,
+        },
+        "provenance": build_provenance(golden_path=golden_path, label=label),
         "summary": summary,
         "results": results,
     }
