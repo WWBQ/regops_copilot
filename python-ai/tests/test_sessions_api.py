@@ -20,7 +20,7 @@ class FakeLLMClient(LLMClient):
     async def chat(self, messages, *, temperature=0.1) -> str:
         return "基于文档的 mock 回复"
 
-    async def chat_with_usage(self, messages, *, temperature=0.1) -> ChatResult:
+    async def chat_with_usage(self, messages, *, temperature=0.1, tools=None) -> ChatResult:
         return ChatResult(content="基于文档的 mock 回复", prompt_tokens=1, completion_tokens=2)
 
 

@@ -270,7 +270,50 @@ def mock_invoke(name: str, parsed: BaseModel, ctx: ToolContext) -> ToolInvokeRes
     if denied is not None:
         return denied
     if name == "lookup_metric":
-        return _lookup(parsed, ctx)  # type: ignore[arg-type]
+        args = parsed
+        names = list(getattr(args, "concepts", None) or [getattr(args, "concept", None)])
+        names = [item for item in names if item]
+        if len(names) <= 1:
+            return _lookup(
+                LookupMetricArgs(
+                    company_code=args.company_code,  # type: ignore[attr-defined]
+                    concept=names[0],
+                    year=args.year,  # type: ignore[attr-defined]
+                    scope=args.scope,  # type: ignore[attr-defined]
+                ),
+                ctx,
+            )
+        lookups = []
+        usable = False
+        for concept in names:
+            one = _lookup(
+                LookupMetricArgs(
+                    company_code=args.company_code,  # type: ignore[attr-defined]
+                    concept=concept,
+                    year=args.year,  # type: ignore[attr-defined]
+                    scope=args.scope,  # type: ignore[attr-defined]
+                ),
+                ctx,
+            )
+            lookups.append(one.result)
+            usable = usable or one.ok
+        return ToolInvokeResponse(
+            name="lookup_metric",
+            ok=usable,
+            stop=not usable,
+            result={
+                "ok": usable,
+                "stop": not usable,
+                "company_code": args.company_code,  # type: ignore[attr-defined]
+                "year": args.year,  # type: ignore[attr-defined]
+                "scope": args.scope,  # type: ignore[attr-defined]
+                "lookups": lookups,
+                "message": "Mock：并列查数。" if usable else "Mock：全部科目无数据。",
+            },
+            error=None if usable else "全部科目无数据。",
+            error_code=None if usable else "missing",
+            request_id=ctx.request_id,
+        )
     if name == "list_scope":
         return _list_scope(parsed, ctx)  # type: ignore[arg-type]
     if name == "verify_number":

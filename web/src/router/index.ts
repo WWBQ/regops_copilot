@@ -9,6 +9,9 @@ import EvalReportView from '../views/ops/EvalReportView.vue'
 import RagMonitorView from '../views/ops/RagMonitorView.vue'
 import AsknumMonitorView from '../views/ops/AsknumMonitorView.vue'
 import ProfileView from '../views/account/ProfileView.vue'
+import UsersPermissionsView from '../views/account/UsersPermissionsView.vue'
+import ReviewQueueView from '../views/compliance/ReviewQueueView.vue'
+import AuditTrailView from '../views/compliance/AuditTrailView.vue'
 import PlaceholderView from '../views/PlaceholderView.vue'
 import QualityGatesView from '../views/quality/QualityGatesView.vue'
 import FinMetricsView from '../views/quality/FinMetricsView.vue'
@@ -102,19 +105,19 @@ const router = createRouter({
     {
       path: '/compliance/review',
       name: 'compliance-review',
-      component: PlaceholderView,
+      component: ReviewQueueView,
       meta: { title: '合规复核', pageId: 'review' },
     },
     {
       path: '/compliance/workflow',
       name: 'workflow',
-      component: PlaceholderView,
+      component: ReviewQueueView,
       meta: { title: '审批流', pageId: 'workflow' },
     },
     {
       path: '/compliance/audit',
       name: 'audit',
-      component: PlaceholderView,
+      component: AuditTrailView,
       meta: { title: '审计追踪', pageId: 'audit' },
     },
     {
@@ -156,7 +159,7 @@ const router = createRouter({
     {
       path: '/settings/users',
       name: 'users',
-      component: PlaceholderView,
+      component: UsersPermissionsView,
       meta: { title: '用户与权限', pageId: 'users' },
     },
   ],

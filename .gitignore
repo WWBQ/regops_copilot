@@ -36,6 +36,9 @@ web/dist-ssr/
 .DS_Store
 Thumbs.db
 
+# LangGraph Checkpoint（本地任务快照，不进仓库）
+data/checkpoints/
+
 # 本地金样本 PDF（巨潮下载，不进仓库）
 data/raw/
 data/labeling/
@@ -43,6 +46,7 @@ data/objects/
 
 # 公开基准原数据（只保留脚本与选型卡）
 eval/.cache/
+eval/reports/
 
 # Docker 本地数据（若有）
 *.log

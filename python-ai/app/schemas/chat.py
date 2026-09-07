@@ -17,6 +17,7 @@ class ChatRequest(BaseModel):
     session_id: str | None = None
     use_rag: bool = True
     model: str | None = None
+    thread_id: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -27,7 +28,10 @@ class ChatResponse(BaseModel):
     session_id: str | None = None
     rag_used: bool = False
     route: str = "general"
+    thread_id: str | None = None
+    pending_node: str | None = None
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
     latency_ms: float = 0.0
+    tool_trace: list[dict] = Field(default_factory=list)

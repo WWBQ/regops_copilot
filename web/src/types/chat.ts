@@ -19,6 +19,7 @@ export interface ChatRequest {
   session_id?: string
   use_rag?: boolean
   model?: string
+  thread_id?: string
 }
 
 export interface ChatResponse {
@@ -29,6 +30,8 @@ export interface ChatResponse {
   session_id?: string | null
   rag_used?: boolean
   route?: string
+  thread_id?: string | null
+  pending_node?: string | null
   prompt_tokens?: number
   completion_tokens?: number
   total_tokens?: number
@@ -51,6 +54,10 @@ export interface ChatMessage {
   /** AI 回复时 RAG/系统提示等输入侧 Token */
   promptTokenCount?: number
   latencyMs?: number
+  /** 正在流式输出 */
+  streaming?: boolean
+  /** 流式等待时的状态文案 */
+  statusText?: string
   /** @deprecated 兼容旧缓存，请用 tokenCount */
   totalTokens?: number
 }

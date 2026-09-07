@@ -51,6 +51,34 @@
         "leak_rate"
       ],
       "builtin": true
+    },
+    {
+      "id": "w6_number_check",
+      "name": "W6 数字校验",
+      "description": "20 例：抽取终稿数字并回溯事实/引用，统计误放行与量纲错误（不调 LLM）",
+      "golden_file": "w6_number_check_20.json",
+      "runner": "w6_number_check",
+      "metrics": [
+        "accuracy",
+        "false_accept_rate",
+        "number_error_rate",
+        "unit_error_rate"
+      ],
+      "builtin": true
+    },
+    {
+      "id": "w6_workflow",
+      "name": "W6 工作流轨迹",
+      "description": "20 场景：节点顺序、工具参数、确认率和失败节点（不调 LLM）",
+      "golden_file": "w6_workflow_20.json",
+      "runner": "w6_workflow",
+      "metrics": [
+        "accuracy",
+        "param_accuracy",
+        "avg_steps",
+        "confirmation_rate"
+      ],
+      "builtin": true
     }
   ]
 }

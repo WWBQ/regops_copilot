@@ -1,10 +1,27 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { CURRENT_USER, userInitials } from '../../config/user'
+import LoginPanel from '../../components/auth/LoginPanel.vue'
+import { useAuth } from '../../composables/useAuth'
+import { deptLabel, GUEST_USER, roleLabel, userInitials } from '../../config/user'
 
 const router = useRouter()
-const initials = userInitials(CURRENT_USER.displayName)
+const { user, loggedIn, logout } = useAuth()
+
+const display = computed(() => {
+  if (!user.value) return GUEST_USER
+  return {
+    id: user.value.id,
+    displayName: user.value.displayName,
+    username: user.value.username,
+    email: user.value.email,
+    role: roleLabel(user.value.role),
+    department: deptLabel(user.value.dept),
+  }
+})
+
+const initials = computed(() => userInitials(display.value.displayName))
 </script>
 
 <template>
@@ -14,46 +31,53 @@ const initials = userInitials(CURRENT_USER.displayName)
         <span class="avatar">{{ initials }}</span>
         <div>
           <h1>个人资料</h1>
-          <p class="subtitle">{{ CURRENT_USER.displayName }} · {{ CURRENT_USER.role }}</p>
+          <p class="subtitle">{{ display.displayName }} · {{ display.role }}</p>
         </div>
       </div>
     </header>
 
-    <div class="profile-card">
+    <div v-if="!loggedIn" class="profile-card">
+      <h2>登录</h2>
+      <p class="hint">演示账号：analyst / checker / rm / admin，密码均为用户名 + 123。</p>
+      <LoginPanel />
+    </div>
+
+    <div v-else class="profile-card">
       <h2>基本信息</h2>
       <dl class="info-grid">
         <div>
           <dt>显示名称</dt>
-          <dd>{{ CURRENT_USER.displayName }}</dd>
+          <dd>{{ display.displayName }}</dd>
         </div>
         <div>
           <dt>用户名</dt>
-          <dd>{{ CURRENT_USER.username }}</dd>
+          <dd>{{ display.username }}</dd>
         </div>
         <div>
           <dt>邮箱</dt>
-          <dd>{{ CURRENT_USER.email }}</dd>
+          <dd>{{ display.email || '—' }}</dd>
         </div>
         <div>
           <dt>角色</dt>
-          <dd>{{ CURRENT_USER.role }}</dd>
+          <dd>{{ display.role }}</dd>
         </div>
         <div>
           <dt>部门</dt>
-          <dd>{{ CURRENT_USER.department }}</dd>
+          <dd>{{ display.department }}</dd>
         </div>
         <div>
           <dt>用户 ID</dt>
-          <dd><code>{{ CURRENT_USER.id }}</code></dd>
+          <dd><code>{{ display.id }}</code></dd>
         </div>
       </dl>
-      <p class="hint">W9+ 接入统一认证与 RBAC 后可在此编辑资料。</p>
+      <p class="hint">JWT 存在浏览器本地。问答 / 评测仍可不登录；复核、客户档案、审计必须带 Token。</p>
     </div>
 
     <div class="profile-actions">
       <button type="button" class="ghost-btn" @click="router.push('/settings/users')">
         用户与权限
       </button>
+      <button v-if="loggedIn" type="button" class="ghost-btn" @click="logout">退出</button>
       <button type="button" class="ghost-btn" @click="router.push('/')">返回问答</button>
     </div>
   </section>

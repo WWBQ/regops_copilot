@@ -45,6 +45,13 @@ export interface EvalRunSummary {
   count?: number
   recall_at_k?: number
   mrr?: number
+  param_accuracy?: number
+  avg_steps?: number
+  confirmation_rate?: number
+  fail_by_node?: Record<string, number>
+  route_accuracy?: number
+  leak_rate?: number
+  unit_error_rate?: number
   by_category?: Record<
     string,
     {
@@ -53,6 +60,7 @@ export interface EvalRunSummary {
       count?: number
       total?: number
       passed?: number
+      failed?: number
       refused?: number
       accuracy?: number
     }
@@ -181,4 +189,6 @@ export const RUNNER_LABELS: Record<string, string> = {
   rag_retrieval: 'RAG 检索（page Recall@k）',
   compliance_schema: '合规结论 Schema 校验（误放行率）',
   w4_asknum: 'W4 问数（受控 lookup）',
+  w6_number_check: 'W6 数字校验（误放行 / 量纲）',
+  w6_workflow: 'W6 工作流轨迹（节点 / 参数 / 确认率）',
 }

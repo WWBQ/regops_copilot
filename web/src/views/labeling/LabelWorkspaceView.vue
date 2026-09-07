@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { postChat } from '../../api/chat'
+import { streamChat } from '../../api/chat'
 import { getLabelItem, htmlProxyUrl, pdfUrl, saveLabelItem } from '../../api/labeling'
 import ChatInput from '../../components/chat/ChatInput.vue'
 import ChatMessage from '../../components/chat/ChatMessage.vue'
@@ -29,6 +29,7 @@ const msg = ref('')
 const loading = ref(true)
 const saving = ref(false)
 const chatLoading = ref(false)
+const chatAbort = ref<AbortController | null>(null)
 const listRef = ref<HTMLElement | null>(null)
 
 const messages = ref<ChatMessageType[]>([
@@ -115,33 +116,87 @@ async function scrollChat() {
 async function handleSend(text: string) {
   messages.value.push({ id: uid(), role: 'user', content: text })
   await scrollChat()
+  const assistantId = uid()
+  messages.value.push({
+    id: assistantId,
+    role: 'assistant',
+    content: '',
+    streaming: true,
+    statusText: '正在回复…',
+  })
+  await scrollChat()
   chatLoading.value = true
+  chatAbort.value?.abort()
+  const abort = new AbortController()
+  chatAbort.value = abort
   const context = sourceText.value.trim().slice(0, 2500)
   const payload = context
     ? `请协助核对下面的标注文本：\n\n${context}\n\n问题：${text}`
     : text
   try {
-    const response = await postChat({ message: payload })
-    messages.value.push({
-      id: uid(),
-      role: 'assistant',
-      content: response.reply,
-      model: response.model,
-      disclaimer: response.disclaimer,
-    })
+    const response = await streamChat(
+      { message: payload },
+      {
+        signal: abort.signal,
+        onStatus: (statusText) => {
+          const index = messages.value.findIndex((item) => item.id === assistantId)
+          if (index >= 0) {
+            messages.value[index] = { ...messages.value[index], statusText }
+          }
+        },
+        onDelta: async (chunk) => {
+          const index = messages.value.findIndex((item) => item.id === assistantId)
+          if (index >= 0) {
+            messages.value[index] = {
+              ...messages.value[index],
+              content: `${messages.value[index].content}${chunk}`,
+              statusText: undefined,
+            }
+          }
+          await nextTick()
+        },
+      },
+    )
+    const index = messages.value.findIndex((item) => item.id === assistantId)
+    if (index >= 0) {
+      messages.value[index] = {
+        ...messages.value[index],
+        content: response.reply,
+        model: response.model,
+        disclaimer: response.disclaimer,
+        streaming: false,
+        statusText: undefined,
+      }
+    }
     emit('connected', response.model)
   } catch (err) {
-    messages.value.push({
-      id: uid(),
-      role: 'assistant',
-      content: `请求失败：${err instanceof Error ? err.message : '未知错误'}`,
-      error: true,
-    })
-    emit('disconnected')
+    const aborted = err instanceof DOMException && err.name === 'AbortError'
+    const index = messages.value.findIndex((item) => item.id === assistantId)
+    if (index >= 0) {
+      messages.value[index] = {
+        ...messages.value[index],
+        content: aborted
+          ? messages.value[index].content.trim() || '已停止生成。'
+          : `请求失败：${err instanceof Error ? err.message : '未知错误'}`,
+        error: !aborted,
+        streaming: false,
+        statusText: undefined,
+      }
+    }
+    if (!aborted) {
+      emit('disconnected')
+    }
   } finally {
+    if (chatAbort.value === abort) {
+      chatAbort.value = null
+    }
     chatLoading.value = false
     await scrollChat()
   }
+}
+
+function handleStopChat() {
+  chatAbort.value?.abort()
 }
 
 function onKeydown(event: KeyboardEvent) {
@@ -157,6 +212,7 @@ onMounted(() => {
   void loadItem()
 })
 onUnmounted(() => {
+  chatAbort.value?.abort()
   window.removeEventListener('keydown', onKeydown)
 })
 </script>
@@ -229,7 +285,6 @@ onUnmounted(() => {
         <h2>问金融 AI</h2>
         <div ref="listRef" class="mini-list">
           <ChatMessage v-for="row in messages" :key="row.id" :message="row" />
-          <p v-if="chatLoading" class="hint">AI 正在回复…</p>
         </div>
         <ChatInput
           :loading="chatLoading"
@@ -237,6 +292,7 @@ onUnmounted(() => {
           :models="[]"
           model=""
           @send="handleSend"
+          @stop="handleStopChat"
         />
       </section>
     </div>

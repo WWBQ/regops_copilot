@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 
-from app.schemas.tools import LookupMetricArgs, VerifyNumberArgs, VerifyNumberResult
+from app.schemas.tools import LookupMetricArgs, LookupMetricResult, VerifyNumberArgs, VerifyNumberResult
 from app.tools.lookup import run_lookup_metric
 
 _RELATIVE_TOL = Decimal("0.0001")
@@ -45,6 +45,8 @@ def run_verify_number(args: VerifyNumberArgs) -> VerifyNumberResult:
             scope=args.scope,
         )
     )
+    if not isinstance(hit, LookupMetricResult):
+        raise TypeError("verify_number 只核对单科")
     if not hit.ok or hit.value_yuan is None:
         return VerifyNumberResult(
             ok=False,

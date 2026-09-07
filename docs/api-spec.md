@@ -35,9 +35,9 @@ flowchart LR
 | RAG 检索、重排、引用、拒答 | **python-ai** | `app/rag/` |
 | 文档解析与入库 | **python-ai** | `app/ingest/`、`app/documents/` |
 | 评测任务与报告 | **python-ai** | `app/eval/` |
-| 问数（受控 lookup） / Agent | **python-ai** | W4：`app/asknum/` 已接 `/chat`；W5：`app/tools/` 合同（Function Calling）；W6 多步仍走同一助手，不另开对话页 |
-| 认证、RBAC、部门数据权限 | **java-service** | 当前仍是 Spring Security 开发默认配置，正式鉴权在 **W7** |
-| maker-checker 复核、审计留痕 | **java-service** | **W7 占位**，尚未实现 |
+| 问数（受控 lookup） / Agent | **python-ai** | W4：`app/asknum/` 已接 `/chat`；W5：`app/tools/`；W6：两家+结论才走 `app/agents/` Workflow（结论前 Checkpoint），不另开对话页 |
+| 认证、RBAC、部门数据权限 | **java-service** | JWT + `@PreAuthorize`；问答/评测仍可不登录，见 [`W7_RBAC.md`](./W7_RBAC.md) |
+| maker-checker 复核、审计留痕 | **java-service** | `PENDING → SUBMITTED → REVIEWED \| REJECTED`；Python 只写 PENDING |
 | 对外 API 聚合与错误归一 | **java-service** | `controller/*ProxyController` + `GlobalExceptionHandler` |
 | 页面与交互 | **web** | Vue3 + vue-router |
 
@@ -81,6 +81,7 @@ BFF 侧 `GET /api/health` 会附带下游状态（下游异常时不影响本级
 | `message` | string | ✅ | 1–16000 字符 | 用户问题 |
 | `temperature` | number | | 0.0–2.0，默认 `0.1` | 采样温度 |
 | `session_id` | string \| null | | 须为合法 UUID | 会话 ID，用于关联本会话上传的临时文档 |
+| `thread_id` | string \| null | | `{dept}:{uuid}` | W6-2 审查任务检查点。暂停后前端回传，用于确认/取消 |
 | `use_rag` | boolean | | 默认 `true` | 关掉则纯 LLM 对话，不检索 |
 | `model` | string \| null | | 默认取 `DEFAULT_MODEL` | 须在 `GET /models` 返回的可用列表内 |
 
@@ -94,7 +95,10 @@ BFF 侧 `GET /api/health` 会附带下游状态（下游异常时不影响本级
 | `citations` | `Citation[]` | 引用列表：`doc_id`、`page`、`snippet`、`viewer_url`、`title`；问数另有 `href`（事实库深链）、`kind`=`facts` \| `document` |
 | `session_id` | string \| null | 回显会话 ID |
 | `rag_used` | boolean | 是否实际命中检索（有引用才为 `true`） |
-| `route` | string | `metric` / `metric_clarify` / `metric_blocked` / `rag` / `chitchat` / `general`。数字题走问数时 `rag_used=false` |
+| `route` | string | `metric` / `metric_clarify` / `metric_blocked` / `agent` / `agent_blocked` / `agent_paused` / `tools` / `tools_blocked` / `rag` / `rag_blocked` / `chitchat` / `general`。数字题走问数时 `rag_used=false`；`tools` = 点名选工具或开放决策（经营概况 / 库外科目 / 待复核追问）；`agent_paused` = 审查图停在 `emit_conclusion` 前；`rag_blocked` / `tools_blocked` 在终稿数字无法回溯时也可能出现 |
+| `thread_id` | string \| null | 审查任务检查点 ID；`agent_paused` 时必带，确认/取消时原样回传 |
+| `pending_node` | string \| null | 暂停时为 `conclude` |
+| `tool_trace` | object[] | 工具自选时的调用记录（`name` / `ok` / `stop` / `value_yuan`）；末项可能是 `number_check`。RAG 被数字校验拦截时也会带这一项 |
 | `prompt_tokens` / `completion_tokens` / `total_tokens` | integer | Token 用量（问数模板答为 0） |
 | `latency_ms` | number | 模型调用耗时 |
 
@@ -121,6 +125,26 @@ curl -s -X POST http://localhost:8000/chat \
   -H 'X-Request-ID: demo-0001' \
   -d '{"message":"什么是审慎监管？一句话说明","use_rag":false}'
 ```
+
+### 2.2.1 `POST /chat/stream`
+
+同一套 `ChatRequest`，以 SSE 边生成边返回。前端合规问答走这条；评测与脚本仍用 `POST /chat`。
+
+| `event` | `data` | 说明 |
+|---------|--------|------|
+| `meta` | `{model, session_id, route?}` | 路由或模型就绪 |
+| `status` | `{text}` | 工具循环 / 检索过程提示 |
+| `delta` | `{text}` | 增量正文（问数/工作流可能一次给完整段） |
+| `done` | `ChatResponse` | 最终回复、引用、用量 |
+| `error` | `{detail, status}` | 生成中失败（HTTP 仍可能是 200） |
+
+```bash
+curl -N -X POST http://localhost:8000/chat/stream \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"什么是审慎监管？一句话说明","use_rag":false}'
+```
+
+BFF：`POST /api/chat/stream` 原样转发 `text/event-stream`，不缓存。
 
 ### 2.3 `GET /models`
 
@@ -220,8 +244,8 @@ Schema 校验失败（422）时 `detail` 是数组，元素含 `type`/`loc`/`msg
 
 | 分组 | 端点 |
 |------|------|
-| 基础 | `GET /`、`GET /health`、`GET /models`、`POST /chat` |
-| 工具合同 | `GET /tools`、`GET /tools/capabilities`、`GET /tools/schema/{name}`、`POST /tools/invoke`（`backend=mock` 可回放） |
+| 基础 | `GET /`、`GET /health`、`GET /models`、`POST /chat`、`POST /chat/stream` |
+| 工具合同 | `GET /tools`、`GET /tools/capabilities`、`GET /tools/schema/{name}`、`POST /tools/invoke`（`backend=mock` 可回放）、`GET /tools/review-drafts`、`GET /tools/review-drafts/{draft_id}`（须 `X-Regops-Dept`） |
 | MCP | `POST /mcp`（JSON-RPC：`initialize` / `tools/list` / `tools/call`） |
 | 文档 | `GET /documents`、`POST /documents/upload`、`GET /documents/{doc_id}`、`GET /documents/{doc_id}/content`、`GET /documents/{doc_id}/viewer-url`、`POST /documents/citation/viewer-url` |
 | 会话 | `POST /sessions`、`GET|POST /sessions/{session_id}/documents`、`GET /sessions/{session_id}/documents/{doc_id}` |
@@ -236,16 +260,20 @@ Schema 校验失败（422）时 `detail` 是数组，元素含 `type`/`loc`/`msg
 | Controller | 前缀 | 端点 |
 |-----------|------|------|
 | `HealthController` | `/api` | `GET /health` |
-| `AiProxyController` | `/api` | `GET /models`、`POST /chat` |
-| `ToolController` | `/api/tools` | `GET /capabilities`、`GET /schema/{name}`、`POST /lookup`、`/compare`、`/scope`、`/verify`、`/review-draft`、`/invoke`（部门隔离；不代理 RAG） |
+| `AiProxyController` | `/api` | `GET /models`、`POST /chat`、`POST /chat/stream` |
+| `ToolController` | `/api/tools` | `GET /capabilities`、`GET /schema/{name}`、`POST /lookup`、`/compare`、`/scope`、`/verify`、`/review-draft`（PENDING 草稿，不重试）、`GET /review-drafts`、`GET /review-drafts/{draftId}`、`/invoke`（部门隔离；不代理 RAG） |
 | `DocumentProxyController` | `/api/documents` | `GET /{docId}/viewer-url`、`GET /{docId}/content` |
 | `SessionProxyController` | `/api/sessions` | `POST ""`、`GET /{sessionId}/documents`、`POST /{sessionId}/documents`（multipart）、`GET /{sessionId}/documents/{docId}` |
 | `OpsProxyController` | `/api/ops` | `GET /rag/overview`、`/rag-traces`、`/rag-traces/{traceId}`、`/asknum-traces`、`/asknum-traces/{traceId}`、`/system/overview`、`/ingest/overview`、`/ingest/jobs`、`/ingest/session-documents`、`/logs/events` |
 | `EvalProxyController` | `/api/ops/eval` | `GET /tasks`、`POST /tasks`、`DELETE /tasks/{taskId}`、`GET /golden-sets`、`POST /golden-sets/upload`、`GET /runs`、`POST /runs`、`GET /runs/{runId}`、`DELETE /runs/{runId}` |
 | `LabelingProxyController` | `/api/labeling` | `GET /tasks`、`POST /tasks`（multipart）、`GET /template`、`GET /tasks/{taskId}`、`GET|POST /tasks/{taskId}/items/{idx}`、`GET /tasks/{taskId}/export`、`GET /tasks/{taskId}/pdf/{filename}`、`GET /tasks/{taskId}/html/{idx}` |
+| `AuditController` | `/api/audit` | `GET /events`（JWT；含 actor / before-after / request_id） |
+| `AuthController` | `/api/auth` | `POST /login`、`GET /me`、`GET /demo-accounts` |
+| `ReviewController` | `/api/reviews` | `GET|POST /tickets`、`POST /tickets/{id}/submit` `/approve` `/reject` |
+| `CustomerController` | `/api/customers` | `GET ""`、`GET /{id}`（客户经理只见 CLIENT，内核 404） |
 | Actuator | `/actuator` | `GET /health`、`GET /info` |
 
-**W7 占位**（尚未实现）：`/api/reviews/**` 合规复核、`/api/auth/**` 认证、审计查询。
+登录：`analyst/analyst123`、`checker/checker123`、`rm/rm123`、`admin/admin123`。工单状态没有 `APPROVED`。详情 [`W7_RBAC.md`](./W7_RBAC.md)。
 
 > 常见误用：BFF 的运维端点都在 `/api/ops/**` 之下，直接请求 `/api/ingest/jobs` 是错的；
 > `/api/sessions` 只接受 `POST`。这两种情况当前都返回 **500** 而非 404/405，
@@ -260,3 +288,5 @@ Schema 校验失败（422）时 `detail` 是数组，元素含 `type`/`loc`/`msg
 - 入库校验规则：[`INGEST_VALIDATION.md`](./INGEST_VALIDATION.md)
 - W4 问数：[`W4_ASKNUM.md`](./W4_ASKNUM.md)
 - W5 工具合同：[`W5_TOOLS.md`](./W5_TOOLS.md)
+- W6 审查对比工作流：[`W6_GRAPH.md`](./W6_GRAPH.md)
+- W7 Java 企业边界：[`W7_RBAC.md`](./W7_RBAC.md)

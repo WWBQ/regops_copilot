@@ -15,6 +15,7 @@ public final class DeptAcl {
 
     public static final Set<String> RESEARCH = Set.of("002594", "601633");
     public static final Set<String> COMPLIANCE = Set.of("002594", "601633", "000333", "000651", "600031");
+    public static final Set<String> RM = Set.of("000333", "000651");
 
     private DeptAcl() {
     }
@@ -23,7 +24,7 @@ public final class DeptAcl {
         if (dept == null || dept.isBlank()) {
             throw new ToolAccessException("unauthorized", "缺少部门：X-Regops-Dept");
         }
-        if (!"research".equals(dept) && !"compliance".equals(dept)) {
+        if (!"research".equals(dept) && !"compliance".equals(dept) && !"rm".equals(dept)) {
             throw new ToolAccessException("unauthorized", "未知部门 " + dept);
         }
     }
@@ -52,6 +53,12 @@ public final class DeptAcl {
     }
 
     public static Set<String> allowlist(String dept) {
-        return "research".equals(dept) ? RESEARCH : COMPLIANCE;
+        if ("research".equals(dept)) {
+            return RESEARCH;
+        }
+        if ("rm".equals(dept)) {
+            return RM;
+        }
+        return COMPLIANCE;
     }
 }

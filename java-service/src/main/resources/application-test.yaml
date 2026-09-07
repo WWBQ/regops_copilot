@@ -5,7 +5,7 @@ spring:
     password:
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: none
   sql:
     init:
       mode: never
@@ -13,3 +13,7 @@ spring:
 regops:
   python-ai:
     base-url: http://localhost:8000
+  auth:
+    jwt-secret: test-regops-jwt-secret-change-me-32b
+    jwt-ttl-seconds: 3600
+    seed: false

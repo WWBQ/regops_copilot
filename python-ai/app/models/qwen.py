@@ -3,13 +3,18 @@ import time
 
 import httpx
 
+from collections.abc import AsyncIterator
+from typing import Any
+
 from app.models.base import (
     ChatResult,
     LLMClient,
     ModelBadResponseError,
     ModelRateLimitError,
     ModelTimeoutError,
+    StreamDelta,
 )
+from app.models.openai_compat import parse_chat_completion, stream_chat_completion
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +40,7 @@ class QwenClient(LLMClient):
 
     async def chat(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         *,
         temperature: float = 0.1,
     ) -> str:
@@ -44,15 +49,19 @@ class QwenClient(LLMClient):
 
     async def chat_with_usage(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         *,
         temperature: float = 0.1,
+        tools: list[dict[str, Any]] | None = None,
     ) -> ChatResult:
-        payload = {
+        payload: dict[str, Any] = {
             "model": self._model,
             "messages": messages,
             "temperature": temperature,
         }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
@@ -79,6 +88,35 @@ class QwenClient(LLMClient):
             result.completion_tokens,
         )
         return result
+
+    async def chat_stream(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        temperature: float = 0.1,
+        tools: list[dict[str, Any]] | None = None,
+    ) -> AsyncIterator[StreamDelta]:
+        payload: dict[str, Any] = {
+            "model": self._model,
+            "messages": messages,
+            "temperature": temperature,
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        url = f"{self._base_url}/chat/completions"
+        async for delta in stream_chat_completion(
+            url=url,
+            headers=headers,
+            payload=payload,
+            timeout=self._timeout,
+            provider="Qwen",
+        ):
+            yield delta
 
     async def _post_with_retry(
         self,
@@ -107,16 +145,7 @@ class QwenClient(LLMClient):
 
     def _parse_response(self, response: httpx.Response, latency_ms: float) -> ChatResult:
         try:
-            data = response.json()
-            content = data["choices"][0]["message"]["content"]
-            usage = data.get("usage", {})
-        except (KeyError, IndexError, ValueError) as exc:
+            return parse_chat_completion(response.json(), latency_ms)
+        except (ModelBadResponseError, ValueError) as exc:
             logger.error("Invalid Qwen response format: %s", exc)
             raise ModelBadResponseError("Invalid Qwen response format") from exc
-
-        return ChatResult(
-            content=content,
-            prompt_tokens=int(usage.get("prompt_tokens", 0)),
-            completion_tokens=int(usage.get("completion_tokens", 0)),
-            latency_ms=latency_ms,
-        )

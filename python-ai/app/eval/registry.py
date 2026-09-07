@@ -13,12 +13,14 @@ GOLDEN_DIR = EVAL_DIR / "golden"
 REPORTS_DIR = EVAL_DIR / "reports"
 TASKS_FILE = EVAL_DIR / "tasks.json"
 
-RUNNERS = ("w1_chat", "rag_retrieval", "compliance_schema", "w4_asknum")
+RUNNERS = ("w1_chat", "rag_retrieval", "compliance_schema", "w4_asknum", "w6_number_check", "w6_workflow")
 RUNNER_DEFAULT_METRICS: dict[str, tuple[str, ...]] = {
     "w1_chat": ("accuracy", "refuse_rate", "latency_p50_ms"),
     "rag_retrieval": ("recall_at_k", "mrr"),
     "compliance_schema": ("accuracy", "false_accept_rate", "false_reject_rate"),
     "w4_asknum": ("accuracy", "route_accuracy", "leak_rate"),
+    "w6_number_check": ("accuracy", "false_accept_rate", "number_error_rate", "unit_error_rate"),
+    "w6_workflow": ("accuracy", "param_accuracy", "avg_steps", "confirmation_rate"),
 }
 _TASK_ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,48}$")
 
@@ -76,6 +78,24 @@ def _default_tasks_payload() -> dict:
                 "golden_file": "w4_asknum_20.json",
                 "runner": "w4_asknum",
                 "metrics": list(RUNNER_DEFAULT_METRICS["w4_asknum"]),
+                "builtin": True,
+            },
+            {
+                "id": "w6_number_check",
+                "name": "W6 数字校验",
+                "description": "20 例：抽取终稿数字并回溯事实/引用，统计误放行与量纲错误（不调 LLM）",
+                "golden_file": "w6_number_check_20.json",
+                "runner": "w6_number_check",
+                "metrics": list(RUNNER_DEFAULT_METRICS["w6_number_check"]),
+                "builtin": True,
+            },
+            {
+                "id": "w6_workflow",
+                "name": "W6 工作流轨迹",
+                "description": "20 场景：节点顺序、工具参数、确认率和失败节点（不调 LLM）",
+                "golden_file": "w6_workflow_20.json",
+                "runner": "w6_workflow",
+                "metrics": list(RUNNER_DEFAULT_METRICS["w6_workflow"]),
                 "builtin": True,
             },
         ],
@@ -310,6 +330,14 @@ def validate_golden_payload(content: dict, *, runner: str | None = None) -> int:
                 raise ValueError(
                     f"items[{index}] expected_route 须为 metric / metric_blocked / metric_clarify / skip"
                 )
+        if runner == "w6_number_check":
+            if not str(item.get("reply") or "").strip():
+                raise ValueError(f"items[{index}] 缺少 reply（数字校验集必填）")
+            if not isinstance(item.get("expected_ok"), bool):
+                raise ValueError(f"items[{index}] expected_ok 须为布尔值")
+        if runner == "w6_workflow":
+            if item.get("expected_entry") not in {None, "graph", "asknum", "tools"}:
+                raise ValueError(f"items[{index}] expected_entry 须为 graph / asknum / tools")
     return len(items)
 
 
@@ -322,6 +350,8 @@ def save_golden_set(*, filename: str, content: dict, runner: str | None = None) 
         "rag_retrieval_100.json",
         "compliance_schema_20.json",
         "w4_asknum_20.json",
+        "w6_number_check_20.json",
+        "w6_workflow_20.json",
     }:
         raise ValueError("内置黄金集不可覆盖，请使用新文件名")
     item_count = validate_golden_payload(content, runner=runner)

@@ -27,8 +27,17 @@ class DeptAclTest {
     }
 
     @Test
-    void complianceCanReadMidea() {
-        DeptAcl.requireCompany("compliance", "000333");
+    void rmCannotReadByd() {
+        ToolAccessException ex = assertThrows(
+                ToolAccessException.class,
+                () -> DeptAcl.requireCompany("rm", "002594")
+        );
+        assertEquals("unauthorized", ex.getErrorCode());
+    }
+
+    @Test
+    void rmCanReadMidea() {
+        DeptAcl.requireCompany("rm", "000333");
     }
 
     @Test

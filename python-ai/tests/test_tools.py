@@ -90,6 +90,18 @@ def test_lookup_metric_ok():
     assert out.result["outcome"] == "ok"
 
 
+def test_lookup_metric_single_item_list_is_flat():
+    with patch("app.tools.lookup.lookup_metric", return_value=_hit()):
+        out = invoke_tool(
+            "lookup_metric",
+            {"company_code": "002594", "year": 2024, "concepts": ["revenue"]},
+        )
+    assert out.ok is True
+    assert "lookups" not in out.result
+    assert out.result["value_yuan"] == "777102455000"
+    assert out.result["concept"] == "revenue"
+
+
 def test_lookup_metric_human_review_stops_without_amount():
     row = _row(status="human_review", review_reason="critical_amount_mismatch")
     with patch("app.tools.lookup.lookup_metric", return_value=_hit(outcome="human_review", row=row)):
@@ -112,6 +124,57 @@ def test_lookup_metric_missing_stops():
     assert out.ok is False
     assert out.stop is True
     assert out.result["outcome"] == "missing"
+
+
+def test_lookup_metric_batches_and_keeps_partial():
+    def fake_lookup(*, company_code, concept, year, scope="consolidated"):
+        if concept == "revenue":
+            row = _row(concept="revenue", status="human_review", review_reason="critical_amount_mismatch")
+            return MetricLookup(
+                company_code=company_code,
+                concept=concept,
+                year=year,
+                scope=scope,
+                outcome="human_review",
+                row=row,
+                review_reason=row.review_reason,
+            )
+        row = _row(concept=concept, value=Decimal("40254346000"))
+        return MetricLookup(
+            company_code=company_code,
+            concept=concept,
+            year=year,
+            scope=scope,
+            outcome="ok",
+            row=row,
+        )
+
+    with patch("app.tools.lookup.lookup_metric", side_effect=fake_lookup):
+        out = invoke_tool(
+            "lookup_metric",
+            {
+                "company_code": "002594",
+                "year": 2024,
+                "concepts": ["revenue", "net_profit_attributable", "operating_cash_flow"],
+            },
+        )
+    assert out.ok is True
+    assert out.stop is False
+    rows = out.result["lookups"]
+    assert len(rows) == 3
+    assert rows[0]["outcome"] == "human_review"
+    assert rows[0]["value_yuan"] is None
+    assert rows[1]["outcome"] == "ok"
+    assert rows[1]["value_yuan"] == "40254346000"
+
+
+def test_lookup_metric_rejects_too_many_concepts():
+    with pytest.raises(ValidationError):
+        LookupMetricArgs(
+            company_code="002594",
+            year=2024,
+            concepts=["revenue", "net_profit", "eps", "total_assets", "cash_end", "income_tax"],  # type: ignore[arg-type]
+        )
 
 
 def test_lookup_rejects_unknown_concept():

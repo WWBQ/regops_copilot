@@ -83,6 +83,12 @@ curl -s -X POST http://localhost:8000/chat \
 # 5. 跑一次合规结论 Schema 校验评测（不依赖 LLM，纯本地）
 python-ai/.venv/bin/python eval/run_compliance_schema.py
 
+# 5b. W6-3 数字校验黄金集（抽取终稿数字并回溯，不调 LLM）
+python-ai/.venv/bin/python eval/run_w6_number_check.py
+
+# 5c. W6-6 审查工作流轨迹黄金集（节点/参数/确认率，脚本工具，不调 LLM）
+python-ai/.venv/bin/python eval/run_w6_workflow.py --fail-on-regression
+
 # 6. W5 工具目录 / 自省 / MCP（未接入 /chat 循环）
 curl -s http://localhost:8000/tools
 curl -s http://localhost:8000/tools/capabilities
@@ -90,11 +96,26 @@ curl -s -X POST http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
-# 7. Java 只读金融工具（必须带部门）
+# 7. Java 金融工具（必须带部门；写草稿走 PENDING，不重试）
 curl -s http://localhost:8080/api/tools/capabilities
 curl -s -X POST http://localhost:8080/api/tools/lookup \
   -H 'Content-Type: application/json' -H 'X-Regops-Dept: research' \
   -d '{"company_code":"002594","concept":"revenue","year":2024,"backend":"mock"}'
+
+# 8. W6 审查对比工作流（两家 + 结论/管理层才进图；结论前会暂停并预览草稿）
+curl -s -X POST http://localhost:8000/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"对比比亚迪和长城2024年净利润，并结合管理层讨论给出结论","use_rag":true}'
+# 记下 thread_id 后确认续跑（不重查数；确认后写入 PENDING 工单）
+curl -s -X POST http://localhost:8000/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"确认","use_rag":true,"thread_id":"<上一步的 thread_id>"}'
+curl -s http://localhost:8080/api/tools/review-drafts -H 'X-Regops-Dept: research'
+
+# 9. W7 登录（复核页也走同一套账号；详见 docs/W7_RBAC.md）
+curl -s -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"analyst","password":"analyst123"}'
 ```
 
 ## Agent 友好度自评（w5-6）
@@ -103,11 +124,11 @@ curl -s -X POST http://localhost:8080/api/tools/lookup \
 
 | 维度 | 优先级 | 现状 | 说明 |
 |---|---|---|---|
-| 非交互 | P0 | 达标 | HTTP / MCP 不暂停等人；缺数直接 `ok=false` |
+| 非交互 | P0 | 部分 | 问数 / MCP / 工具 HTTP 不暂停等人；审查对比在 `emit_conclusion` 前 Checkpoint 等人确认 |
 | 结构化输出 | P0 | 达标 | `ToolInvokeResponse` 字段稳定；结论走 JSON Schema |
-| 分级退出码 | P1 | 部分 | 用稳定 `error_code`（`missing` / `unauthorized` / `timeout` / `forbidden_write`），不是进程退出码。Java 鉴权是 HTTP 403，业务缺数仍是 200 |
+| 分级退出码 | P1 | 部分 | 用稳定 `error_code`（`missing` / `unauthorized` / `timeout` / `forbidden_write` / `budget_exceeded`），不是进程退出码。Java 鉴权是 HTTP 403，业务缺数仍是 200 |
 | 渐进帮助 | P1 | 部分 | `GET /tools` 精简目录，`/tools/schema/{name}` 给完整参数；没有 CLI `--help-full` |
-| dry-run | P1 | 部分 | `create_review_draft` 只拒绝、不落库，没有「将要写入什么」的预演载荷 |
+| dry-run | P1 | 部分 | 审查图暂停时给出【待写入草稿预览】；确认后才落 PENDING，取消不写 |
 | 契约自省 | P1 | 达标 | `GET /tools/capabilities` 与 `GET /api/tools/capabilities` |
 
 行业里普遍有命令清单，少有自省，输出 Schema 强制校验更少。本仓库 `emit_conclusion` 不合规直接拒绝，见 [`docs/AGENT_RULES.md`](./docs/AGENT_RULES.md)。

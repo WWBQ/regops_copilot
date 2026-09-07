@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.schemas.compliance import ComplianceConclusion
 
@@ -31,9 +31,33 @@ VerifyVerdict = Literal["match", "mismatch", "unavailable"]
 
 class LookupMetricArgs(BaseModel):
     company_code: str = Field(..., pattern=r"^\d{6}$", description="6 位证券代码")
-    concept: ConceptName
     year: int = Field(..., ge=2000, le=2100)
     scope: ScopeName = "consolidated"
+    concept: ConceptName | None = Field(default=None, description="单科时可用；与 concepts 二选一")
+    concepts: list[ConceptName] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=5,
+        description="一次 1–5 个科目。单科传一个元素即可",
+    )
+
+    @model_validator(mode="after")
+    def normalize_concepts(self) -> LookupMetricArgs:
+        items = list(self.concepts or [])
+        if self.concept:
+            if items and self.concept not in items:
+                raise ValueError("concept 与 concepts 不一致")
+            if not items:
+                items = [self.concept]
+        if not items:
+            raise ValueError("必须提供 concept 或 concepts")
+        if len(items) != len(set(items)):
+            raise ValueError("concepts 不能重复")
+        if len(items) > 5:
+            raise ValueError("一次最多查询 5 个科目")
+        self.concepts = items  # type: ignore[assignment]
+        self.concept = items[0]  # type: ignore[assignment]
+        return self
 
 
 class LookupMetricResult(BaseModel):
@@ -50,6 +74,16 @@ class LookupMetricResult(BaseModel):
     doc_id: str | None = None
     status: str | None = None
     review_reason: str | None = None
+    message: str
+
+
+class LookupMetricsResult(BaseModel):
+    ok: bool
+    stop: bool
+    company_code: str
+    year: int
+    scope: str
+    lookups: list[LookupMetricResult]
     message: str
 
 
@@ -158,12 +192,37 @@ class CreateReviewDraftArgs(BaseModel):
     company_code: str = Field(..., pattern=r"^\d{6}$")
     title: str = Field(..., min_length=1, max_length=120)
     reason: str = Field(..., min_length=1, max_length=500)
+    company_codes: list[str] = Field(default_factory=list)
+    conclusion: str = Field(default="", max_length=2000)
+    risk_level: str | None = Field(default=None, max_length=8)
+    clause_refs: list[str] = Field(default_factory=list)
+    evidence_quotes: list[str] = Field(default_factory=list)
+    impact_scope: str = Field(default="", max_length=500)
+    thread_id: str | None = Field(default=None, max_length=80)
+    session_id: str | None = None
+    request_id: str | None = Field(default=None, max_length=64)
+    dept: str | None = Field(default=None, max_length=32)
+
+    @field_validator("company_codes")
+    @classmethod
+    def _codes(cls, value: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        for code in value:
+            item = code.strip()
+            if not re.fullmatch(r"\d{6}", item):
+                raise ValueError("company_codes 必须是 6 位证券代码")
+            if item not in cleaned:
+                cleaned.append(item)
+        return cleaned
 
 
 class CreateReviewDraftResult(BaseModel):
     ok: bool
     stop: bool
     message: str
+    draft_id: str | None = None
+    status: str | None = None
+    replayed: bool = False
 
 
 class EmitConclusionArgs(ComplianceConclusion):
@@ -185,6 +244,7 @@ ToolErrorCode = Literal[
     "timeout",
     "handler_error",
     "forbidden_write",
+    "budget_exceeded",
 ]
 ToolInject = Literal["missing", "unauthorized", "timeout"]
 

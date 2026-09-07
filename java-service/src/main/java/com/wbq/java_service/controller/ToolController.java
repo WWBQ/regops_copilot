@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -84,7 +85,24 @@ public class ToolController {
             @RequestHeader(value = "X-Regops-Dept", required = false) String dept,
             @Valid @RequestBody ReviewDraftRequest body
     ) {
-        return finToolService.refuseDraft(dept, body);
+        return finToolService.createDraft(dept, body);
+    }
+
+    @GetMapping("/review-drafts")
+    public Map<String, Object> listReviewDrafts(
+            @RequestHeader(value = "X-Regops-Dept", required = false) String dept,
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "0") int offset
+    ) {
+        return finToolService.listDrafts(dept, limit, offset);
+    }
+
+    @GetMapping("/review-drafts/{draftId}")
+    public Map<String, Object> getReviewDraft(
+            @RequestHeader(value = "X-Regops-Dept", required = false) String dept,
+            @PathVariable String draftId
+    ) {
+        return finToolService.getDraft(dept, draftId);
     }
 
     @PostMapping("/invoke")

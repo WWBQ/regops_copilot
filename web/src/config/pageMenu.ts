@@ -25,6 +25,17 @@ export const PAGE_MENUS: Record<string, PageMenuItem[]> = {
     { id: 'rag-monitor', label: 'RAG 检索监控', path: '/ops/rag', icon: 'list' },
     { id: 'eval', label: '评估报告', path: '/ops/eval', icon: 'list' },
   ],
+  '/compliance/review': [
+    { id: 'compliance-audit', label: '审计追踪', path: '/compliance/audit', icon: 'list' },
+    { id: 'users', label: '用户与权限', path: '/settings/users', icon: 'list' },
+  ],
+  '/compliance/workflow': [
+    { id: 'compliance-review', label: '合规复核', path: '/compliance/review', icon: 'list' },
+    { id: 'compliance-audit', label: '审计追踪', path: '/compliance/audit', icon: 'list' },
+  ],
+  '/compliance/audit': [
+    { id: 'compliance-review', label: '合规复核', path: '/compliance/review', icon: 'list' },
+  ],
 }
 
 export function pageMenuForPath(path: string): PageMenuItem[] {
@@ -45,6 +56,15 @@ export function pageMenuForPath(path: string): PageMenuItem[] {
   }
   if (path.startsWith('/ops/asknum')) {
     return PAGE_MENUS['/ops/asknum'] ?? []
+  }
+  if (path.startsWith('/compliance/workflow')) {
+    return PAGE_MENUS['/compliance/workflow'] ?? []
+  }
+  if (path.startsWith('/compliance/audit')) {
+    return PAGE_MENUS['/compliance/audit'] ?? []
+  }
+  if (path.startsWith('/compliance/review')) {
+    return PAGE_MENUS['/compliance/review'] ?? []
   }
   return []
 }

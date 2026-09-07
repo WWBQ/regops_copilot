@@ -25,7 +25,9 @@ async def test_list_tools_catalog(client: AsyncClient):
     assert body["transport"] == "function_calling"
     assert body["mcp"]["endpoint"] == "/mcp"
     assert "tools/list" in body["mcp"]["methods"]
-    assert body["wired_to_chat"] is False
+    assert body["wired_to_chat"] is True
+    assert body["chat_entry"] == "intent"
+    assert body["wired_to_graph"] is True
     names = [item["name"] for item in body["tools"]]
     assert "lookup_metric" in names
     assert "verify_number" in names

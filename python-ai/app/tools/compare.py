@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from app.schemas.tools import ComparePeersArgs, ComparePeersResult, LookupMetricArgs
+from app.schemas.tools import ComparePeersArgs, ComparePeersResult, LookupMetricArgs, LookupMetricResult
 from app.tools.lookup import run_lookup_metric
 
 
 def run_compare_peers(args: ComparePeersArgs) -> ComparePeersResult:
-    lookups = [
-        run_lookup_metric(
+    lookups: list[LookupMetricResult] = []
+    for code in args.company_codes:
+        hit = run_lookup_metric(
             LookupMetricArgs(
                 company_code=code,
                 concept=args.concept,
@@ -16,8 +17,9 @@ def run_compare_peers(args: ComparePeersArgs) -> ComparePeersResult:
                 scope=args.scope,
             )
         )
-        for code in args.company_codes
-    ]
+        if not isinstance(hit, LookupMetricResult):
+            raise TypeError("compare_peers 只并列单科结果")
+        lookups.append(hit)
     ok = all(item.ok for item in lookups)
     return ComparePeersResult(
         ok=ok,

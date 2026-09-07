@@ -24,8 +24,16 @@ async def test_list_eval_tasks():
     assert "w1_chat" in ids
     assert "rag_retrieval" in ids
     assert "w4_asknum" in ids
+    assert "w6_number_check" in ids
+    assert "w6_workflow" in ids
     asknum = next(item for item in body["items"] if item["id"] == "w4_asknum")
     assert "leak_rate" in asknum["metrics"]
+    numbers = next(item for item in body["items"] if item["id"] == "w6_number_check")
+    assert "number_error_rate" in numbers["metrics"]
+    assert "unit_error_rate" in numbers["metrics"]
+    workflow = next(item for item in body["items"] if item["id"] == "w6_workflow")
+    assert "param_accuracy" in workflow["metrics"]
+    assert "confirmation_rate" in workflow["metrics"]
     w1 = next(item for item in body["items"] if item["id"] == "w1_chat")
     assert "refuse_rate" in w1["metrics"]
     assert "number_error_rate" not in w1["metrics"]

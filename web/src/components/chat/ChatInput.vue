@@ -22,15 +22,22 @@ const props = withDefaults(
 const emit = defineEmits<{
   send: [message: string]
   attach: [file: File]
+  stop: []
   'update:model': [model: string]
 }>()
 
 const draft = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
-const canSend = computed(
-  () => !props.loading && !props.uploading && draft.value.trim().length > 0,
-)
+const canSend = computed(() => {
+  if (props.uploading) {
+    return false
+  }
+  if (props.loading) {
+    return true
+  }
+  return draft.value.trim().length > 0
+})
 
 const hasModels = computed(() => props.models.length > 0)
 
@@ -55,6 +62,10 @@ const statusTitle = computed(() => {
 })
 
 function submit() {
+  if (props.loading) {
+    emit('stop')
+    return
+  }
   const text = draft.value.trim()
   if (!text || !canSend.value) {
     return
@@ -143,7 +154,7 @@ function onModelChange(event: Event) {
       </label>
 
       <button type="button" class="send-btn" :disabled="!canSend" @click="submit">
-        {{ loading ? '…' : '发送' }}
+        {{ loading ? '停止' : '发送' }}
       </button>
     </div>
   </div>

@@ -2,7 +2,7 @@
 import { inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { CHAT_BRIDGE_KEY } from '../../composables/chatBridge'
-import { getModels, postChat } from '../../api/chat'
+import { getModels, streamChat } from '../../api/chat'
 import {
   ensureSessionId,
   listSessionDocuments,
@@ -17,6 +17,8 @@ import {
   clearChatMessages,
   loadChatMessages,
   saveChatMessages,
+  loadWorkflowThreadId,
+  saveWorkflowThreadId,
 } from '../../utils/chatStorage'
 import {
   defaultNewChatTitle,
@@ -50,14 +52,18 @@ const messages = ref<ChatMessageType[]>([createWelcomeMessage()])
 const loading = ref(false)
 const uploading = ref(false)
 const sessionId = ref<string | null>(null)
+const workflowThreadId = ref<string | null>(null)
 const sessionDocs = ref<SessionDocument[]>([])
 const listRef = ref<HTMLElement | null>(null)
+const abortRef = ref<AbortController | null>(null)
 const suppressSessionMeta = ref(false)
 const availableModels = ref<string[]>([])
 const selectedModel = ref('')
 const connectionAlert = ref<string | null>(null)
 
 const DISCLAIMER = '本回答由 AI 生成，仅供参考，不构成合规或投资建议。'
+
+const EXAMPLE_TOOL_LOOP = '格力2024年经营得怎么样'
 
 function connectionBlockedMessage(): string | null {
   if (props.backendOk === false) {
@@ -151,6 +157,23 @@ async function initModels() {
   }
 }
 
+function rememberWorkflowThread(threadId: string | null) {
+  workflowThreadId.value = threadId
+  if (sessionId.value) {
+    saveWorkflowThreadId(sessionId.value, threadId)
+  }
+}
+
+function applyWorkflowThread(response: { route?: string; thread_id?: string | null }) {
+  if (response.route === 'agent_paused' && response.thread_id) {
+    rememberWorkflowThread(response.thread_id)
+    return
+  }
+  if (response.route === 'agent' || response.route === 'agent_blocked') {
+    rememberWorkflowThread(null)
+  }
+}
+
 function onModelChange(model: string) {
   selectedModel.value = model
   storeModel(model)
@@ -160,9 +183,10 @@ async function initSession() {
   try {
     rebuildChatSessionsFromStorage()
     sessionId.value = await ensureSessionId()
+    workflowThreadId.value = loadWorkflowThreadId(sessionId.value)
     const restored = loadChatMessages(sessionId.value)
     if (restored) {
-      messages.value = restored
+      messages.value = restored.map((item) => ({ ...item, streaming: false, statusText: undefined }))
     }
     touchSessionMeta({ touchUpdatedAt: false })
     await refreshSessionDocs()
@@ -185,6 +209,7 @@ async function handleNewChat() {
   touchSessionMeta({ touchUpdatedAt: true })
   try {
     sessionId.value = await startNewSession()
+    rememberWorkflowThread(null)
     messages.value = [createWelcomeMessage()]
     sessionDocs.value = []
     touchSessionMeta({ touchUpdatedAt: true, moveToFront: true })
@@ -213,8 +238,13 @@ async function handleSwitchSession(targetSessionId: string) {
   }
   storeSessionId(targetSessionId)
   sessionId.value = targetSessionId
+  workflowThreadId.value = loadWorkflowThreadId(targetSessionId)
   suppressSessionMeta.value = true
-  messages.value = loadChatMessages(targetSessionId) ?? [createWelcomeMessage()]
+  messages.value = (loadChatMessages(targetSessionId) ?? [createWelcomeMessage()]).map((item) => ({
+    ...item,
+    streaming: false,
+    statusText: undefined,
+  }))
   suppressSessionMeta.value = false
   await refreshSessionDocs()
   await scrollToBottom()
@@ -354,46 +384,105 @@ async function handleSend(text: string) {
   })
   await scrollToBottom()
 
+  const assistantId = uid()
+  messages.value.push({
+    id: assistantId,
+    role: 'assistant',
+    content: '',
+    streaming: true,
+    statusText: '正在回复…',
+  })
+  await scrollToBottom()
+
+  const patchAssistant = (partial: Partial<ChatMessageType>) => {
+    const index = messages.value.findIndex((item) => item.id === assistantId)
+    if (index < 0) {
+      return
+    }
+    messages.value[index] = { ...messages.value[index], ...partial }
+  }
+
   loading.value = true
   const startedAt = performance.now()
+  abortRef.value?.abort()
+  const abort = new AbortController()
+  abortRef.value = abort
   try {
-    const response = await postChat({
-      message: text,
-      session_id: sessionId.value ?? undefined,
-      use_rag: true,
-      model: selectedModel.value || undefined,
-    })
+    const response = await streamChat(
+      {
+        message: text,
+        session_id: sessionId.value ?? undefined,
+        thread_id: workflowThreadId.value ?? undefined,
+        use_rag: true,
+        model: selectedModel.value || undefined,
+      },
+      {
+        signal: abort.signal,
+        onStatus: (statusText) => patchAssistant({ statusText }),
+        onMeta: (meta) =>
+          patchAssistant({
+            ...(meta.route ? { route: meta.route } : {}),
+            ...(meta.model ? { model: meta.model } : {}),
+          }),
+        onDelta: async (chunk) => {
+          const current = messages.value.find((item) => item.id === assistantId)
+          patchAssistant({
+            content: `${current?.content ?? ''}${chunk}`,
+            statusText: undefined,
+          })
+          await nextTick()
+        },
+      },
+    )
     const clientLatencyMs = performance.now() - startedAt
     const tokenCount = resolveCompletionTokens(response)
     const promptTokenCount = response.prompt_tokens ?? 0
     const latencyMs = response.latency_ms && response.latency_ms > 0 ? response.latency_ms : clientLatencyMs
-    messages.value.push({
-      id: uid(),
-      role: 'assistant',
+    patchAssistant({
       content: response.reply,
       model: response.model,
-      tokenCount,
+      tokenCount: tokenCount > 0 ? tokenCount : undefined,
       promptTokenCount: promptTokenCount > 0 ? promptTokenCount : undefined,
       latencyMs,
       route: response.route,
+      streaming: false,
+      statusText: undefined,
       ...(response.citations?.length
         ? { citations: response.citations, ragUsed: Boolean(response.rag_used) }
         : {}),
     })
+    applyWorkflowThread(response)
     emit('connected', response.model)
   } catch (error) {
-    const detail = error instanceof Error ? error.message : '未知错误'
-    messages.value.push({
-      id: uid(),
-      role: 'assistant',
-      content: `请求失败：${detail}`,
-      error: true,
-    })
-    emit('disconnected')
+    const aborted = error instanceof DOMException && error.name === 'AbortError'
+    const current = messages.value.find((item) => item.id === assistantId)
+    if (aborted) {
+      patchAssistant({
+        content: current?.content?.trim() ? current.content : '已停止生成。',
+        streaming: false,
+        statusText: undefined,
+      })
+    } else {
+      const detail = error instanceof Error ? error.message : '未知错误'
+      patchAssistant({
+        content: `请求失败：${detail}`,
+        error: true,
+        streaming: false,
+        statusText: undefined,
+      })
+      emit('disconnected')
+    }
   } finally {
+    if (abortRef.value === abort) {
+      abortRef.value = null
+    }
     loading.value = false
     await scrollToBottom()
   }
+}
+
+function handleStop() {
+  abortRef.value?.abort()
 }
 
 onMounted(() => {
@@ -402,6 +491,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  abortRef.value?.abort()
   if (chatBridge) {
     chatBridge.value.ready = false
   }
@@ -437,7 +527,7 @@ watch(
       <div>
         <h1>合规问答</h1>
         <p>
-          一个助手：数字走问数，叙述走年报 RAG。多步对比（W6）也在本页升级成任务，不另开对话。
+          一个助手：数字走问数，叙述走年报 RAG。两家+结论走工作流，出结论前会暂停确认。经营概况、研发/毛利率/分红、待复核数字追问会让模型自选只读工具。
           📎 可上传仅本会话有效的 PDF。
           <span v-if="sessionId" class="session-tag">会话 {{ sessionId.slice(0, 8) }}…</span>
         </p>
@@ -452,7 +542,6 @@ watch(
 
     <div ref="listRef" class="message-list">
       <ChatMessage v-for="item in messages" :key="item.id" :message="item" />
-      <p v-if="loading" class="typing">AI 正在回复…（含 RAG 检索时可能需 30–60 秒）</p>
       <p v-if="uploading" class="typing">PDF 解析入库中…</p>
     </div>
 
@@ -460,6 +549,28 @@ watch(
       <div v-if="connectionAlert" class="connection-alert" role="alert">
         <p>{{ connectionAlert }}</p>
         <button type="button" class="alert-close" aria-label="关闭" @click="connectionAlert = null">×</button>
+      </div>
+
+      <div v-if="messages.length <= 1 && !loading" class="example-chips">
+        <button type="button" class="example-chip" @click="handleSend('比亚迪2024年营业收入是多少')">
+          问数
+        </button>
+        <button
+          type="button"
+          class="example-chip"
+          @click="handleSend('对比比亚迪和长城2024年净利润，并结合管理层讨论给出结论')"
+        >
+          工作流
+        </button>
+        <button type="button" class="example-chip" @click="handleSend(EXAMPLE_TOOL_LOOP)">
+          经营概况
+        </button>
+        <button type="button" class="example-chip" @click="handleSend('比亚迪研发投入多不多')">
+          研发
+        </button>
+        <button type="button" class="example-chip" @click="handleSend('美的2024年营收到底能不能用')">
+          待复核
+        </button>
       </div>
 
       <ChatInput
@@ -470,6 +581,7 @@ watch(
         :backend-ok="props.backendOk"
         @update:model="onModelChange"
         @send="handleSend"
+        @stop="handleStop"
         @attach="handleAttach"
       />
 
@@ -521,6 +633,29 @@ watch(
   background: #fffbeb;
   border-color: #fde68a;
   color: #92400e;
+}
+
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.example-chip {
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--text-strong);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.example-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .chat-footer {

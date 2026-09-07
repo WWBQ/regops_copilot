@@ -35,9 +35,9 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'compliance',
     label: '合规业务',
     items: [
-      { id: 'review', label: '合规复核', path: '/compliance/review', phase: 'W9+' },
-      { id: 'workflow', label: '审批流', path: '/compliance/workflow', phase: 'W9+' },
-      { id: 'audit', label: '审计追踪', path: '/compliance/audit', phase: 'W9+' },
+      { id: 'review', label: '合规复核', path: '/compliance/review', phase: 'W7', enabled: true },
+      { id: 'workflow', label: '审批流', path: '/compliance/workflow', phase: 'W7', enabled: true },
+      { id: 'audit', label: '审计追踪', path: '/compliance/audit', phase: 'W7', enabled: true },
     ],
   },
   {
@@ -105,19 +105,21 @@ export const PLACEHOLDER_PAGES: Record<
   },
   review: {
     title: '合规复核',
-    summary: 'Maker-Checker 复核界面，结论留痕。',
-    backend: 'java-service',
-    phase: 'W9+',
+    summary: 'Java maker-checker：PENDING 草稿提交后由他人复核为 REVIEWED / REJECTED。',
+    backend: 'POST /api/reviews/tickets · /submit · /approve · /reject',
+    phase: 'W7',
   },
   workflow: {
     title: '审批流',
-    summary: '制度条款变更、异常交易等审批工单。',
-    phase: 'W9+',
+    summary: '与合规复核同一状态机：PENDING → SUBMITTED → REVIEWED | REJECTED，状态不能倒流。',
+    backend: 'java-service ReviewService',
+    phase: 'W7',
   },
   audit: {
     title: '审计追踪',
-    summary: 'Correlation ID 跨链路、操作人、时间戳。',
-    phase: 'W9+',
+    summary: '操作人、时间、前后快照、X-Request-ID。',
+    backend: 'GET /api/audit/events',
+    phase: 'W7',
   },
   logs: {
     title: '日志监控',
@@ -151,8 +153,8 @@ export const PLACEHOLDER_PAGES: Record<
   },
   users: {
     title: '用户与权限',
-    summary: 'RBAC、角色、数据域隔离。',
-    backend: 'java-service Security',
-    phase: 'W9+',
+    summary: 'JWT 登录、角色与客户档案数据域。客户经理看不到投研内核。',
+    backend: 'POST /api/auth/login · GET /api/customers',
+    phase: 'W7',
   },
 }

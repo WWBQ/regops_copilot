@@ -155,8 +155,16 @@ def invoke_tool(
         ctx.request_id,
         mask_pii(str(arguments or {})),
     )
+    arguments = dict(arguments or {})
+    if name == "create_review_draft":
+        if ctx.dept and not arguments.get("dept"):
+            arguments["dept"] = ctx.dept
+        if ctx.idempotency_key and not arguments.get("thread_id"):
+            arguments["thread_id"] = ctx.idempotency_key
+        if ctx.request_id and not arguments.get("request_id"):
+            arguments["request_id"] = ctx.request_id
     try:
-        parsed = spec.args_model.model_validate(arguments or {})
+        parsed = spec.args_model.model_validate(arguments)
     except ValidationError as exc:
         return ToolInvokeResponse(
             name=name,
@@ -182,13 +190,18 @@ def invoke_tool(
             request_id=ctx.request_id,
         )
     payload = result.model_dump()
-    error_code = "forbidden_write" if name == "create_review_draft" else None
+    error_code = None
+    if name == "create_review_draft" and not payload.get("ok"):
+        error_code = "handler_error"
+        if "不落库" in str(payload.get("message") or "") or "未开放" in str(payload.get("message") or ""):
+            error_code = "forbidden_write"
     return ToolInvokeResponse(
         name=name,
         ok=bool(payload.get("ok")),
         stop=bool(payload.get("stop")),
         result=payload,
-        error=payload.get("message") if error_code else None,
+        error=None if payload.get("ok") else payload.get("message"),
         error_code=error_code,  # type: ignore[arg-type]
+        replayed=bool(payload.get("replayed")),
         request_id=ctx.request_id,
     )

@@ -2,14 +2,28 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { CURRENT_USER, userInitials } from '../../config/user'
+import { useAuth } from '../../composables/useAuth'
+import { deptLabel, GUEST_USER, roleLabel, userInitials } from '../../config/user'
 
 const router = useRouter()
+const { user, loggedIn, logout } = useAuth()
 
 const profileOpen = ref(false)
 const barRef = ref<HTMLElement | null>(null)
 
-const initials = computed(() => userInitials(CURRENT_USER.displayName))
+const display = computed(() => {
+  if (!user.value) return GUEST_USER
+  return {
+    id: user.value.id,
+    displayName: user.value.displayName,
+    username: user.value.username,
+    email: user.value.email,
+    role: roleLabel(user.value.role),
+    department: deptLabel(user.value.dept),
+  }
+})
+
+const initials = computed(() => userInitials(display.value.displayName))
 
 function toggleProfile() {
   profileOpen.value = !profileOpen.value
@@ -32,6 +46,12 @@ function openPermissions() {
 function openSettings() {
   closeProfile()
   void router.push('/settings')
+}
+
+function onLogout() {
+  logout()
+  closeProfile()
+  void router.push('/settings/users')
 }
 
 function onDocumentClick(event: MouseEvent) {
@@ -84,27 +104,28 @@ onUnmounted(() => {
           <div class="profile-head">
             <span class="avatar avatar-lg">{{ initials }}</span>
             <div class="profile-meta">
-              <p class="profile-name">{{ CURRENT_USER.displayName }}</p>
-              <p class="profile-role">{{ CURRENT_USER.role }}</p>
+              <p class="profile-name">{{ display.displayName }}</p>
+              <p class="profile-role">{{ display.role }}</p>
             </div>
           </div>
           <dl class="profile-fields">
             <div>
               <dt>用户名</dt>
-              <dd>{{ CURRENT_USER.username }}</dd>
+              <dd>{{ display.username }}</dd>
             </div>
             <div>
               <dt>邮箱</dt>
-              <dd>{{ CURRENT_USER.email }}</dd>
+              <dd>{{ display.email || '—' }}</dd>
             </div>
             <div>
               <dt>部门</dt>
-              <dd>{{ CURRENT_USER.department }}</dd>
+              <dd>{{ display.department }}</dd>
             </div>
           </dl>
           <div class="profile-actions">
             <button type="button" class="panel-btn" @click="openProfilePage">个人资料</button>
-            <button type="button" class="panel-btn subtle" @click="openSettings">设置</button>
+            <button v-if="loggedIn" type="button" class="panel-btn subtle" @click="onLogout">退出</button>
+            <button v-else type="button" class="panel-btn subtle" @click="openPermissions">登录</button>
           </div>
         </div>
       </Transition>

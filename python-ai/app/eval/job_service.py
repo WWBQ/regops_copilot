@@ -14,6 +14,8 @@ from uuid import uuid4
 from app.config import get_settings
 from app.eval.asknum_runner import run_asknum_eval
 from app.eval.compliance_schema_runner import run_compliance_schema_eval
+from app.eval.number_check_runner import run_number_check_eval
+from app.eval.workflow_runner import run_workflow_eval
 from app.eval.rag_retrieval_runner import run_rag_retrieval_eval
 from app.eval.registry import REPORTS_DIR, get_task, task_to_dict
 from app.eval.selection import normalize_categories, normalize_item_ids, select_items
@@ -238,6 +240,22 @@ def _execute_run(task_id: str, run_id: str, params: dict[str, Any]) -> None:
             )
         elif task.runner == "w4_asknum":
             report = run_asknum_eval(
+                golden_path=task.golden_path,
+                limit=int(params.get("limit") or 0),
+                categories=params.get("categories") or None,
+                item_ids=params.get("item_ids") or None,
+                on_progress=on_progress,
+            )
+        elif task.runner == "w6_number_check":
+            report = run_number_check_eval(
+                golden_path=task.golden_path,
+                limit=int(params.get("limit") or 0),
+                categories=params.get("categories") or None,
+                item_ids=params.get("item_ids") or None,
+                on_progress=on_progress,
+            )
+        elif task.runner == "w6_workflow":
+            report = run_workflow_eval(
                 golden_path=task.golden_path,
                 limit=int(params.get("limit") or 0),
                 categories=params.get("categories") or None,

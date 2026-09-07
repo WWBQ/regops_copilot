@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 
 import { documentViewerPage } from '../../api/documents'
 import type { ChatMessage, Citation } from '../../types/chat'
-import { citationAt, renderAssistantMarkdown } from '../../utils/citations'
+import { attachCitationMarks, citationAt, renderAssistantMarkdown } from '../../utils/citations'
 import { formatLatency, formatTokenCount } from '../../utils/tokens'
 
 const props = defineProps<{
@@ -22,11 +22,20 @@ const displayTokenCount = computed(() => {
 
 const routeLabel = computed(() => {
   const route = props.message.route
+  if (typeof props.message.content === 'string' && props.message.content.includes('【数字校验拦截】')) {
+    return '数字拦截'
+  }
   if (route === 'metric' || route === 'metric_blocked' || route === 'metric_clarify') {
     return '问数'
   }
-  if (route === 'rag' || props.message.ragUsed) {
-    return 'RAG'
+  if (route === 'agent' || route === 'agent_blocked' || route === 'agent_paused') {
+    return route === 'agent_paused' ? '待确认' : '工作流'
+  }
+  if (route === 'tools' || route === 'tools_blocked') {
+    return '工具自选'
+  }
+  if (route === 'rag' || route === 'rag_blocked' || props.message.ragUsed) {
+    return route === 'rag_blocked' ? '数字拦截' : 'RAG'
   }
   return ''
 })
@@ -39,6 +48,13 @@ const showUsage = computed(() => {
     return displayTokenCount.value != null && displayTokenCount.value > 0
   }
   return displayTokenCount.value != null && props.message.latencyMs != null
+})
+
+const boundCitations = computed(() => {
+  if (props.message.role !== 'assistant' || props.message.error) {
+    return []
+  }
+  return attachCitationMarks(props.message.content, props.message.citations ?? []).citations
 })
 
 const htmlContent = computed(() => {
@@ -72,13 +88,13 @@ function openPopover(citation: Citation, target: HTMLElement) {
 function onContentClick(event: MouseEvent) {
   const target = event.target as HTMLElement | null
   const button = target?.closest('.cite-mark') as HTMLElement | null
-  if (!button || !props.message.citations?.length) {
+  if (!button || !boundCitations.value.length) {
     return
   }
   event.preventDefault()
   event.stopPropagation()
   const index = Number.parseInt(button.dataset.citeIndex ?? '', 10)
-  const citation = citationAt(props.message.citations, index)
+  const citation = citationAt(boundCitations.value, index)
   if (!citation) {
     return
   }
@@ -112,13 +128,17 @@ function openCitation(citation: Citation) {
     <div class="bubble" @click.stop>
       <p v-if="routeLabel" class="route-tag" :data-route="message.route || ''">{{ routeLabel }}</p>
       <p v-if="message.attachmentName" class="attachment-tag">📎 {{ message.attachmentName }}</p>
+      <p v-if="message.streaming && !message.content" class="typing-status">
+        {{ message.statusText || '正在回复…' }}
+      </p>
       <div
-        v-if="htmlContent"
+        v-else-if="htmlContent"
         class="content markdown-body"
+        :class="{ streaming: message.streaming }"
         v-html="htmlContent"
         @click="onContentClick"
       />
-      <p v-else class="content">{{ message.content }}</p>
+      <p v-else class="content" :class="{ streaming: message.streaming }">{{ message.content }}</p>
 
       <div
         v-if="activeCitation"
@@ -180,9 +200,35 @@ function openCitation(citation: Citation) {
   color: #c2410c;
 }
 
+.route-tag[data-route='agent_blocked'] {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.route-tag[data-route='agent_paused'] {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.route-tag[data-route='agent'] {
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
 .route-tag[data-route='rag'] {
   background: #eef2ff;
   color: #4338ca;
+}
+
+.route-tag[data-route='rag_blocked'],
+.route-tag[data-route='tools_blocked'] {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.route-tag[data-route='tools'] {
+  background: #fff7ed;
+  color: #c2410c;
 }
 
 .attachment-tag {
@@ -383,5 +429,25 @@ function openCitation(citation: Citation) {
 
 .markdown-body :deep(th) {
   background: #f8fafc;
+}
+
+.typing-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.content.streaming::after {
+  content: '▍';
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--accent);
+  animation: caret 1s step-end infinite;
+}
+
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
 }
 </style>

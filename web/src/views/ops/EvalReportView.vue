@@ -494,6 +494,24 @@ const isAsknumReport = computed(
     tasks.value.find((t) => t.id === activeRun.value?.task_id)?.runner === 'w4_asknum',
 )
 
+const isNumberCheckReport = computed(
+  () =>
+    selectedTask.value?.runner === 'w6_number_check' ||
+    tasks.value.find((t) => t.id === activeRun.value?.task_id)?.runner === 'w6_number_check',
+)
+
+const isWorkflowReport = computed(
+  () =>
+    selectedTask.value?.runner === 'w6_workflow' ||
+    tasks.value.find((t) => t.id === activeRun.value?.task_id)?.runner === 'w6_workflow',
+)
+
+const failByNodeRows = computed(() => {
+  const raw = activeRun.value?.summary?.fail_by_node
+  if (!raw) return []
+  return Object.entries(raw).map(([node, count]) => ({ node, count }))
+})
+
 const summaryCards = computed(() => {
   const summary = activeRun.value?.summary
   if (!summary) return []
@@ -518,6 +536,22 @@ const summaryCards = computed(() => {
       { label: '路由准确率', value: formatPercent(summary.route_accuracy) },
       { label: '数字泄露率', value: formatPercent(summary.leak_rate) },
       { label: '样本数', value: String(summary.total ?? '—') },
+    ]
+  }
+  if (isNumberCheckReport.value) {
+    return [
+      { label: '准确率', value: formatPercent(summary.accuracy) },
+      { label: '误放行率', value: formatPercent(summary.false_accept_rate) },
+      { label: '数字错误率', value: formatPercent(summary.number_error_rate) },
+      { label: '量纲错误率', value: formatPercent(summary.unit_error_rate) },
+    ]
+  }
+  if (isWorkflowReport.value) {
+    return [
+      { label: '准确率', value: formatPercent(summary.accuracy) },
+      { label: '参数正确率', value: formatPercent(summary.param_accuracy) },
+      { label: '平均步数', value: summary.avg_steps != null ? String(summary.avg_steps) : '—' },
+      { label: '确认率', value: formatPercent(summary.confirmation_rate) },
     ]
   }
   return [
@@ -1037,7 +1071,7 @@ onBeforeUnmount(stopPolling)
           </div>
         </section>
 
-        <section v-if="activeRun.summary?.by_category && isAsknumReport" class="section">
+        <section v-if="activeRun.summary?.by_category && (isAsknumReport || isNumberCheckReport || isWorkflowReport)" class="section">
           <h3>分题型</h3>
           <div class="table-wrap">
             <table class="data-table">
@@ -1060,6 +1094,26 @@ onBeforeUnmount(stopPolling)
                   <td>{{ metrics.total }}</td>
                   <td>{{ metrics.passed }}</td>
                   <td>{{ metrics.failed }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section v-if="isWorkflowReport && failByNodeRows.length" class="section">
+          <h3>失败定位到节点</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>节点</th>
+                  <th>次数</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in failByNodeRows" :key="row.node">
+                  <td class="mono">{{ row.node }}</td>
+                  <td>{{ row.count }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1136,7 +1190,8 @@ onBeforeUnmount(stopPolling)
                   </template>
                   <template v-else>
                     <th>问题</th>
-                    <th v-if="isW1ChatReport || isAsknumReport">题型</th>
+                    <th v-if="isW1ChatReport || isAsknumReport || isNumberCheckReport || isWorkflowReport">题型</th>
+                    <th v-if="isWorkflowReport">节点</th>
                     <th v-if="isRagReport">Gold 页</th>
                     <th v-if="isRagReport">命中页</th>
                     <th v-if="isRagReport">命中</th>
@@ -1161,7 +1216,8 @@ onBeforeUnmount(stopPolling)
                   </template>
                   <template v-else>
                     <td class="question">{{ row.question }}</td>
-                    <td v-if="isW1ChatReport || isAsknumReport">{{ row.category }}</td>
+                    <td v-if="isW1ChatReport || isAsknumReport || isNumberCheckReport || isWorkflowReport">{{ row.category }}</td>
+                    <td v-if="isWorkflowReport" class="mono">{{ String(row.fail_node || '—') }}</td>
                     <template v-if="isRagReport">
                       <td class="mono">{{ (row.gold_pages as number[])?.join(', ') }}</td>
                       <td class="mono">{{ (row.retrieved_pages as number[])?.slice(0, 5).join(', ') }}</td>

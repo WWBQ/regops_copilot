@@ -1,0 +1,196 @@
+{
+  "version": "w6-number-check-v1",
+  "description": "W6-3 数字校验 20 例：抽取终稿数字并回溯到 facts/snippets。FinQA/TAT-QA 只作失败形态参照，不入库官方题。误放行必须为 0。量纲错误单独统计。",
+  "items": [
+    {
+      "id": "nc-001",
+      "category": "grounded",
+      "question": "事实库净利润写成约亿元",
+      "reply": "比亚迪 2024 年净利润约 415.88 亿元 [1]。",
+      "facts": ["41587940000"],
+      "snippets": [],
+      "expected_ok": true
+    },
+    {
+      "id": "nc-002",
+      "category": "grounded",
+      "question": "事实库金额写成带千分位的元",
+      "reply": "净利润 41,587,940,000.00 元，来自财务事实库。",
+      "facts": ["41587940000"],
+      "snippets": [],
+      "expected_ok": true
+    },
+    {
+      "id": "nc-003",
+      "category": "grounded",
+      "question": "事实库原始元整串",
+      "reply": "已核对金额为 41587940000 元。",
+      "facts": ["41587940000"],
+      "snippets": [],
+      "expected_ok": true
+    },
+    {
+      "id": "nc-004",
+      "category": "grounded",
+      "question": "营收亿元与事实库一致",
+      "reply": "营业收入约 7,771.02 亿元。",
+      "facts": ["777102455000"],
+      "snippets": [],
+      "expected_ok": true
+    },
+    {
+      "id": "nc-005",
+      "category": "grounded",
+      "question": "两家并列、未手算差额",
+      "reply": "比亚迪净利润约 415.88 亿元；长城净利润约 126.60 亿元。未手算差额。",
+      "facts": ["41587940000", "12660012515.78"],
+      "snippets": [],
+      "expected_ok": true
+    },
+    {
+      "id": "nc-006",
+      "category": "citation",
+      "question": "引用片段中的百分数",
+      "reply": "年报称同比变动 10.91%。",
+      "facts": [],
+      "snippets": ["报告期内净利润同比变动 10.91%，主要来自销量结构。"],
+      "expected_ok": true
+    },
+    {
+      "id": "nc-007",
+      "category": "citation",
+      "question": "引用片段中的亿元金额",
+      "reply": "管理层讨论提到营业总收入 1,900.38 亿元，非已核对数字。",
+      "facts": ["32371069287.35"],
+      "snippets": ["营业总收入1,900.38亿元，较上年增长。"],
+      "expected_ok": true
+    },
+    {
+      "id": "nc-008",
+      "category": "citation",
+      "question": "原文数字出现在引用片段",
+      "reply": "年报原文写研发投入约 542 亿元。",
+      "facts": ["777102455000"],
+      "snippets": ["研发投入约 542 亿元，详见管理层讨论。"],
+      "expected_ok": true
+    },
+    {
+      "id": "nc-009",
+      "category": "skip_meta",
+      "question": "年份、页码、角标不是财务声称",
+      "reply": "2024 年年报第 20 页已引用 [1]，未给出额外金额。",
+      "facts": ["41587940000"],
+      "snippets": ["净利润变动主要来自销量与产品结构。"],
+      "expected_ok": true
+    },
+    {
+      "id": "nc-010",
+      "category": "skip_meta",
+      "question": "小时、家数与证券代码跳过",
+      "reply": "检查点默认 24 小时过期，覆盖 5 家样本；doc_id 002594_2024。",
+      "facts": [],
+      "snippets": [],
+      "expected_ok": true
+    },
+    {
+      "id": "nc-011",
+      "category": "unbacked",
+      "question": "致辞口径研发投入未在证据包",
+      "reply": "比亚迪研发投入约 542 亿元。",
+      "facts": ["777102455000"],
+      "snippets": ["管理层讨论销量与产品结构。"],
+      "expected_ok": false,
+      "expected_categories": ["unbacked"]
+    },
+    {
+      "id": "nc-012",
+      "category": "unbacked",
+      "question": "编造净利润",
+      "reply": "净利润高达 999 亿元。",
+      "facts": ["41587940000"],
+      "snippets": [],
+      "expected_ok": false,
+      "expected_categories": ["unbacked"]
+    },
+    {
+      "id": "nc-013",
+      "category": "unbacked",
+      "question": "ROE 百分数无引用也无事实",
+      "reply": "该公司 ROE 约 15%。",
+      "facts": ["41587940000"],
+      "snippets": ["管理层讨论经营情况。"],
+      "expected_ok": false,
+      "expected_categories": ["unbacked"]
+    },
+    {
+      "id": "nc-014",
+      "category": "unit_error",
+      "question": "把亿元写成万元",
+      "reply": "净利润约 415.88 万元。",
+      "facts": ["41587940000"],
+      "snippets": [],
+      "expected_ok": false,
+      "expected_categories": ["unit_error"]
+    },
+    {
+      "id": "nc-015",
+      "category": "unit_error",
+      "question": "把亿元写成元",
+      "reply": "营业收入约 7,771.02 元。",
+      "facts": ["777102455000"],
+      "snippets": [],
+      "expected_ok": false,
+      "expected_categories": ["unit_error"]
+    },
+    {
+      "id": "nc-016",
+      "category": "percent_scale",
+      "question": "把 10.91% 写成 0.1091",
+      "reply": "同比变动 0.1091。",
+      "facts": [],
+      "snippets": ["净利润同比变动 10.91%。"],
+      "expected_ok": false,
+      "expected_categories": ["percent_scale"]
+    },
+    {
+      "id": "nc-017",
+      "category": "percent_scale",
+      "question": "把 18.5% 写成小数",
+      "reply": "毛利率 0.185。",
+      "facts": [],
+      "snippets": ["综合毛利率 18.5%。"],
+      "expected_ok": false,
+      "expected_categories": ["percent_scale"]
+    },
+    {
+      "id": "nc-018",
+      "category": "computed",
+      "question": "两家净利润差额手算",
+      "reply": "两家差额约 289.28 亿元。",
+      "facts": ["41587940000", "12660012515.78"],
+      "snippets": [],
+      "expected_ok": false,
+      "expected_categories": ["computed"]
+    },
+    {
+      "id": "nc-019",
+      "category": "computed",
+      "question": "用净利润/营收手算比率",
+      "reply": "净利率约 5.35%。",
+      "facts": ["41587940000", "777102455000"],
+      "snippets": [],
+      "expected_ok": false,
+      "expected_categories": ["computed"]
+    },
+    {
+      "id": "nc-020",
+      "category": "mixed",
+      "question": "已核对金额与编造金额混写",
+      "reply": "净利润约 415.88 亿元，研发投入约 542 亿元。",
+      "facts": ["41587940000"],
+      "snippets": ["销量与产品结构变化。"],
+      "expected_ok": false,
+      "expected_categories": ["unbacked"]
+    }
+  ]
+}

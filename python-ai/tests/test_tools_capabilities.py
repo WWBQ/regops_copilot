@@ -11,8 +11,17 @@ def test_capabilities_lists_commands_and_forbids_sql():
     assert "compare_peers" in names
     assert "create_review_draft" in names
     assert "execute_sql" in body["forbidden"]
+    assert body["wired_to_graph"] is True
+    assert body["chat_entry"] == "intent"
+    assert "overview" in body["chat_intents"]
     lookup = next(item for item in body["commands"] if item["name"] == "lookup_metric")
     assert "properties" in lookup["input_schema"]
+    draft = next(item for item in body["commands"] if item["name"] == "create_review_draft")
+    assert draft["kind"] == "write"
+    assert "confirm_before_create_review_draft" in body["must"]
+    assert "review_draft_pending_only" in body["must"]
+    assert "stop_on_budget_exceeded" in body["must"]
+    assert "maker_checker_via_java" in body["must"]
 
 
 def test_schema_unknown_is_none():
@@ -20,14 +29,30 @@ def test_schema_unknown_is_none():
     assert tool_schema("lookup_metric")["name"] == "lookup_metric"
 
 
-def test_create_review_draft_refuses_write():
+def test_create_review_draft_mock_still_refuses_write():
     out = invoke_tool(
         "create_review_draft",
         {"company_code": "002594", "title": "关联交易", "reason": "需复核"},
+        context=ToolContext(backend="mock"),
     )
     assert out.ok is False
     assert out.stop is True
     assert out.error_code == "forbidden_write"
+
+
+def test_lookup_metric_batch_mock():
+    out = invoke_tool(
+        "lookup_metric",
+        {
+            "company_code": "002594",
+            "year": 2024,
+            "concepts": ["revenue", "net_profit"],
+        },
+        context=ToolContext(backend="mock"),
+    )
+    assert out.ok is True
+    assert len(out.result["lookups"]) == 2
+    assert out.result["lookups"][0]["value_yuan"] == "777102455000"
 
 
 def test_compare_peers_mock():

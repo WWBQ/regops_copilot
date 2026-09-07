@@ -15,7 +15,9 @@ public record ChatResponse(
         @JsonProperty("prompt_tokens") int promptTokens,
         @JsonProperty("completion_tokens") int completionTokens,
         @JsonProperty("total_tokens") int totalTokens,
-        @JsonProperty("latency_ms") double latencyMs
+        @JsonProperty("latency_ms") double latencyMs,
+        @JsonProperty("thread_id") String threadId,
+        @JsonProperty("pending_node") String pendingNode
 ) {
     public ChatResponse {
         if (citations == null) {

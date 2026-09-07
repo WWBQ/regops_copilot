@@ -14,7 +14,8 @@ public record ChatRequest(
         @DecimalMin("0.0") @DecimalMax("2.0") Double temperature,
         @JsonProperty("session_id") String sessionId,
         @JsonProperty("use_rag") Boolean useRag,
-        String model
+        String model,
+        @JsonProperty("thread_id") String threadId
 ) {
     public ChatRequest {
         if (temperature == null) {

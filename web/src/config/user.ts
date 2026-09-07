@@ -7,14 +7,44 @@ export interface CurrentUser {
   department: string
 }
 
-/** 演示用户；W9+ 接入 java-service RBAC 后替换 */
-export const CURRENT_USER: CurrentUser = {
-  id: 'demo-user',
-  displayName: '合规专员',
-  username: 'compliance.demo',
-  email: 'demo@regops.local',
-  role: '合规分析师',
-  department: '风险管理部',
+export const GUEST_USER: CurrentUser = {
+  id: 'guest',
+  displayName: '未登录',
+  username: 'guest',
+  email: '',
+  role: '访客',
+  department: '—',
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  ANALYST: '投研分析师',
+  CHECKER: '合规复核员',
+  RM: '客户经理',
+  ADMIN: '系统管理员',
+}
+
+const DEPT_LABEL: Record<string, string> = {
+  research: '投研',
+  compliance: '合规',
+  rm: '客户经理部',
+}
+
+export function roleLabel(role: string | undefined): string {
+  if (!role) return '访客'
+  return ROLE_LABEL[role] ?? role
+}
+
+export function deptLabel(dept: string | undefined): string {
+  if (!dept) return '—'
+  return DEPT_LABEL[dept] ?? dept
+}
+
+export function canSubmitTickets(role: string | undefined): boolean {
+  return role === 'ANALYST' || role === 'CHECKER' || role === 'ADMIN'
+}
+
+export function canReviewTickets(role: string | undefined): boolean {
+  return role === 'CHECKER' || role === 'ADMIN'
 }
 
 export function userInitials(name: string): string {

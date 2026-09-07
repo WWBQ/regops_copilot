@@ -38,6 +38,16 @@ class Settings(BaseSettings):
     rag_trace_enabled: bool = True
     eval_chat_base_url: str = "http://127.0.0.1:8000"
     tool_backend: str = "live"
+    checkpoint_sqlite_path: str = str(ROOT_DIR / "data" / "checkpoints" / "review.sqlite")
+    checkpoint_ttl_hours: float = 24.0
+    workflow_max_steps: int = 12
+    workflow_max_tool_calls: int = 8
+    workflow_max_time_ms: float = 120_000.0
+    tool_loop_max_rounds: int = 4
+    tool_loop_max_tool_calls: int = 6
+    tool_loop_max_lookup_metric: int = 1
+    tool_loop_max_tokens: int = 8_000
+    tool_loop_max_time_ms: float = 120_000.0
     service_token: str = Field(
         default="",
         validation_alias=AliasChoices("REGOPS_SERVICE_TOKEN", "SERVICE_TOKEN"),

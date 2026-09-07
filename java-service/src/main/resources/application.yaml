@@ -16,9 +16,9 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+  mvc:
+    async:
+      request-timeout: 180000
 
 regops:
   python-ai:
@@ -28,6 +28,10 @@ regops:
     service-name: java-service
     service-token: ${REGOPS_SERVICE_TOKEN:dev-service-token}
     read-retry-count: 2
+  auth:
+    jwt-secret: ${REGOPS_JWT_SECRET:dev-regops-jwt-secret-change-me-32b}
+    jwt-ttl-seconds: 28800
+    seed: true
 
 management:
   endpoints:

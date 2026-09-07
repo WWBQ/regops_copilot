@@ -1,8 +1,10 @@
 package com.wbq.java_service.controller;
 
+import java.util.List;
 import java.util.Map;
 
 import com.wbq.java_service.client.PythonAiClient;
+import com.wbq.java_service.exception.PythonAiException;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,15 +80,56 @@ class ToolControllerTest {
     }
 
     @Test
-    void reviewDraftRefusesWrite() throws Exception {
+    void reviewDraftCallsPythonWrite() throws Exception {
+        when(pythonAiClient.invokeToolWrite(eq("create_review_draft"), any(), eq("compliance"), isNull(), isNull()))
+                .thenReturn(Map.of(
+                        "ok", true,
+                        "stop", false,
+                        "name", "create_review_draft",
+                        "result", Map.of("status", "PENDING", "draft_id", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+                ));
         mvc.perform(post("/api/tools/review-draft")
                         .header("X-Regops-Dept", "compliance")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"company_code\":\"002594\",\"title\":\"关联交易\",\"reason\":\"需复核\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ok").value(false))
-                .andExpect(jsonPath("$.stop").value(true))
-                .andExpect(jsonPath("$.error_code").value("forbidden_write"));
+                .andExpect(jsonPath("$.ok").value(true));
+    }
+
+    @Test
+    void reviewDraftMissingDeptIs403() throws Exception {
+        mvc.perform(post("/api/tools/review-draft")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"company_code\":\"002594\",\"title\":\"关联交易\",\"reason\":\"需复核\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.extra.error_code").value("unauthorized"));
+        verifyNoInteractions(pythonAiClient);
+    }
+
+    @Test
+    void listReviewDraftsCallsPython() throws Exception {
+        when(pythonAiClient.listReviewDrafts("research", 50, 0))
+                .thenReturn(Map.of("items", List.of(), "total", 0, "dept", "research"));
+        mvc.perform(get("/api/tools/review-drafts")
+                        .header("X-Regops-Dept", "research"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0));
+    }
+
+    @Test
+    void getReviewDraftCrossDeptIs404() throws Exception {
+        when(pythonAiClient.getReviewDraft("research", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
+                .thenThrow(new PythonAiException(404, "review draft not found"));
+        mvc.perform(get("/api/tools/review-drafts/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+                        .header("X-Regops-Dept", "research"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void listReviewDraftsMissingDeptIs403() throws Exception {
+        mvc.perform(get("/api/tools/review-drafts"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.extra.error_code").value("unauthorized"));
         verifyNoInteractions(pythonAiClient);
     }
 
@@ -106,7 +149,9 @@ class ToolControllerTest {
         mvc.perform(get("/api/tools/capabilities"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.kind").value("agent-capabilities"))
-                .andExpect(jsonPath("$.forbidden[0]").exists());
+                .andExpect(jsonPath("$.forbidden[0]").exists())
+                .andExpect(jsonPath("$.must[2]").value("confirm_before_create_review_draft"))
+                .andExpect(jsonPath("$.must[4]").value("stop_on_budget_exceeded"));
         mvc.perform(get("/api/tools/schema/lookup_metric"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("lookup_metric"));

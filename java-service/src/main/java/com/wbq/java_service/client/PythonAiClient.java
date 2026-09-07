@@ -1,5 +1,13 @@
 package com.wbq.java_service.client;
 
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -14,6 +22,8 @@ import com.wbq.java_service.dto.sessions.SessionDocumentUploadResponse;
 import com.wbq.java_service.exception.PythonAiException;
 import com.wbq.java_service.filter.RequestIdFilter;
 import com.wbq.java_service.util.ReadRetry;
+
+import tools.jackson.databind.ObjectMapper;
 
 import org.slf4j.MDC;
 import org.springframework.core.ParameterizedTypeReference;
@@ -42,10 +52,17 @@ public class PythonAiClient {
 
     private final RestClient restClient;
     private final AppProperties properties;
+    private final ObjectMapper objectMapper;
+    private final HttpClient streamHttpClient;
 
-    public PythonAiClient(RestClient pythonRestClient, AppProperties properties) {
+    public PythonAiClient(RestClient pythonRestClient, AppProperties properties, ObjectMapper objectMapper) {
         this.restClient = pythonRestClient;
         this.properties = properties;
+        this.objectMapper = objectMapper;
+        this.streamHttpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(properties.pythonAi().connectTimeoutMs()))
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build();
     }
 
     public Map<String, Object> invokeTool(
@@ -68,6 +85,53 @@ public class PythonAiClient {
                 .headers(headers -> forwardOutboundHeaders(headers, dept))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(body)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> invokeToolWrite(
+            String name,
+            Map<String, Object> arguments,
+            String dept,
+            String backend,
+            String idempotencyKey
+    ) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("name", name);
+        body.put("arguments", arguments == null ? Map.of() : arguments);
+        if (dept != null && !dept.isBlank()) {
+            body.put("dept", dept);
+        }
+        if (backend != null && !backend.isBlank()) {
+            body.put("backend", backend);
+        }
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            body.put("idempotency_key", idempotencyKey);
+        }
+        return exchange(() -> restClient.post()
+                .uri("/tools/invoke")
+                .headers(headers -> forwardOutboundHeaders(headers, dept))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> listReviewDrafts(String dept, int limit, int offset) {
+        return exchange(() -> restClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/tools/review-drafts")
+                        .queryParam("limit", limit)
+                        .queryParam("offset", offset)
+                        .build())
+                .headers(headers -> forwardOutboundHeaders(headers, dept))
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> getReviewDraft(String dept, String draftId) {
+        return exchange(() -> restClient.get()
+                .uri("/tools/review-drafts/{draftId}", draftId)
+                .headers(headers -> forwardOutboundHeaders(headers, dept))
                 .retrieve()
                 .body(MAP_TYPE));
     }
@@ -96,6 +160,60 @@ public class PythonAiClient {
                 .body(request)
                 .retrieve()
                 .body(ChatResponse.class));
+    }
+
+    public void copyChatStream(ChatRequest request, OutputStream output) {
+        try {
+            String json = objectMapper.writeValueAsString(request);
+            String base = properties.pythonAi().baseUrl();
+            if (base.endsWith("/")) {
+                base = base.substring(0, base.length() - 1);
+            }
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(base + "/chat/stream"))
+                    .timeout(Duration.ofMillis(Math.max(properties.pythonAi().readTimeoutMs(), 180_000)))
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .header(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM_VALUE)
+                    .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8));
+            String requestId = MDC.get(RequestIdFilter.MDC_KEY);
+            if (requestId != null && !requestId.isBlank()) {
+                builder.header(RequestIdFilter.HEADER, requestId);
+            }
+            var python = properties.pythonAi();
+            if (python.serviceName() != null && !python.serviceName().isBlank()) {
+                builder.header("X-Regops-Service", python.serviceName());
+            }
+            if (python.serviceToken() != null && !python.serviceToken().isBlank()) {
+                builder.header("X-Regops-Service-Token", python.serviceToken());
+            }
+            HttpResponse<InputStream> response = streamHttpClient.send(
+                    builder.build(),
+                    HttpResponse.BodyHandlers.ofInputStream()
+            );
+            int status = response.statusCode();
+            InputStream in = response.body();
+            if (status >= 400) {
+                byte[] errBytes = in == null ? new byte[0] : in.readAllBytes();
+                String err = new String(errBytes, StandardCharsets.UTF_8);
+                throw new PythonAiException(status, err.isBlank() ? "python-ai HTTP " + status : err);
+            }
+            if (in == null) {
+                throw new PythonAiException(502, "python-ai returned empty stream");
+            }
+            byte[] buf = new byte[256];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                output.write(buf, 0, n);
+                output.flush();
+            }
+        } catch (PythonAiException ex) {
+            throw ex;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new PythonAiException(502, "python-ai stream interrupted");
+        } catch (Exception ex) {
+            throw new PythonAiException(502, "python-ai unavailable: " + ex.getMessage());
+        }
     }
 
     public ViewerUrlResponse viewerUrl(String docId, Integer page, Integer expiresIn) {

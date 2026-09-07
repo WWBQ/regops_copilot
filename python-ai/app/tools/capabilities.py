@@ -13,15 +13,15 @@ _READ = {
     "verify_number",
     "compare_peers",
 }
-_WRITE_STUB = {"create_review_draft"}
+_WRITE = {"create_review_draft"}
 _VALIDATE = {"emit_conclusion"}
 
 
 def tool_capabilities() -> dict[str, Any]:
     commands = []
     for spec in list_tool_specs():
-        if spec.name in _WRITE_STUB:
-            kind = "write_stub"
+        if spec.name in _WRITE:
+            kind = "write"
         elif spec.name in _VALIDATE:
             kind = "validate"
         else:
@@ -36,7 +36,10 @@ def tool_capabilities() -> dict[str, Any]:
         )
     return {
         "kind": "agent-capabilities",
-        "wired_to_chat": False,
+        "wired_to_chat": True,
+        "chat_entry": "intent",
+        "chat_intents": ["opt_in", "overview", "unsupported_topic", "blocked_followup"],
+        "wired_to_graph": True,
         "rules": "docs/AGENT_RULES.md",
         "commands": commands,
         "forbidden": [
@@ -50,6 +53,11 @@ def tool_capabilities() -> dict[str, Any]:
             "list_scope_before_unknown_company_or_concept",
             "stop_when_ok_false",
             "cite_doc_id_and_page_for_rag",
+            "checkpoint_before_emit_conclusion",
+            "confirm_before_create_review_draft",
+            "review_draft_pending_only",
+            "stop_on_budget_exceeded",
+            "maker_checker_via_java",
         ],
     }
 

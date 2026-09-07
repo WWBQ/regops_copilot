@@ -74,4 +74,4 @@ python-ai/.venv/bin/python eval/run_asknum.py --fail-on-regression
 - 不让 LLM 写 SQL，不做 EXPLAIN 校正循环。
 - 不手算 ROE / 毛利率 / 研发强度。
 - 不用 `human_review` 的数。
-- 不上 LangGraph（那是 W6，工具仍是本模块的 `lookup_metric` / `try_answer`）。
+- 单轮问数不上 LangGraph（W6-1 只接「对比 + 管理层/结论」）。
