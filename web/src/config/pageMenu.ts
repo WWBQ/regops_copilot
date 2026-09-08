@@ -23,6 +23,11 @@ export const PAGE_MENUS: Record<string, PageMenuItem[]> = {
   ],
   '/ops/asknum': [
     { id: 'rag-monitor', label: 'RAG 检索监控', path: '/ops/rag', icon: 'list' },
+    { id: 'llm-trace', label: 'LLM Trace', path: '/ops/traces', icon: 'list' },
+    { id: 'eval', label: '评估报告', path: '/ops/eval', icon: 'list' },
+  ],
+  '/ops/traces': [
+    { id: 'asknum-monitor', label: '问数监控', path: '/ops/asknum', icon: 'list' },
     { id: 'eval', label: '评估报告', path: '/ops/eval', icon: 'list' },
   ],
   '/compliance/review': [
@@ -56,6 +61,9 @@ export function pageMenuForPath(path: string): PageMenuItem[] {
   }
   if (path.startsWith('/ops/asknum')) {
     return PAGE_MENUS['/ops/asknum'] ?? []
+  }
+  if (path.startsWith('/ops/traces')) {
+    return PAGE_MENUS['/ops/traces'] ?? []
   }
   if (path.startsWith('/compliance/workflow')) {
     return PAGE_MENUS['/compliance/workflow'] ?? []

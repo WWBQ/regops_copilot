@@ -60,6 +60,7 @@ public class PythonAiClient {
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.streamHttpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofMillis(properties.pythonAi().connectTimeoutMs()))
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
@@ -137,11 +138,34 @@ public class PythonAiClient {
     }
 
     public Map<String, Object> health() {
-        return exchange(() -> restClient.get()
-                .uri("/health")
-                .headers(this::forwardRequestId)
-                .retrieve()
-                .body(MAP_TYPE));
+        try {
+            String base = properties.pythonAi().baseUrl();
+            if (base.endsWith("/")) {
+                base = base.substring(0, base.length() - 1);
+            }
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(base + "/health"))
+                    .timeout(Duration.ofMillis(properties.pythonAi().resolvedHealthTimeoutMs()))
+                    .GET();
+            applyCorrelation(builder);
+            HttpResponse<String> response = streamHttpClient.send(
+                    builder.build(),
+                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+            );
+            int status = response.statusCode();
+            String body = response.body() == null ? "" : response.body();
+            if (status >= 400) {
+                throw PythonErrorMapper.fromDownstream(status, body);
+            }
+            return parseHealthBody(body);
+        } catch (PythonAiException ex) {
+            throw ex;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new PythonAiException(502, "python-ai unavailable", "upstream_down");
+        } catch (Exception ex) {
+            throw PythonErrorMapper.fromTransport(ex);
+        }
     }
 
     public Map<String, Object> models() {
@@ -171,14 +195,11 @@ public class PythonAiClient {
             }
             HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(base + "/chat/stream"))
-                    .timeout(Duration.ofMillis(Math.max(properties.pythonAi().readTimeoutMs(), 180_000)))
+                    .timeout(Duration.ofMillis(properties.pythonAi().resolvedStreamTimeoutMs()))
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .header(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM_VALUE)
                     .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8));
-            String requestId = MDC.get(RequestIdFilter.MDC_KEY);
-            if (requestId != null && !requestId.isBlank()) {
-                builder.header(RequestIdFilter.HEADER, requestId);
-            }
+            applyCorrelation(builder);
             var python = properties.pythonAi();
             if (python.serviceName() != null && !python.serviceName().isBlank()) {
                 builder.header("X-Regops-Service", python.serviceName());
@@ -195,7 +216,7 @@ public class PythonAiClient {
             if (status >= 400) {
                 byte[] errBytes = in == null ? new byte[0] : in.readAllBytes();
                 String err = new String(errBytes, StandardCharsets.UTF_8);
-                throw new PythonAiException(status, err.isBlank() ? "python-ai HTTP " + status : err);
+                throw PythonErrorMapper.fromDownstream(status, err);
             }
             if (in == null) {
                 throw new PythonAiException(502, "python-ai returned empty stream");
@@ -210,9 +231,9 @@ public class PythonAiClient {
             throw ex;
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            throw new PythonAiException(502, "python-ai stream interrupted");
+            throw new PythonAiException(502, "python-ai stream interrupted", "upstream_down");
         } catch (Exception ex) {
-            throw new PythonAiException(502, "python-ai unavailable: " + ex.getMessage());
+            throw PythonErrorMapper.fromTransport(ex);
         }
     }
 
@@ -292,8 +313,10 @@ public class PythonAiClient {
                     .body(body)
                     .retrieve()
                     .body(SessionDocumentUploadResponse.class));
+        } catch (PythonAiException ex) {
+            throw ex;
         } catch (Exception ex) {
-            throw new PythonAiException(502, "upload failed: " + ex.getMessage());
+            throw PythonErrorMapper.fromTransport(ex);
         }
     }
 
@@ -456,6 +479,25 @@ public class PythonAiClient {
                 .body(MAP_TYPE));
     }
 
+    public Map<String, Object> getObsOverview() {
+        return exchange(() -> restClient.get()
+                .uri("/ops/obs/overview")
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> listObsTraces(int limit, int offset) {
+        return exchange(() -> restClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/ops/obs/traces")
+                        .queryParam("limit", limit)
+                        .queryParam("offset", offset)
+                        .build())
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
     public Map<String, Object> getIngestOverview() {
         return exchange(() -> restClient.get()
                 .uri("/ops/ingest/overview")
@@ -603,7 +645,7 @@ public class PythonAiClient {
         } catch (PythonAiException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new PythonAiException(502, "upload failed: " + ex.getMessage());
+            throw PythonErrorMapper.fromTransport(ex);
         }
     }
 
@@ -706,6 +748,17 @@ public class PythonAiClient {
         return Integer.parseInt(String.valueOf(value));
     }
 
+    private void applyCorrelation(HttpRequest.Builder builder) {
+        String requestId = MDC.get(RequestIdFilter.MDC_KEY);
+        if (requestId != null && !requestId.isBlank()) {
+            builder.header(RequestIdFilter.HEADER, requestId);
+        }
+        String traceparent = MDC.get(RequestIdFilter.TRACEPARENT_MDC_KEY);
+        if (traceparent != null && !traceparent.isBlank()) {
+            builder.header(RequestIdFilter.TRACEPARENT_HEADER, traceparent);
+        }
+    }
+
     private void forwardRequestId(org.springframework.http.HttpHeaders headers) {
         forwardOutboundHeaders(headers, null);
     }
@@ -714,6 +767,10 @@ public class PythonAiClient {
         String requestId = MDC.get(RequestIdFilter.MDC_KEY);
         if (requestId != null && !requestId.isBlank()) {
             headers.set(RequestIdFilter.HEADER, requestId);
+        }
+        String traceparent = MDC.get(RequestIdFilter.TRACEPARENT_MDC_KEY);
+        if (traceparent != null && !traceparent.isBlank()) {
+            headers.set(RequestIdFilter.TRACEPARENT_HEADER, traceparent);
         }
         var python = properties.pythonAi();
         if (python.serviceName() != null && !python.serviceName().isBlank()) {
@@ -740,20 +797,35 @@ public class PythonAiClient {
             }
             return body;
         } catch (RestClientResponseException ex) {
-            throw new PythonAiException(ex.getStatusCode().value(), extractDetail(ex));
+            throw PythonErrorMapper.fromDownstream(ex.getStatusCode().value(), ex.getResponseBodyAsString());
         } catch (PythonAiException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new PythonAiException(502, "python-ai unavailable: " + ex.getMessage());
+            throw PythonErrorMapper.fromTransport(ex);
         }
     }
 
-    private static String extractDetail(RestClientResponseException ex) {
-        String body = ex.getResponseBodyAsString();
+    private Map<String, Object> parseHealthBody(String body) {
         if (body == null || body.isBlank()) {
-            return ex.getMessage();
+            throw new PythonAiException(502, "python-ai returned empty body", "upstream_down");
         }
-        return body;
+        try {
+            var node = objectMapper.readTree(body);
+            Map<String, Object> out = new java.util.LinkedHashMap<>();
+            var status = node.get("status");
+            out.put("status", status == null || status.isNull() || !status.isString() || status.asString().isBlank()
+                    ? "ok"
+                    : status.asString());
+            var service = node.get("service");
+            if (service != null && service.isString() && !service.asString().isBlank()) {
+                out.put("service", service.asString());
+            }
+            return out;
+        } catch (PythonAiException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            return Map.of("status", "ok");
+        }
     }
 
     @FunctionalInterface

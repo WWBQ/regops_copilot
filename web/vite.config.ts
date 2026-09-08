@@ -13,14 +13,6 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path: string) => path.replace(/^\/api/, ''),
       },
-      // RestClient 会把 SSE 攒完再转发；开发时直连 Python 才能看见逐字。
-      '/api/chat/stream': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        timeout: 180_000,
-        proxyTimeout: 180_000,
-        rewrite: (path: string) => path.replace(/^\/api/, ''),
-      },
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,

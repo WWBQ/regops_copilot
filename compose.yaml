@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: regops
-      POSTGRES_PASSWORD: regops123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-regops123}
       POSTGRES_DB: regops_db
     ports:
       - "5432:5432"
@@ -25,21 +25,85 @@ services:
       timeout: 5s
       retries: 5
 
+  python-ai:
+    build:
+      context: .
+      dockerfile: python-ai/Dockerfile
+    container_name: regops-python
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://regops:${POSTGRES_PASSWORD:-regops123}@db:5432/regops_db
+      REGOPS_SERVICE_TOKEN: ${REGOPS_SERVICE_TOKEN:-dev-service-token}
+      OBJECT_STORE_ROOT: /app/data/objects
+      CHECKPOINT_SQLITE_PATH: /app/data/checkpoints/review.sqlite
+      LABELING_DATA_DIR: /app/data/labeling
+      HF_HOME: /app/data/hf
+      API_PUBLIC_BASE_URL: http://localhost:8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - python_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 90s
+
   java-service:
     build: ./java-service
     container_name: regops-java
     restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
     ports:
       - "8080:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/regops_db
       SPRING_DATASOURCE_USERNAME: regops
-      SPRING_DATASOURCE_PASSWORD: regops123
-      REGOPS_PYTHON_AI_BASE_URL: http://host.docker.internal:8000
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-regops123}
+      REGOPS_PYTHON_AI_BASE_URL: http://python-ai:8000
       REGOPS_JWT_SECRET: ${REGOPS_JWT_SECRET:-dev-regops-jwt-secret-change-me-32b}
+      REGOPS_SERVICE_TOKEN: ${REGOPS_SERVICE_TOKEN:-dev-service-token}
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+
+  web:
+    build: ./web
+    container_name: regops-web
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    depends_on:
+      java-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
 volumes:
   db_data:
+  python_data:

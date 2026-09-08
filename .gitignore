@@ -48,8 +48,8 @@ data/objects/
 eval/.cache/
 eval/reports/
 
-# Docker 本地数据（若有）
-*.log
+# 本地 K8s 覆盖（含真实 Key，勿提交）
+k8s/secret.local.yaml
 
 # 本地开发编排脚本产物（日志 + pid）
 .dev-logs/

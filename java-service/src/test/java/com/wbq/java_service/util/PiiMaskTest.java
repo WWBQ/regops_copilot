@@ -16,4 +16,12 @@ class PiiMaskTest {
         assertTrue(masked.contains("[身份证]"));
         assertTrue(masked.contains("[账号]"));
     }
+
+    @Test
+    void masksApiKeys() {
+        String masked = PiiMask.mask("DEEPSEEK_API_KEY=sk-abcdefghijklmnopqrstuvwxyz Authorization: Bearer abcdefghijklmnop");
+        assertFalse(masked.contains("sk-abcdefghijklmnopqrstuvwxyz"));
+        assertFalse(masked.contains("abcdefghijklmnop"));
+        assertTrue(masked.contains("[密钥]"));
+    }
 }

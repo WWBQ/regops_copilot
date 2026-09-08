@@ -7,12 +7,14 @@ import {
   type BffHealth,
   type SystemOverview,
 } from '../../api/system'
+import { getLastRequestId, formatUserFacingError } from '../../api/client'
 
 const overview = ref<SystemOverview | null>(null)
 const bffHealth = ref<BffHealth | null>(null)
 const loading = ref(true)
 const error = ref('')
 const autoRefresh = ref(true)
+const lastRequestId = ref<string | null>(null)
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
@@ -49,7 +51,7 @@ function formatTime(value: string | null | undefined) {
 const serviceCards = computed(() => {
   const o = overview.value
   const bff = bffHealth.value
-  return [
+  const cards = [
     {
       name: 'Java BFF',
       status: bff?.status === 'ok' ? 'ok' : 'down',
@@ -58,26 +60,34 @@ const serviceCards = computed(() => {
     },
     {
       name: 'Python AI',
-      status: bff?.pythonAi?.status === 'ok' ? 'ok' : o?.services.python_ai.status ?? 'unknown',
-      detail: String(bff?.pythonAi?.service ?? o?.services.python_ai.service ?? 'python-ai'),
-      latency: null,
-    },
-    {
-      name: 'PostgreSQL',
-      status: o?.services.postgresql.status ?? 'unknown',
+      status: bff?.pythonAi?.status === 'ok' ? 'ok' : o?.services.python_ai.status ?? 'down',
       detail:
-        o?.services.postgresql.latency_ms != null
-          ? `${o.services.postgresql.latency_ms} ms`
-          : o?.services.postgresql.error ?? '—',
-      latency: o?.services.postgresql.latency_ms ?? null,
-    },
-    {
-      name: 'pgvector',
-      status: o?.services.pgvector.status ?? 'unknown',
-      detail: o?.services.pgvector.installed ? '已安装' : '未检测到扩展',
+        bff?.pythonAi?.status === 'down'
+          ? String(bff.pythonAi.error_code ?? bff.pythonAi.error ?? 'down')
+          : String(bff?.pythonAi?.service ?? o?.services.python_ai.service ?? 'python-ai'),
       latency: null,
     },
   ]
+  if (o) {
+    cards.push(
+      {
+        name: 'PostgreSQL',
+        status: o.services.postgresql.status ?? 'unknown',
+        detail:
+          o.services.postgresql.latency_ms != null
+            ? `${o.services.postgresql.latency_ms} ms`
+            : o.services.postgresql.error ?? '—',
+        latency: o.services.postgresql.latency_ms ?? null,
+      },
+      {
+        name: 'pgvector',
+        status: o.services.pgvector.status ?? 'unknown',
+        detail: o.services.pgvector.installed ? '已安装' : '未检测到扩展',
+        latency: null,
+      },
+    )
+  }
+  return cards
 })
 
 const ragOutcomeRows = computed(() => {
@@ -89,12 +99,22 @@ async function refresh() {
   loading.value = true
   error.value = ''
   try {
-    const [ov, bff] = await Promise.all([getSystemOverview(), getBffHealth()])
-    overview.value = ov
-    bffHealth.value = bff
+    bffHealth.value = await getBffHealth()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '加载失败'
+    bffHealth.value = null
+    error.value = formatUserFacingError(err)
+  }
+  try {
+    overview.value = await getSystemOverview()
+  } catch {
+    overview.value = null
+    if (bffHealth.value?.status === 'ok') {
+      error.value = '语料与 RAG 概况需要 python-ai。Java 探活见上方卡片；复核和审计仍可用。'
+    } else if (!error.value) {
+      error.value = '系统概况加载失败'
+    }
   } finally {
+    lastRequestId.value = getLastRequestId()
     loading.value = false
   }
 }
@@ -121,8 +141,9 @@ onBeforeUnmount(() => {
     <header class="head">
       <div>
         <h1>系统健康</h1>
-        <p>服务探活、语料库、入库任务与 RAG 运行概况；每 30 秒可自动刷新。</p>
+        <p>服务探活、语料库、入库任务与 RAG 运行概况；每 30 秒可自动刷新。python-ai 挂了时本页仍显示 Java 探活；复核和审计不依赖问答。</p>
         <p v-if="overview" class="checked-at">上次检查：{{ formatTime(overview.checked_at) }}</p>
+        <p v-if="lastRequestId" class="checked-at">最近关联 ID：<code>{{ lastRequestId }}</code></p>
       </div>
       <div class="head-actions">
         <label class="auto-refresh">
@@ -139,10 +160,20 @@ onBeforeUnmount(() => {
       </router-link>
     </nav>
 
-    <p v-if="loading && !overview" class="hint">加载中…</p>
+    <p v-if="loading && !overview && !bffHealth" class="hint">加载中…</p>
     <p v-if="error" class="error">{{ error }}</p>
+    <p
+      v-if="bffHealth?.status === 'ok' && bffHealth.pythonAi?.status === 'down'"
+      class="degrade-note"
+    >
+      python-ai 不可用：问答 / 问数 / 标注会失败。
+      <router-link to="/compliance/review">合规复核</router-link>
+      与
+      <router-link to="/compliance/audit">审计</router-link>
+      仍走 Java。
+    </p>
 
-    <template v-if="overview">
+    <template v-if="bffHealth || overview">
       <div class="stats">
         <article v-for="svc in serviceCards" :key="svc.name" class="stat-card">
           <div class="stat-head">
@@ -152,6 +183,9 @@ onBeforeUnmount(() => {
           <p class="stat-value stat-detail">{{ svc.detail }}</p>
         </article>
       </div>
+    </template>
+
+    <template v-if="overview">
 
       <div class="grid-2">
         <section class="panel">
@@ -495,6 +529,21 @@ onBeforeUnmount(() => {
 .hint {
   color: var(--text-muted);
   font-size: 14px;
+}
+
+.degrade-note {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 13px;
+}
+
+.degrade-note a {
+  color: inherit;
+  font-weight: 700;
 }
 
 .error {

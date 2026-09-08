@@ -26,6 +26,9 @@ async def test_list_eval_tasks():
     assert "w4_asknum" in ids
     assert "w6_number_check" in ids
     assert "w6_workflow" in ids
+    assert "w8_strategy" in ids
+    assert "w8_ab" in ids
+    assert "w9_redteam" in ids
     asknum = next(item for item in body["items"] if item["id"] == "w4_asknum")
     assert "leak_rate" in asknum["metrics"]
     numbers = next(item for item in body["items"] if item["id"] == "w6_number_check")
@@ -34,6 +37,13 @@ async def test_list_eval_tasks():
     workflow = next(item for item in body["items"] if item["id"] == "w6_workflow")
     assert "param_accuracy" in workflow["metrics"]
     assert "confirmation_rate" in workflow["metrics"]
+    strategy = next(item for item in body["items"] if item["id"] == "w8_strategy")
+    assert "number_error_rate" in strategy["metrics"]
+    ab = next(item for item in body["items"] if item["id"] == "w8_ab")
+    assert "credible" in ab["metrics"]
+    redteam = next(item for item in body["items"] if item["id"] == "w9_redteam")
+    assert "sql_leak_rate" in redteam["metrics"]
+    assert "acl_leak_rate" in redteam["metrics"]
     w1 = next(item for item in body["items"] if item["id"] == "w1_chat")
     assert "refuse_rate" in w1["metrics"]
     assert "number_error_rate" not in w1["metrics"]

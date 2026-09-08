@@ -176,3 +176,22 @@ def list_log_events_api(
     from app.ops.logs_service import list_log_events
 
     return list_log_events(limit=limit, offset=offset, source=source, level=level)
+
+
+@router.get("/obs/overview")
+def obs_overview_api() -> dict[str, Any]:
+    from app.obs.generations import overview
+
+    return overview()
+
+
+@router.get("/obs/traces")
+def obs_traces_api(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
+    from app.obs.generations import list_generations, overview
+
+    payload = list_generations(limit=limit, offset=offset)
+    payload["summary"] = overview()
+    return payload

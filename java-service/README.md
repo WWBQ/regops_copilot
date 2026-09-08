@@ -13,13 +13,15 @@ Agent / Python 只写 `PENDING` 草稿。提交和复核只在本服务：`PENDI
 
 当前已实现：
 
-- `GET /api/health` — Java + Python 健康检查
+- `GET /api/health` — Java + Python 健康检查（Python 探活 2.5s；挂了仍 200 + `pythonAi.down`）
 - `POST /api/chat` — 转发至 python-ai `/chat`
 - `POST /api/chat/stream` — 转发 python-ai SSE，不缓存
 - `GET /api/models` — 转发至 python-ai `/models`
 - `GET /api/documents/{docId}/viewer-url` — 客户经理访问内核年报返回 404
 - `/api/labeling/**` — 转发 python-ai 数据标注
-- `X-Request-ID` — 全链路关联 ID
+- `X-Request-ID` — 全链路关联 ID（响应头 + `ApiError.extra.request_id`）
+- `traceparent` — W3C Trace ID，向 Python 透传
+- 上游失败映射：`502 upstream_down` / `504 upstream_timeout`；读路径 5xx 可重试、超时不重试
 - `/api/tools/**` — 金融工具（部门隔离）；不代理 RAG；`POST /review-draft` 写 PENDING 草稿（不重试）
 - Java → Python 带服务身份（`X-Regops-Service` / Token），**不转发用户 JWT**
 - `/api/auth/**` — 登录发 JWT
@@ -75,6 +77,8 @@ cd java-service && mvn test
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/regops_db` |
 | `REGOPS_PYTHON_AI_BASE_URL` | `http://localhost:8000` |
 | `REGOPS_JWT_SECRET` | 开发默认（至少 32 字符） |
+
+超时预算（`application.yaml`）：建连 5s / 读 120s / 流式 180s / 探活 2.5s。详见 [`docs/W9_E2E.md`](../docs/W9_E2E.md)。
 
 ## 目录结构
 

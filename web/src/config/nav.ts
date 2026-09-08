@@ -47,6 +47,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'ingest-monitor', label: '解析监控', path: '/ops/ingest', phase: 'W2-5', enabled: true },
       { id: 'rag-monitor', label: 'RAG 检索监控', path: '/ops/rag', phase: 'W3', enabled: true },
       { id: 'asknum-monitor', label: '问数监控', path: '/ops/asknum', phase: 'W4', enabled: true },
+      { id: 'llm-trace', label: 'LLM Trace', path: '/ops/traces', phase: 'W9', enabled: true },
       { id: 'logs', label: '日志监控', path: '/ops/logs', phase: 'W2+', enabled: true },
       { id: 'health', label: '系统健康', path: '/ops/health', phase: 'W1', enabled: true },
       { id: 'eval', label: '评估报告', path: '/ops/eval', phase: 'W1-4', enabled: true },
@@ -135,9 +136,15 @@ export const PLACEHOLDER_PAGES: Record<
   },
   eval: {
     title: '评估报告',
-    summary: '选择评测任务（W1 聊天 / RAG 检索），一键运行并查看 Recall@k、准确率与明细。',
+    summary: '选择评测任务（W1 聊天 / RAG 检索 / 红队），一键运行并查看 Recall@k、准确率与明细。',
     backend: 'POST /api/ops/eval/runs',
     phase: 'W1-4',
+  },
+  'llm-trace': {
+    title: 'LLM Trace',
+    summary: 'Prompt 版本、Token、估算成本与 W3C Trace ID。未配 Langfuse 时使用进程内缓冲。',
+    backend: 'GET /api/ops/obs/traces',
+    phase: 'W9',
   },
   agent: {
     title: '合规问答（多步）',

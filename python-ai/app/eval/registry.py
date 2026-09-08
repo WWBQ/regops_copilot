@@ -13,7 +13,17 @@ GOLDEN_DIR = EVAL_DIR / "golden"
 REPORTS_DIR = EVAL_DIR / "reports"
 TASKS_FILE = EVAL_DIR / "tasks.json"
 
-RUNNERS = ("w1_chat", "rag_retrieval", "compliance_schema", "w4_asknum", "w6_number_check", "w6_workflow")
+RUNNERS = (
+    "w1_chat",
+    "rag_retrieval",
+    "compliance_schema",
+    "w4_asknum",
+    "w6_number_check",
+    "w6_workflow",
+    "w8_strategy",
+    "w8_ab",
+    "w9_redteam",
+)
 RUNNER_DEFAULT_METRICS: dict[str, tuple[str, ...]] = {
     "w1_chat": ("accuracy", "refuse_rate", "latency_p50_ms"),
     "rag_retrieval": ("recall_at_k", "mrr"),
@@ -21,6 +31,9 @@ RUNNER_DEFAULT_METRICS: dict[str, tuple[str, ...]] = {
     "w4_asknum": ("accuracy", "route_accuracy", "leak_rate"),
     "w6_number_check": ("accuracy", "false_accept_rate", "number_error_rate", "unit_error_rate"),
     "w6_workflow": ("accuracy", "param_accuracy", "avg_steps", "confirmation_rate"),
+    "w8_strategy": ("accuracy", "number_error_rate", "avg_tokens", "latency_p50_ms"),
+    "w8_ab": ("accuracy", "delta", "mcnemar_p", "credible"),
+    "w9_redteam": ("accuracy", "sql_leak_rate", "acl_leak_rate", "number_error_rate"),
 }
 _TASK_ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,48}$")
 
@@ -96,6 +109,33 @@ def _default_tasks_payload() -> dict:
                 "golden_file": "w6_workflow_20.json",
                 "runner": "w6_workflow",
                 "metrics": list(RUNNER_DEFAULT_METRICS["w6_workflow"]),
+                "builtin": True,
+            },
+            {
+                "id": "w8_strategy",
+                "name": "W8 四策略对照",
+                "description": "30 题：Zero-shot / Few-shot / CoT / ReAct，对照准确率、数字错误率、Token、延迟（默认 fixture）",
+                "golden_file": "w8_prompt_30.json",
+                "runner": "w8_strategy",
+                "metrics": list(RUNNER_DEFAULT_METRICS["w8_strategy"]),
+                "builtin": True,
+            },
+            {
+                "id": "w8_ab",
+                "name": "W8 Prompt A/B",
+                "description": "同一 30 题、固定种子、随机顺序；Wilson / McNemar，n=30 提升 3% 通常不可信",
+                "golden_file": "w8_prompt_30.json",
+                "runner": "w8_ab",
+                "metrics": list(RUNNER_DEFAULT_METRICS["w8_ab"]),
+                "builtin": True,
+            },
+            {
+                "id": "w9_redteam",
+                "name": "W9 金融红队",
+                "description": "25 条：注入 / 越权 / SQL / PII / 诱导编造；证明边界在代码不在 Prompt（不调 LLM）",
+                "golden_file": "w9_redteam_25.json",
+                "runner": "w9_redteam",
+                "metrics": list(RUNNER_DEFAULT_METRICS["w9_redteam"]),
                 "builtin": True,
             },
         ],
@@ -338,6 +378,36 @@ def validate_golden_payload(content: dict, *, runner: str | None = None) -> int:
         if runner == "w6_workflow":
             if item.get("expected_entry") not in {None, "graph", "asknum", "tools"}:
                 raise ValueError(f"items[{index}] expected_entry 须为 graph / asknum / tools")
+        if runner in {"w8_strategy", "w8_ab"}:
+            if item.get("category") not in {
+                "concept",
+                "numeric_unbacked",
+                "numeric_trap",
+                "refuse",
+                "format",
+            }:
+                raise ValueError(
+                    f"items[{index}] category 须为 concept / numeric_unbacked / numeric_trap / refuse / format"
+                )
+            if not str(item.get("expected") or "").strip():
+                raise ValueError(f"items[{index}] 缺少 expected")
+            outcomes = item.get("strategy_outcomes")
+            if not isinstance(outcomes, dict) or not outcomes:
+                raise ValueError(f"items[{index}] 缺少 strategy_outcomes")
+            if runner == "w8_ab":
+                flags = item.get("ab")
+                if not isinstance(flags, dict) or "A" not in flags or "B" not in flags:
+                    raise ValueError(f"items[{index}] 缺少 ab.A / ab.B")
+        if runner == "w9_redteam":
+            if not str(item.get("kind") or "").strip():
+                raise ValueError(f"items[{index}] 缺少 kind")
+            if item.get("kind") == "number_check":
+                if not str(item.get("reply") or "").strip():
+                    raise ValueError(f"items[{index}] 缺少 reply")
+                if not isinstance(item.get("expected_ok"), bool):
+                    raise ValueError(f"items[{index}] expected_ok 须为布尔值")
+            elif not isinstance(item.get("expect"), dict):
+                raise ValueError(f"items[{index}] 缺少 expect")
     return len(items)
 
 
@@ -352,6 +422,8 @@ def save_golden_set(*, filename: str, content: dict, runner: str | None = None) 
         "w4_asknum_20.json",
         "w6_number_check_20.json",
         "w6_workflow_20.json",
+        "w8_prompt_30.json",
+        "w9_redteam_25.json",
     }:
         raise ValueError("内置黄金集不可覆盖，请使用新文件名")
     item_count = validate_golden_payload(content, runner=runner)

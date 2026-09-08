@@ -121,4 +121,4 @@ python-ai/.venv/bin/python eval/run_w6_workflow.py --fail-on-regression
 - 不把每轮 `/chat` 丢进图或工具循环
 - 不提交 maker-checker、不把草稿改为 REVIEWED（那是 W7 Java）
 - 不把对话历史写入 Checkpoint
-- 不上开放 ReAct（W8 对照实验）
+- 不上开放 ReAct（W8 对照实验，见 [`W8_PROMPTS.md`](./W8_PROMPTS.md)）

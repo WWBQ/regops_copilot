@@ -161,20 +161,18 @@ BFF：`POST /api/chat/stream` 原样转发 `text/event-stream`，不缓存。
 
 ## 3. 关联 ID（Correlation ID）约定
 
-请求头 / 响应头统一使用 **`X-Request-ID`**。该链路**已实现**，不是占位：
+请求头 / 响应头使用 **`X-Request-ID`** 和 W3C **`traceparent`**。关联 ID 链路见 [`W9_E2E.md`](./W9_E2E.md)；跨服务 Trace 与 Prompt 版本见 [`W9_OBS.md`](./W9_OBS.md)。
 
-1. **入口生成**：`java-service` 的 `RequestIdFilter`（`@Order(HIGHEST_PRECEDENCE)`）
-   读取请求头 `X-Request-ID`；缺失或空白则生成一个 UUID。
-2. **写入日志上下文**：放入 SLF4J MDC 的 `requestId` 键。
-   日志格式为 `logging.pattern.level: "%5p [${spring.application.name:},%X{requestId:-}]"`，
-   所以每行日志都带服务名与请求 ID。
-3. **回写响应头**：同名 `X-Request-ID` 写回响应，前端可在网络面板直接看到。
-4. **向下游透传**：`PythonAiClient` 的每个方法都经 `forwardRequestId` 把该头透传给 python-ai。
-5. **python-ai 接收**：`POST /chat` 通过 `Header(alias="X-Request-ID")` 接收，
-   并传入 RAG trace（`prepare_chat_rag(request_id=...)`），用于 `/ops/rag-traces` 排障。
+1. **浏览器生成**：`web/src/api/client.ts` 每次 `apiFetch` / `streamChat` 写入请求头。
+2. **Java 入口**：`RequestIdFilter`（`@Order(HIGHEST_PRECEDENCE)`）读取；缺失或空白则生成 UUID。
+3. **写入日志上下文**：SLF4J MDC 的 `requestId` 键。
+   日志格式为 `logging.pattern.level: "%5p [${spring.application.name:},%X{requestId:-}]"`。
+4. **回写响应头**：同名 `X-Request-ID`。Java `ApiError.extra.request_id` 同步带上。同时回写 `traceparent`（缺则按 W3C 补一条）。
+5. **向下游透传**：`PythonAiClient` 经 `forwardOutboundHeaders` 透传 `X-Request-ID` 与 `traceparent`，并带服务身份，不转发用户 JWT。
+6. **python-ai**：ASGI `RequestIdMiddleware` 缺则补、回写全部响应（含 SSE）；日志 `%(request_id)s` `%(trace_id)s`。
+   `POST /chat` 的 Header 仍传入 RAG trace（`prepare_chat_rag(request_id=...)`）。LLM generation 写入 `/ops/obs/traces`。
 
-排障用法：从前端网络面板拿到 `X-Request-ID`，即可在 java-service 日志、
-python-ai 日志与 RAG trace 三处对齐同一次请求。
+排障：从前端网络面板或聊天失败文案里的关联 ID，在 java-service 日志、python-ai 日志、RAG trace、审计行四处对齐。
 
 ---
 
@@ -207,34 +205,34 @@ Schema 校验失败（422）时 `detail` 是数组，元素含 `type`/`loc`/`msg
 **java-service**（`ApiError` record，`GlobalExceptionHandler` 统一产出）
 
 ```json
-{ "detail": "错误说明", "extra": {} }
+{ "detail": "错误说明", "extra": { "error_code": "upstream_timeout", "request_id": "…" } }
 ```
 
 映射规则：
 
 | 异常 | 结果 |
 |------|------|
-| `PythonAiException` | 沿用下游状态码（无法解析时降级为 `502`） |
+| `PythonAiException` 连不上 Python | `502`，`error_code=upstream_down`，detail 为 `python-ai unavailable` |
+| `PythonAiException` 读/流式超时 | `504`，`error_code=upstream_timeout`，detail 为 `python-ai timeout` |
+| `PythonAiException` 下游 4xx/5xx | 沿用下游状态码；FastAPI `{detail}` 解析成短句，截断到 400 字 |
 | `MethodArgumentNotValidException` | `400`，detail 取第一个字段错误信息 |
-| 其他 `Exception` | `500` |
+| 其他 `Exception` | `500`，`error_code=internal_error` |
 
-### 已知不足（两处，均已实测确认）
+`GET /api/health` 探 Python 用 **2.5s** 预算，Python 挂了仍返回 Java **200** 且 `pythonAi.status=down`。读工具 5xx 最多再试 2 次，**504 不重试**。详见 [`W9_E2E.md`](./W9_E2E.md)。
 
-1. **兜底 handler 会把 Spring 自身的 4xx 改写成 500。**
-   `handleGeneric` 捕获所有 `Exception`，因此路由不存在（`NoResourceFoundException`）
-   和方法不支持（`HttpRequestMethodNotSupportedException`）都被归到 `500`：
+### 已知不足（一处，已实测确认）
 
-   ```
-   GET /api/ingest/jobs   → 500（语义应为 404，正确路径是 /api/ops/ingest/jobs）
-   GET /api/sessions      → 500（语义应为 405，该路径只接受 POST）
-                            body: {"detail":"Request method 'GET' is not supported","extra":{}}
-   ```
+**兜底 handler 会把 Spring 自身的 4xx 改写成 500。**
+`handleGeneric` 捕获所有 `Exception`，因此路由不存在（`NoResourceFoundException`）
+和方法不支持（`HttpRequestMethodNotSupportedException`）都被归到 `500`：
 
-   影响：客户端无法区分「我打错了路径」和「服务端崩了」，监控里也会混入假告警。
-   修法是为这两类异常各加一个 `@ExceptionHandler` 并返回对应状态码。
+```
+GET /api/ingest/jobs   → 500（语义应为 404，正确路径是 /api/ops/ingest/jobs）
+GET /api/sessions      → 500（语义应为 405，该路径只接受 POST）
+```
 
-2. **`ApiError.extra` 恒为空对象**，未携带 `requestId`。
-   排障需回到日志按 `X-Request-ID` 检索。
+影响：客户端无法区分「我打错了路径」和「服务端崩了」，监控里也会混入假告警。
+修法是为这两类异常各加一个 `@ExceptionHandler` 并返回对应状态码。
 
 ---
 
@@ -250,9 +248,10 @@ Schema 校验失败（422）时 `detail` 是数组，元素含 `type`/`loc`/`msg
 | 文档 | `GET /documents`、`POST /documents/upload`、`GET /documents/{doc_id}`、`GET /documents/{doc_id}/content`、`GET /documents/{doc_id}/viewer-url`、`POST /documents/citation/viewer-url` |
 | 会话 | `POST /sessions`、`GET|POST /sessions/{session_id}/documents`、`GET /sessions/{session_id}/documents/{doc_id}` |
 | 标注 | `GET|POST /labeling/tasks`、`GET /labeling/tasks/{task_id}`、`GET /labeling/tasks/{task_id}/export`、`GET|POST /labeling/tasks/{task_id}/items/{idx}`、`GET /labeling/template` 等 |
-| 运维观测 | `GET /ops/system/overview`、`GET /ops/rag/overview`、`GET /ops/rag-traces`、`GET /ops/rag-traces/{trace_id}`、`GET /ops/asknum-traces`、`GET /ops/asknum-traces/{trace_id}`、`GET /ops/ingest/overview`、`GET /ops/ingest/jobs`、`GET /ops/ingest/session-documents`、`GET /ops/logs/events` |
+| 运维观测 | `GET /ops/system/overview`、`GET /ops/rag/overview`、`GET /ops/rag-traces`、`GET /ops/rag-traces/{trace_id}`、`GET /ops/asknum-traces`、`GET /ops/asknum-traces/{trace_id}`、`GET /ops/obs/overview`、`GET /ops/obs/traces`、`GET /ops/ingest/overview`、`GET /ops/ingest/jobs`、`GET /ops/ingest/session-documents`、`GET /ops/logs/events` |
 | 质量 | `GET /ops/quality/gates`、`GET /ops/quality/facts`、`POST /ops/quality/ingest` |
 | 评测 | `GET|POST /ops/eval/tasks`、`DELETE /ops/eval/tasks/{task_id}`、`GET /ops/eval/golden-sets`、`POST /ops/eval/golden-sets/upload`、`GET|POST /ops/eval/runs`、`GET|DELETE /ops/eval/runs/{run_id}` |
+| Prompt 库 | `GET /ops/prompts`、`GET /ops/prompts/{name}`、`POST /ops/prompts/{name}/rollback`（只改钉扎，须绑评测的版本才能进库） |
 | 存储 | `GET /storage/objects/{bucket}/{key}`（签名 URL 访问） |
 
 ### 5.2 java-service（`:8080`，全部为 BFF 代理）
@@ -290,3 +289,5 @@ Schema 校验失败（422）时 `detail` 是数组，元素含 `type`/`loc`/`msg
 - W5 工具合同：[`W5_TOOLS.md`](./W5_TOOLS.md)
 - W6 审查对比工作流：[`W6_GRAPH.md`](./W6_GRAPH.md)
 - W7 Java 企业边界：[`W7_RBAC.md`](./W7_RBAC.md)
+- W8 Prompt 模板 / 四策略 / A/B：[`W8_PROMPTS.md`](./W8_PROMPTS.md)
+- W9-1 双栈贯通 / Correlation ID / 超时与降级：[`W9_E2E.md`](./W9_E2E.md)

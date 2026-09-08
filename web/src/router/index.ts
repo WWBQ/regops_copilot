@@ -8,6 +8,7 @@ import LogsMonitorView from '../views/ops/LogsMonitorView.vue'
 import EvalReportView from '../views/ops/EvalReportView.vue'
 import RagMonitorView from '../views/ops/RagMonitorView.vue'
 import AsknumMonitorView from '../views/ops/AsknumMonitorView.vue'
+import LlmTraceView from '../views/ops/LlmTraceView.vue'
 import ProfileView from '../views/account/ProfileView.vue'
 import UsersPermissionsView from '../views/account/UsersPermissionsView.vue'
 import ReviewQueueView from '../views/compliance/ReviewQueueView.vue'
@@ -65,6 +66,12 @@ const router = createRouter({
       name: 'asknum-monitor',
       component: AsknumMonitorView,
       meta: { title: '问数监控', pageId: 'asknum-monitor', group: 'ops' },
+    },
+    {
+      path: '/ops/traces',
+      name: 'llm-trace',
+      component: LlmTraceView,
+      meta: { title: 'LLM Trace', pageId: 'llm-trace', group: 'ops' },
     },
     {
       path: '/quality/gates',

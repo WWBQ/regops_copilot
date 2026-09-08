@@ -313,3 +313,63 @@ export const LOG_LEVEL_LABELS: Record<string, string> = {
   warn: '警告',
   info: '信息',
 }
+
+export interface LlmTraceItem {
+  id: string
+  created_at: string
+  request_id: string
+  trace_id: string
+  traceparent?: string
+  route: string
+  model: string
+  prompt_name: string | null
+  prompt_version: string | null
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+  latency_ms: number
+  ttft_ms: number | null
+  tokens_per_s: number | null
+  cost_usd: number
+  stream?: boolean
+  input?: string
+  output?: string
+}
+
+export interface LlmObsOverview {
+  count: number
+  p95_latency_ms: number | null
+  p50_latency_ms: number | null
+  ttft_p95_ms: number | null
+  avg_tokens_per_s: number | null
+  tokens_sum: number
+  cost_usd_sum: number
+  prompt_version_rate: number
+  langfuse_enabled: boolean
+  langfuse_host: string | null
+  store: string
+  note?: string
+}
+
+export interface LlmTraceListResponse {
+  total: number
+  limit: number
+  offset: number
+  items: LlmTraceItem[]
+  summary?: LlmObsOverview
+}
+
+export function fetchObsOverview(): Promise<LlmObsOverview> {
+  return apiFetch<LlmObsOverview>('/ops/obs/overview')
+}
+
+export function listObsTraces(params?: {
+  limit?: number
+  offset?: number
+}): Promise<LlmTraceListResponse> {
+  const search = new URLSearchParams()
+  if (params?.limit != null) search.set('limit', String(params.limit))
+  if (params?.offset != null) search.set('offset', String(params.offset))
+  const qs = search.toString()
+  return apiFetch<LlmTraceListResponse>(`/ops/obs/traces${qs ? `?${qs}` : ''}`)
+}

@@ -60,6 +60,19 @@ public class OpsProxyController {
         return pythonAiClient.getSystemOverview();
     }
 
+    @GetMapping("/obs/overview")
+    public Map<String, Object> obsOverview() {
+        return pythonAiClient.getObsOverview();
+    }
+
+    @GetMapping("/obs/traces")
+    public Map<String, Object> listObsTraces(
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "0") int offset
+    ) {
+        return pythonAiClient.listObsTraces(limit, offset);
+    }
+
     @GetMapping("/ingest/overview")
     public Map<String, Object> ingestOverview() {
         return pythonAiClient.getIngestOverview();

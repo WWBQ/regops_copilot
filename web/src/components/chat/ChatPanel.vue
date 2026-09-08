@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { CHAT_BRIDGE_KEY } from '../../composables/chatBridge'
+import { SERVICE_HEALTH_KEY } from '../../composables/useServiceHealth'
 import { getModels, streamChat } from '../../api/chat'
+import { ApiRequestError, formatUserFacingError } from '../../api/client'
 import {
   ensureSessionId,
+  getStoredSessionId,
   listSessionDocuments,
   startNewSession,
   storeSessionId,
@@ -47,6 +50,10 @@ const emit = defineEmits<{
 }>()
 
 const chatBridge = inject(CHAT_BRIDGE_KEY, null)
+const health = inject(SERVICE_HEALTH_KEY, null)
+const javaOk = computed(() => health?.javaOk.value ?? props.backendOk)
+const pythonOk = computed(() => health?.pythonOk.value ?? props.backendOk)
+const pythonDown = computed(() => pythonOk.value === false)
 
 const messages = ref<ChatMessageType[]>([createWelcomeMessage()])
 const loading = ref(false)
@@ -65,11 +72,28 @@ const DISCLAIMER = '本回答由 AI 生成，仅供参考，不构成合规或�
 
 const EXAMPLE_TOOL_LOOP = '格力2024年经营得怎么样'
 
-function connectionBlockedMessage(): string | null {
-  if (props.backendOk === false) {
-    return '后端服务不可用，请确认 Python AI (8000) 与 Java BFF (8080) 已启动后再试。'
+function isVisibleStatus(text: string): boolean {
+  const t = text.trim()
+  if (!t) {
+    return false
   }
-  if (props.backendOk === null) {
+  if (/^(thought|action|observation|final answer)\s*:/i.test(t)) {
+    return false
+  }
+  if (/思维链|chain of thought/i.test(t)) {
+    return false
+  }
+  return true
+}
+
+function connectionBlockedMessage(): string | null {
+  if (javaOk.value === false) {
+    return 'Java BFF 不可用。登录、复核、审计也会失败，请先恢复 java-service。'
+  }
+  if (pythonOk.value === false) {
+    return '问答服务暂时不可用。合规复核和审计仍可用。'
+  }
+  if (javaOk.value === null) {
     return '正在检测服务连接，请稍候再试。'
   }
   return null
@@ -192,7 +216,17 @@ async function initSession() {
     await refreshSessionDocs()
     syncChatBridge()
   } catch (error) {
-    const detail = error instanceof Error ? error.message : '未知错误'
+    if (error instanceof ApiRequestError && (error.status === 502 || error.status === 504)) {
+      sessionId.value = getStoredSessionId()
+      if (sessionId.value) {
+        const restored = loadChatMessages(sessionId.value)
+        if (restored) {
+          messages.value = restored.map((item) => ({ ...item, streaming: false, statusText: undefined }))
+        }
+      }
+      return
+    }
+    const detail = formatUserFacingError(error)
     messages.value.push({
       id: uid(),
       role: 'assistant',
@@ -292,6 +326,11 @@ function statusLabel(status: SessionDocument['status']): string {
 }
 
 async function handleAttach(file: File) {
+  const blocked = connectionBlockedMessage()
+  if (blocked) {
+    connectionAlert.value = blocked
+    return
+  }
   if (!sessionId.value) {
     await initSession()
   }
@@ -418,7 +457,11 @@ async function handleSend(text: string) {
       },
       {
         signal: abort.signal,
-        onStatus: (statusText) => patchAssistant({ statusText }),
+        onStatus: (statusText) => {
+          if (isVisibleStatus(statusText)) {
+            patchAssistant({ statusText })
+          }
+        },
         onMeta: (meta) =>
           patchAssistant({
             ...(meta.route ? { route: meta.route } : {}),
@@ -463,14 +506,18 @@ async function handleSend(text: string) {
         statusText: undefined,
       })
     } else {
-      const detail = error instanceof Error ? error.message : '未知错误'
       patchAssistant({
-        content: `请求失败：${detail}`,
+        content: formatUserFacingError(error),
         error: true,
         streaming: false,
         statusText: undefined,
       })
-      emit('disconnected')
+      if (error instanceof ApiRequestError && (error.status === 502 || error.errorCode === 'upstream_down')) {
+        if (health) {
+          health.pythonOk.value = false
+        }
+        void health?.refresh()
+      }
     }
   } finally {
     if (abortRef.value === abort) {
@@ -512,10 +559,22 @@ watch(
 watch([loading, uploading, sessionId], syncChatBridge)
 
 watch(
-  () => props.backendOk,
-  (ok) => {
-    if (ok === true) {
+  [javaOk, pythonOk],
+  () => {
+    const blocked = connectionBlockedMessage()
+    if (javaOk.value === false || pythonOk.value === false) {
+      connectionAlert.value = blocked
+    } else if (javaOk.value === true) {
       connectionAlert.value = null
+    }
+  },
+)
+
+watch(
+  pythonOk,
+  (ok) => {
+    if (ok === true && availableModels.value.length === 0) {
+      void initModels()
     }
   },
 )
@@ -528,7 +587,7 @@ watch(
         <h1>合规问答</h1>
         <p>
           一个助手：数字走问数，叙述走年报 RAG。两家+结论走工作流，出结论前会暂停确认。经营概况、研发/毛利率/分红、待复核数字追问会让模型自选只读工具。
-          📎 可上传仅本会话有效的 PDF。
+          📎 可上传仅本会话有效的 PDF。生成中点「停止」取消。引用可点开年报页，不展示思维链。
           <span v-if="sessionId" class="session-tag">会话 {{ sessionId.slice(0, 8) }}…</span>
         </p>
         <p v-if="sessionDocs.length" class="doc-strip">
@@ -546,29 +605,35 @@ watch(
     </div>
 
     <div class="chat-composer-dock">
-      <div v-if="connectionAlert" class="connection-alert" role="alert">
+      <div v-if="connectionAlert" class="connection-alert" :class="{ warn: pythonDown && javaOk }" role="alert">
         <p>{{ connectionAlert }}</p>
+        <p v-if="pythonDown && javaOk" class="alert-links">
+          <router-link to="/compliance/review">合规复核</router-link>
+          ·
+          <router-link to="/compliance/audit">审计追踪</router-link>
+        </p>
         <button type="button" class="alert-close" aria-label="关闭" @click="connectionAlert = null">×</button>
       </div>
 
       <div v-if="messages.length <= 1 && !loading" class="example-chips">
-        <button type="button" class="example-chip" @click="handleSend('比亚迪2024年营业收入是多少')">
+        <button type="button" class="example-chip" :disabled="Boolean(connectionBlockedMessage())" @click="handleSend('比亚迪2024年营业收入是多少')">
           问数
         </button>
         <button
           type="button"
           class="example-chip"
+          :disabled="Boolean(connectionBlockedMessage())"
           @click="handleSend('对比比亚迪和长城2024年净利润，并结合管理层讨论给出结论')"
         >
           工作流
         </button>
-        <button type="button" class="example-chip" @click="handleSend(EXAMPLE_TOOL_LOOP)">
+        <button type="button" class="example-chip" :disabled="Boolean(connectionBlockedMessage())" @click="handleSend(EXAMPLE_TOOL_LOOP)">
           经营概况
         </button>
-        <button type="button" class="example-chip" @click="handleSend('比亚迪研发投入多不多')">
+        <button type="button" class="example-chip" :disabled="Boolean(connectionBlockedMessage())" @click="handleSend('比亚迪研发投入多不多')">
           研发
         </button>
-        <button type="button" class="example-chip" @click="handleSend('美的2024年营收到底能不能用')">
+        <button type="button" class="example-chip" :disabled="Boolean(connectionBlockedMessage())" @click="handleSend('美的2024年营收到底能不能用')">
           待复核
         </button>
       </div>
@@ -578,7 +643,8 @@ watch(
         :models="availableModels"
         :loading="loading"
         :uploading="uploading"
-        :backend-ok="props.backendOk"
+        :java-ok="javaOk"
+        :python-ok="pythonOk"
         @update:model="onModelChange"
         @send="handleSend"
         @stop="handleStop"
@@ -658,6 +724,16 @@ watch(
   color: var(--accent);
 }
 
+.example-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.example-chip:disabled:hover {
+  border-color: var(--border);
+  color: var(--text-strong);
+}
+
 .chat-footer {
   padding: 8px 4px 0;
 }
@@ -673,6 +749,7 @@ watch(
 .connection-alert {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 8px;
   padding: 10px 12px;
@@ -683,16 +760,32 @@ watch(
   font-size: 13px;
 }
 
+.connection-alert.warn {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
 .connection-alert p {
   margin: 0;
   flex: 1;
   line-height: 1.45;
 }
 
+.alert-links {
+  flex: 1 1 100%;
+  margin: 4px 0 0;
+}
+
+.alert-links a {
+  color: inherit;
+  font-weight: 700;
+}
+
 .alert-close {
   border: none;
   background: transparent;
-  color: #991b1b;
+  color: inherit;
   font-size: 18px;
   line-height: 1;
   cursor: pointer;

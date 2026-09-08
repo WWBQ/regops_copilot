@@ -52,6 +52,9 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("REGOPS_SERVICE_TOKEN", "SERVICE_TOKEN"),
     )
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_host: str = "https://cloud.langfuse.com"
 
     model_config = SettingsConfigDict(
         # 本地：有 .env 就读文件

@@ -7,6 +7,7 @@ import com.wbq.java_service.auth.JwtAuthFilter;
 import com.wbq.java_service.auth.JwtService;
 import com.wbq.java_service.dto.common.ApiError;
 
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.context.annotation.Bean;
@@ -56,6 +57,8 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint())
                         .accessDeniedHandler(accessDeniedHandler()))
                 .authorizeHttpRequests(auth -> auth
+                        // SSE StreamingResponseBody 二次派发是 ASYNC；不放行会被当成未登录。
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/**", "/api/health", "/api/auth/login", "/api/auth/demo-accounts").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/tools/capabilities", "/api/tools/schema/**").permitAll()
                         .requestMatchers("/api/reviews/**", "/api/customers/**", "/api/audit/**", "/api/auth/me")

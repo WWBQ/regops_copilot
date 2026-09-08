@@ -75,6 +75,27 @@ export interface EvalRunSummary {
   rule_hit_rate?: number
   strict_pass_rate?: number
   by_rule?: Array<{ rule: string | null; total: number; passed: number; failed: number }>
+  n?: number
+  seed?: number
+  delta?: number
+  mcnemar_p?: number
+  credible?: boolean
+  verdict?: string
+  accuracy_a?: number
+  accuracy_b?: number
+  ci95_delta?: number[]
+  avg_tokens?: number
+  by_strategy?: Record<
+    string,
+    {
+      n?: number
+      accuracy?: number
+      number_error_rate?: number
+      avg_tokens?: number
+      latency_p50_ms?: number
+    }
+  >
+  when_not_worth?: Array<{ strategy: string; when: string; reason: string }>
 }
 
 export interface EvalRunItem {
@@ -191,4 +212,6 @@ export const RUNNER_LABELS: Record<string, string> = {
   w4_asknum: 'W4 问数（受控 lookup）',
   w6_number_check: 'W6 数字校验（误放行 / 量纲）',
   w6_workflow: 'W6 工作流轨迹（节点 / 参数 / 确认率）',
+  w8_strategy: 'W8 四策略对照（Zero-shot / Few-shot / CoT / ReAct）',
+  w8_ab: 'W8 Prompt A/B（Wilson / McNemar）',
 }

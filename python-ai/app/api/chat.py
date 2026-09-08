@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Annotated, Any
@@ -29,16 +30,16 @@ from app.documents.service import DocumentService
 from app.models.base import LLMClient, ModelError
 from app.models.factory import get_llm_client, list_available_models
 from app.rag.service import collect_rag_doc_ids, prepare_chat_rag
+from app.prompts.library import render_system
 from app.schemas.chat import ChatRequest, ChatResponse, Citation
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
 
-GENERAL_CHAT_SYSTEM = (
-    "你是 RegOps Copilot 合规助手。"
-    "对寒暄请用一两句话简短回复，不要引用文档、不要罗列引用来源、不要主动展开长篇说明。"
-    "若用户尚未提出具体问题，可简要说明可协助查询合规、监管或年报财务信息。"
-)
+def _general_chat_system() -> str:
+    return render_system("chat.general")
+
+
 SSE_HEADERS = {
     "Cache-Control": "no-cache, no-transform",
     "Connection": "keep-alive",
@@ -237,7 +238,7 @@ def _prepare_llm_turn(
     if not body.use_rag:
         return LlmTurn(
             messages=[
-                {"role": "system", "content": GENERAL_CHAT_SYSTEM},
+                {"role": "system", "content": _general_chat_system()},
                 {"role": "user", "content": body.message},
             ],
             route="general",
@@ -270,7 +271,7 @@ def _prepare_llm_turn(
     route = "chitchat" if rag_result.trace.outcome == "no_intent" else "general"
     return LlmTurn(
         messages=[
-            {"role": "system", "content": GENERAL_CHAT_SYSTEM},
+            {"role": "system", "content": _general_chat_system()},
             {"role": "user", "content": body.message},
         ],
         route=route,
@@ -286,6 +287,22 @@ def _error_detail(detail: Any) -> str:
     if isinstance(detail, str):
         return detail
     return json.dumps(detail, ensure_ascii=False, default=str)
+
+
+def _observe(
+    response: ChatResponse,
+    *,
+    message: str,
+    stream: bool = False,
+    ttft_ms: float | None = None,
+) -> ChatResponse:
+    try:
+        from app.obs.generations import record_from_chat
+
+        record_from_chat(response, message=message, stream=stream, ttft_ms=ttft_ms)
+    except Exception:
+        logger.debug("obs skipped", exc_info=True)
+    return response
 
 
 async def _complete_llm(
@@ -317,7 +334,7 @@ async def _complete_llm(
             route=turn.route,
         )
         tool_trace.append(checked.to_trace())
-    return ChatResponse(
+    response = ChatResponse(
         reply=reply,
         model=model_name,
         citations=turn.citations,
@@ -330,6 +347,7 @@ async def _complete_llm(
         latency_ms=result.latency_ms,
         tool_trace=tool_trace,
     )
+    return _observe(response, message=body.message)
 
 
 async def _stream_tool_loop(
@@ -367,7 +385,7 @@ async def _stream_tool_loop(
             kind, payload = await queue.get()
             if kind == "__done__":
                 loop = payload
-                response = _from_tool_loop(loop, model_name, session_id)
+                response = _observe(_from_tool_loop(loop, model_name, session_id), message=body.message, stream=True)
                 logger.info(
                     "POST /chat/stream tools route=%s reason=%s steps=%d tokens=%d",
                     loop.route,
@@ -418,7 +436,7 @@ async def chat(
             workflow.thread_id,
             workflow.pending_node,
         )
-        return _from_workflow(workflow, model_name, session_id)
+        return _observe(_from_workflow(workflow, model_name, session_id), message=body.message)
     if body.use_rag and wants_tool_loop(body.message):
         loop = await run_tool_loop(
             body.message,
@@ -434,7 +452,7 @@ async def chat(
             len(loop.trace),
             loop.prompt_tokens + loop.completion_tokens,
         )
-        return _from_tool_loop(loop, model_name, session_id)
+        return _observe(_from_tool_loop(loop, model_name, session_id), message=body.message)
     if body.use_rag:
         asknum = _try_asknum(
             body,
@@ -444,10 +462,10 @@ async def chat(
             document_service=document_service,
         )
         if asknum is not None:
-            return asknum
+            return _observe(asknum, message=body.message)
         pending = _pending_docs_response(session_id=session_id, model_name=model_name)
         if pending is not None:
-            return pending
+            return _observe(pending, message=body.message)
 
     turn = _prepare_llm_turn(
         body,
@@ -507,7 +525,7 @@ async def chat_stream(
                     workflow.thread_id,
                     workflow.pending_node,
                 )
-                response = _from_workflow(workflow, model_name, session_id)
+                response = _observe(_from_workflow(workflow, model_name, session_id), message=body.message, stream=True)
                 yield _sse("meta", {"route": response.route, "thread_id": response.thread_id})
                 yield _sse("delta", {"text": response.reply})
                 yield _sse("done", response.model_dump())
@@ -533,13 +551,13 @@ async def chat_stream(
                 if asknum is not None:
                     yield _sse("meta", {"route": asknum.route})
                     yield _sse("delta", {"text": asknum.reply})
-                    yield _sse("done", asknum.model_dump())
+                    yield _sse("done", _observe(asknum, message=body.message, stream=True).model_dump())
                     return
                 yield _sse("status", {"text": "正在检索相关文档…"})
                 pending = _pending_docs_response(session_id=session_id, model_name=model_name)
                 if pending is not None:
                     yield _sse("delta", {"text": pending.reply})
-                    yield _sse("done", pending.model_dump())
+                    yield _sse("done", _observe(pending, message=body.message, stream=True).model_dump())
                     return
             turn = _prepare_llm_turn(
                 body,
@@ -551,8 +569,12 @@ async def chat_stream(
             yield _sse("meta", {"route": turn.route, "model": model_name})
             pieces: list[str] = []
             result = None
+            started = time.perf_counter()
+            ttft_ms: float | None = None
             async for delta in client.chat_stream(turn.messages, temperature=body.temperature):
                 if delta.text:
+                    if ttft_ms is None:
+                        ttft_ms = (time.perf_counter() - started) * 1000
                     pieces.append(delta.text)
                     yield _sse("delta", {"text": delta.text})
                     await asyncio.sleep(0)
@@ -570,18 +592,23 @@ async def chat_stream(
                     route=turn.route,
                 )
                 tool_trace.append(checked.to_trace())
-            response = ChatResponse(
-                reply=reply,
-                model=model_name,
-                citations=turn.citations,
-                session_id=session_id,
-                rag_used=turn.rag_used,
-                route=route,
-                prompt_tokens=result.prompt_tokens,
-                completion_tokens=result.completion_tokens,
-                total_tokens=result.total_tokens,
-                latency_ms=result.latency_ms,
-                tool_trace=tool_trace,
+            response = _observe(
+                ChatResponse(
+                    reply=reply,
+                    model=model_name,
+                    citations=turn.citations,
+                    session_id=session_id,
+                    rag_used=turn.rag_used,
+                    route=route,
+                    prompt_tokens=result.prompt_tokens,
+                    completion_tokens=result.completion_tokens,
+                    total_tokens=result.total_tokens,
+                    latency_ms=result.latency_ms,
+                    tool_trace=tool_trace,
+                ),
+                message=body.message,
+                stream=True,
+                ttft_ms=ttft_ms,
             )
             logger.info(
                 "POST /chat/stream ok model=%s session_id=%s route=%s rag_used=%s citations=%d tokens=%d latency_ms=%.0f",

@@ -11,11 +11,15 @@ const props = withDefaults(
     models?: string[]
     model?: string
     backendOk?: boolean | null
+    javaOk?: boolean | null
+    pythonOk?: boolean | null
   }>(),
   {
     models: () => [],
     model: '',
     backendOk: null,
+    javaOk: undefined,
+    pythonOk: undefined,
   },
 )
 
@@ -29,6 +33,9 @@ const emit = defineEmits<{
 const draft = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
+const javaOk = computed(() => props.javaOk ?? props.backendOk)
+const pythonOk = computed(() => props.pythonOk ?? props.backendOk)
+
 const canSend = computed(() => {
   if (props.uploading) {
     return false
@@ -36,27 +43,53 @@ const canSend = computed(() => {
   if (props.loading) {
     return true
   }
+  if (props.disabled || javaOk.value === false || pythonOk.value === false) {
+    return false
+  }
   return draft.value.trim().length > 0
 })
 
 const hasModels = computed(() => props.models.length > 0)
 
-const statusDotClass = computed(() => {
-  if (props.backendOk === true) {
-    return 'ok'
+const inputLocked = computed(
+  () =>
+    props.uploading ||
+    Boolean(props.disabled) ||
+    (!props.loading && (javaOk.value === false || pythonOk.value === false)),
+)
+
+const placeholder = computed(() => {
+  if (javaOk.value === false) {
+    return 'Java BFF 不可用'
   }
-  if (props.backendOk === false) {
+  if (pythonOk.value === false || props.disabled) {
+    return '问答暂不可用，复核和审计仍可用'
+  }
+  return '输入合规/监管或年报相关问题，Enter 发送'
+})
+
+const statusDotClass = computed(() => {
+  if (javaOk.value === false) {
     return 'bad'
+  }
+  if (pythonOk.value === false) {
+    return 'warn'
+  }
+  if (javaOk.value === true && pythonOk.value === true) {
+    return 'ok'
   }
   return 'idle'
 })
 
 const statusTitle = computed(() => {
-  if (props.backendOk === true) {
-    return '服务已连接'
+  if (javaOk.value === false) {
+    return 'Java BFF 不可用'
   }
-  if (props.backendOk === false) {
-    return '服务不可用'
+  if (pythonOk.value === false) {
+    return '问答不可用，复核和审计仍可用'
+  }
+  if (javaOk.value === true && pythonOk.value === true) {
+    return '服务已连接'
   }
   return '正在检测连接…'
 })
@@ -82,7 +115,7 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 function openFilePicker() {
-  if (props.loading || props.uploading) {
+  if (props.loading || props.uploading || props.disabled || pythonOk.value === false) {
     return
   }
   fileInputRef.value?.click()
@@ -115,7 +148,7 @@ function onModelChange(event: Event) {
         type="button"
         class="attach-btn"
         title="上传 PDF（本会话有效）"
-        :disabled="loading || uploading"
+        :disabled="loading || uploading || disabled || pythonOk === false"
         @click="openFilePicker"
       >
         {{ uploading ? '…' : '📎' }}
@@ -132,8 +165,8 @@ function onModelChange(event: Event) {
         v-model="draft"
         class="composer-input"
         rows="1"
-        placeholder="输入合规/监管或年报相关问题，Enter 发送"
-        :disabled="loading || uploading"
+        :placeholder="placeholder"
+        :disabled="loading || uploading || inputLocked"
         @keydown="onKeydown"
       />
 
@@ -143,7 +176,7 @@ function onModelChange(event: Event) {
           v-if="hasModels"
           class="model-select"
           :value="model"
-          :disabled="loading || uploading"
+          :disabled="loading || uploading || inputLocked"
           @change="onModelChange"
         >
           <option v-for="item in models" :key="item" :value="item">
@@ -221,6 +254,10 @@ function onModelChange(event: Event) {
 
 .status-dot.bad {
   background: #dc2626;
+}
+
+.status-dot.warn {
+  background: #d97706;
 }
 
 .status-dot.idle {

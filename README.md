@@ -33,6 +33,8 @@ RegOps Copilot 的做法是把「能不能追溯」当作硬约束：
 | `web` | Vue 3 · Vite | 合规问答、文档标注、评测与运维看板 |
 
 服务边界、端点契约、`X-Request-ID` 关联 ID 约定见 [`docs/api-spec.md`](./docs/api-spec.md)。
+W9-1 五条链路与超时/降级见 [`docs/W9_E2E.md`](./docs/W9_E2E.md)。
+红队 / Trace / Compose / K8s / 前端降级见 [`docs/W9_SECURITY.md`](./docs/W9_SECURITY.md) · [`docs/W9_OBS.md`](./docs/W9_OBS.md) · [`docs/W9_COMPOSE.md`](./docs/W9_COMPOSE.md) · [`docs/W9_K8S.md`](./docs/W9_K8S.md) · [`docs/W9_UX.md`](./docs/W9_UX.md)。
 
 ## 快速启动
 
@@ -60,6 +62,24 @@ cd web && npm install && cd ..
 | Postgres + pgvector | localhost:5432 · regops/regops123 · regops_db |
 
 脚本用法与注意事项见下方[「本地开发脚本」](#本地开发脚本)。
+
+一键 Compose（web :8088，首次 python 镜像较慢）：
+
+```bash
+docker compose up --build
+./scripts/compose-smoke.sh
+```
+
+详见 [`docs/W9_COMPOSE.md`](./docs/W9_COMPOSE.md)。日常改代码仍用 `./scripts/dev.sh`。
+
+最小 K8s（kind / minikube，需先 load 本地镜像）：
+
+```bash
+./scripts/kind-up.sh
+# 或：kubectl apply --dry-run=client -k k8s/
+```
+
+详见 [`docs/W9_K8S.md`](./docs/W9_K8S.md)。无 AI 时复核仍可用，见 [`docs/W9_UX.md`](./docs/W9_UX.md)。
 
 ## 试一下
 
@@ -116,6 +136,12 @@ curl -s http://localhost:8080/api/tools/review-drafts -H 'X-Regops-Dept: researc
 curl -s -X POST http://localhost:8080/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"analyst","password":"analyst123"}'
+
+# 10. W9-1 五条链路冒烟（经 Java :8080；详见 docs/W9_E2E.md）
+python-ai/.venv/bin/python eval/run_w9_e2e.py
+
+# 11. W9-2 金融红队（不调 LLM；泄露率必须为 0）
+python-ai/.venv/bin/python eval/run_w9_redteam.py --fail-on-regression
 ```
 
 ## Agent 友好度自评（w5-6）
@@ -135,7 +161,8 @@ curl -s -X POST http://localhost:8080/api/auth/login \
 
 评测报告落在 `eval/reports/<任务>/<时间戳>/`，含 `report.json` 与 `report.md`。
 基线与口径说明见 [`docs/eval_w1_baseline.md`](./docs/eval_w1_baseline.md)、
-[`docs/eval_rag_retrieval.md`](./docs/eval_rag_retrieval.md)。
+[`docs/eval_rag_retrieval.md`](./docs/eval_rag_retrieval.md)、
+[`docs/W8_PROMPTS.md`](./docs/W8_PROMPTS.md)。
 
 ## 目录结构
 

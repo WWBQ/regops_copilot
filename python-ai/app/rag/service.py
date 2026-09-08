@@ -25,16 +25,13 @@ from app.rag.retrieval import (
     hit_passes_relevance_threshold,
     reciprocal_rank_fusion,
 )
+from app.prompts.library import render_system
 from app.rag.trace import RagPrepareResult, RagTrace
 
 logger = logging.getLogger(__name__)
 
-RAG_SYSTEM_PROMPT = (
-    "你是 RegOps Copilot 合规助手。请结合用户提供的年报/公告片段回答合规与财务问题。\n"
-    "若片段中没有足够依据，请明确说明「文档中未找到相关信息」，不要编造数字或事实。\n"
-    "引用片段中的事实或数字时，必须在对应句子末尾标注角标 [1]、[2]（数字与上文「片段N」一致）。\n"
-    "不要单独列出「引用来源」或大段摘录；只在正文行内标注角标。"
-)
+def _rag_system_prompt() -> str:
+    return render_system("rag.answer")
 
 _CHITCHAT_RE = re.compile(
     r"^(?:你好|您好|嗨|hi|hello|hey|在吗|在不在|谢谢|多谢|感谢|再见|拜拜|"
@@ -270,7 +267,7 @@ def build_rag_answer(
         "请用中文回答；引用时在句末标注 [片段编号] 角标，勿输出引用列表。"
     )
     messages = [
-        {"role": "system", "content": RAG_SYSTEM_PROMPT},
+        {"role": "system", "content": _rag_system_prompt()},
         {"role": "user", "content": user_content},
     ]
     return RagAnswer(messages=messages, citations=citations, doc_ids=doc_ids)

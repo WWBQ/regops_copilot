@@ -135,6 +135,7 @@ onMounted(refresh)
         <p>
           Agent / Python 只写 <code>PENDING</code> 草稿。提交、通过、驳回只在 Java：
           <code>PENDING → SUBMITTED → REVIEWED | REJECTED</code>。客户经理不能看工单，也不能复核。
+          本页不经过 python-ai，问答挂了仍可建单和复核。
         </p>
       </div>
       <div class="actions">

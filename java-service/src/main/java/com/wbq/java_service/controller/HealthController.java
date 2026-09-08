@@ -4,6 +4,7 @@ import java.util.Map;
 
 import com.wbq.java_service.client.PythonAiClient;
 import com.wbq.java_service.dto.common.ServiceHealthResponse;
+import com.wbq.java_service.exception.PythonAiException;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,10 +26,19 @@ public class HealthController {
         try {
             pythonHealth = pythonAiClient.health();
         } catch (Exception ex) {
-            pythonHealth = Map.of(
-                    "status", "down",
-                    "error", ex.getMessage()
-            );
+            if (ex instanceof PythonAiException py) {
+                pythonHealth = Map.of(
+                        "status", "down",
+                        "error", py.getMessage(),
+                        "error_code", py.getErrorCode()
+                );
+            } else {
+                pythonHealth = Map.of(
+                        "status", "down",
+                        "error", "unavailable",
+                        "error_code", "upstream_down"
+                );
+            }
         }
         return new ServiceHealthResponse("ok", "java-service", pythonHealth);
     }

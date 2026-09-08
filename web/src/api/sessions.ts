@@ -65,12 +65,16 @@ export async function ensureSessionId(): Promise<string> {
   if (existing && (await sessionIsValid(existing))) {
     return existing
   }
-  if (existing) {
-    clearStoredSessionId()
+  try {
+    const created = await createSession()
+    storeSessionId(created.session_id)
+    return created.session_id
+  } catch (err) {
+    if (existing) {
+      return existing
+    }
+    throw err
   }
-  const created = await createSession()
-  storeSessionId(created.session_id)
-  return created.session_id
 }
 
 export async function startNewSession(): Promise<string> {

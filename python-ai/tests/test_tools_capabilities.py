@@ -1,6 +1,6 @@
 from app.tools import invoke_tool
 from app.tools.capabilities import tool_capabilities, tool_schema
-from app.tools.pii import mask_pii
+from app.tools.pii import mask_for_log, mask_pii
 from app.schemas.tools import ToolContext
 
 
@@ -75,3 +75,8 @@ def test_mask_pii():
     assert "110101199001011234" not in text
     assert "[手机号]" in text
     assert "[身份证]" in text
+    secret = mask_for_log("DEEPSEEK_API_KEY=sk-abcdefghijklmnopqrstuvwxyz 电话 13900139000")
+    assert "sk-abcdefghijklmnopqrstuvwxyz" not in secret
+    assert "13900139000" not in secret
+    assert "[密钥]" in secret
+    assert "[手机号]" in secret

@@ -1,4 +1,4 @@
-import { API_BASE, apiFetch, authHeaders, formatErrorDetail } from './client'
+import { API_BASE, apiFetch, authHeaders, ensureRequestId, formatErrorDetail, rememberResponseRequestId, ApiRequestError } from './client'
 import type { ChatRequest, ChatResponse } from '../types/chat'
 
 type RawChatResponse = ChatResponse & {
@@ -61,7 +61,18 @@ function takeSseEvents(buffer: string): { events: SseEvent[]; rest: string } {
   return { events, rest }
 }
 
-export function getHealth(): Promise<{ status: string }> {
+export type BffHealthResponse = {
+  status: string
+  service?: string
+  pythonAi?: {
+    status?: string
+    error?: string
+    error_code?: string
+    service?: string
+  }
+}
+
+export function getHealth(): Promise<BffHealthResponse> {
   return apiFetch('/health')
 }
 
@@ -131,18 +142,29 @@ async function emitDelta(handlers: ChatStreamHandlers, text: string): Promise<vo
 }
 
 export async function streamChat(body: ChatRequest, handlers: ChatStreamHandlers = {}): Promise<ChatResponse> {
+  const headers = authHeaders({
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream',
+  })
+  ensureRequestId(headers)
   const response = await fetch(`${API_BASE}/chat/stream`, {
     method: 'POST',
-    headers: authHeaders({
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    }),
+    headers,
     body: chatBody(body),
     signal: handlers.signal,
   })
+  rememberResponseRequestId(response)
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}))
-    throw new Error(formatErrorDetail((payload as { detail?: unknown }).detail, response.status))
+    const payload = (await response.json().catch(() => ({}))) as {
+      detail?: unknown
+      extra?: { error_code?: string; request_id?: string }
+    }
+    throw new ApiRequestError(
+      formatErrorDetail(payload.detail, response.status),
+      response.status,
+      payload.extra?.error_code,
+      payload.extra?.request_id ?? response.headers.get('X-Request-ID') ?? undefined,
+    )
   }
   if (!response.body) {
     throw new Error('浏览器未提供流式响应')
@@ -170,8 +192,13 @@ export async function streamChat(body: ChatRequest, handlers: ChatStreamHandlers
           parsed = item.data
         }
         if (item.event === 'error') {
-          const err = parsed as { detail?: unknown; status?: number }
-          throw new Error(formatErrorDetail(err.detail, err.status ?? 502))
+          const err = parsed as { detail?: unknown; status?: number; extra?: { error_code?: string; request_id?: string } }
+          throw new ApiRequestError(
+            formatErrorDetail(err.detail, err.status ?? 502),
+            err.status ?? 502,
+            err.extra?.error_code,
+            err.extra?.request_id ?? response.headers.get('X-Request-ID') ?? undefined,
+          )
         }
         if (item.event === 'status' && parsed && typeof parsed === 'object' && 'text' in parsed) {
           await handlers.onStatus?.(String((parsed as { text: string }).text))

@@ -1,22 +1,28 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { streamChat } from '../../api/chat'
+import { ApiRequestError, formatUserFacingError } from '../../api/client'
 import { getLabelItem, htmlProxyUrl, pdfUrl, saveLabelItem } from '../../api/labeling'
 import ChatInput from '../../components/chat/ChatInput.vue'
 import ChatMessage from '../../components/chat/ChatMessage.vue'
+import { SERVICE_HEALTH_KEY } from '../../composables/useServiceHealth'
 import type { ChatMessage as ChatMessageType } from '../../types/chat'
 import type { LabelItem } from '../../types/labeling'
 
 const props = defineProps<{
-  backendOk: boolean | null
+  backendOk?: boolean | null
 }>()
 
 const emit = defineEmits<{
   connected: [model: string]
   disconnected: []
 }>()
+
+const health = inject(SERVICE_HEALTH_KEY, null)
+const javaOk = computed(() => health?.javaOk.value ?? props.backendOk ?? null)
+const pythonOk = computed(() => health?.pythonOk.value ?? props.backendOk ?? null)
 
 const route = useRoute()
 const router = useRouter()
@@ -173,18 +179,32 @@ async function handleSend(text: string) {
     const aborted = err instanceof DOMException && err.name === 'AbortError'
     const index = messages.value.findIndex((item) => item.id === assistantId)
     if (index >= 0) {
-      messages.value[index] = {
-        ...messages.value[index],
-        content: aborted
-          ? messages.value[index].content.trim() || '已停止生成。'
-          : `请求失败：${err instanceof Error ? err.message : '未知错误'}`,
-        error: !aborted,
-        streaming: false,
-        statusText: undefined,
+      if (!aborted) {
+        messages.value[index] = {
+          ...messages.value[index],
+          content: formatUserFacingError(err),
+          error: true,
+          streaming: false,
+          statusText: undefined,
+        }
+      } else {
+        messages.value[index] = {
+          ...messages.value[index],
+          content: messages.value[index].content.trim() || '已停止生成。',
+          error: false,
+          streaming: false,
+          statusText: undefined,
+        }
       }
     }
-    if (!aborted) {
+    if (
+      !aborted &&
+      !(err instanceof ApiRequestError && (err.status === 502 || err.status === 504))
+    ) {
       emit('disconnected')
+    } else if (!aborted && health) {
+      health.pythonOk.value = false
+      void health.refresh()
     }
   } finally {
     if (chatAbort.value === abort) {
@@ -283,12 +303,15 @@ onUnmounted(() => {
 
       <section class="mini-chat">
         <h2>问金融 AI</h2>
+        <p v-if="pythonOk === false" class="hint">问答暂不可用。本页标注保存仍走 python-ai，AI 挂了保存也会失败；复核和审计不依赖问答。</p>
         <div ref="listRef" class="mini-list">
           <ChatMessage v-for="row in messages" :key="row.id" :message="row" />
         </div>
         <ChatInput
           :loading="chatLoading"
-          :disabled="props.backendOk === false"
+          :disabled="pythonOk === false || javaOk === false"
+          :java-ok="javaOk"
+          :python-ok="pythonOk"
           :models="[]"
           model=""
           @send="handleSend"
@@ -383,6 +406,12 @@ onUnmounted(() => {
 .ok {
   color: #15803d;
   font-size: 13px;
+}
+
+.hint {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--muted);
 }
 
 .error {

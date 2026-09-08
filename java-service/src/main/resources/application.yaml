@@ -23,8 +23,11 @@ spring:
 regops:
   python-ai:
     base-url: ${REGOPS_PYTHON_AI_BASE_URL:http://localhost:8000}
+    # 超时预算：建连 5s / 读 120s / 流式 ≥180s / 探活 2.5s。读路径 5xx 最多再试 2 次，超时不重试。
     connect-timeout-ms: 5000
     read-timeout-ms: 120000
+    stream-timeout-ms: 180000
+    health-timeout-ms: 2500
     service-name: java-service
     service-token: ${REGOPS_SERVICE_TOKEN:dev-service-token}
     read-retry-count: 2
@@ -41,4 +44,4 @@ management:
 
 logging:
   pattern:
-    level: "%5p [${spring.application.name:},%X{requestId:-}]"
+    level: "%5p [${spring.application.name:},%X{requestId:-},%X{traceId:-}]"

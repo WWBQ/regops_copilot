@@ -554,6 +554,24 @@ const summaryCards = computed(() => {
       { label: '确认率', value: formatPercent(summary.confirmation_rate) },
     ]
   }
+  if (isStrategyReport.value) {
+    const rates = Object.values(summary.by_strategy ?? {}).map((row) => row.number_error_rate ?? 0)
+    const maxErr = rates.length ? Math.max(...rates) : summary.number_error_rate
+    return [
+      { label: '样本 n', value: String(summary.n ?? summary.total ?? '—') },
+      { label: 'Zero-shot 准确率', value: formatPercent(summary.by_strategy?.zero_shot?.accuracy ?? summary.accuracy) },
+      { label: '最高数字错误率', value: formatPercent(maxErr) },
+      { label: '种子', value: summary.seed != null ? String(summary.seed) : '—' },
+    ]
+  }
+  if (isAbReport.value) {
+    return [
+      { label: 'A 准确率', value: formatPercent(summary.accuracy_a) },
+      { label: 'B 准确率', value: formatPercent(summary.accuracy_b) },
+      { label: 'Δ', value: formatPercent(summary.delta) },
+      { label: '可信？', value: summary.credible ? '是' : '否' },
+    ]
+  }
   return [
     { label: '模型', value: runModelLabel(activeRun.value) },
     { label: '准确率', value: formatPercent(summary.accuracy) },
@@ -624,6 +642,37 @@ const isW1ChatReport = computed(
     selectedTask.value?.runner === 'w1_chat' ||
     tasks.value.find((t) => t.id === activeRun.value?.task_id)?.runner === 'w1_chat',
 )
+
+const isStrategyReport = computed(
+  () =>
+    selectedTask.value?.runner === 'w8_strategy' ||
+    tasks.value.find((t) => t.id === activeRun.value?.task_id)?.runner === 'w8_strategy',
+)
+
+const isAbReport = computed(
+  () =>
+    selectedTask.value?.runner === 'w8_ab' ||
+    tasks.value.find((t) => t.id === activeRun.value?.task_id)?.runner === 'w8_ab',
+)
+
+const strategyRows = computed(() => {
+  const raw = activeRun.value?.summary?.by_strategy
+  if (!raw) return []
+  const labels: Record<string, string> = {
+    zero_shot: 'Zero-shot',
+    few_shot: 'Few-shot',
+    cot: 'CoT',
+    react: 'ReAct',
+  }
+  return Object.entries(raw).map(([key, metrics]) => ({
+    key,
+    label: labels[key] ?? key,
+    accuracy: metrics.accuracy,
+    number_error_rate: metrics.number_error_rate,
+    avg_tokens: metrics.avg_tokens,
+    latency_p50_ms: metrics.latency_p50_ms,
+  }))
+})
 
 const compareRows = computed(() => {
   const leftResults = compareLeft.value?.report?.results ?? []
@@ -1042,6 +1091,40 @@ onBeforeUnmount(stopPolling)
           </article>
         </div>
 
+        <p v-if="isAbReport && activeRun.summary?.verdict" class="hint">{{ activeRun.summary.verdict }}</p>
+
+        <section v-if="isStrategyReport && strategyRows.length" class="section">
+          <h3>四策略对照</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>策略</th>
+                  <th>准确率</th>
+                  <th>数字错误率</th>
+                  <th>均 Token</th>
+                  <th>P50 延迟</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in strategyRows" :key="row.key">
+                  <td>{{ row.label }}</td>
+                  <td>{{ formatPercent(row.accuracy) }}</td>
+                  <td>{{ formatPercent(row.number_error_rate) }}</td>
+                  <td>{{ row.avg_tokens != null ? Math.round(row.avg_tokens) : '—' }}</td>
+                  <td>{{ row.latency_p50_ms != null ? `${Math.round(row.latency_p50_ms)} ms` : '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <ul v-if="activeRun.summary?.when_not_worth?.length" class="hint-list">
+            <li v-for="note in activeRun.summary.when_not_worth" :key="`${note.strategy}-${note.when}`">
+              <strong>{{ note.strategy }}</strong>
+              · {{ note.when }}：{{ note.reason }}
+            </li>
+          </ul>
+        </section>
+
         <section v-if="activeRun.summary?.by_category && isRagReport" class="section">
           <h3>分题型</h3>
           <div class="table-wrap">
@@ -1071,7 +1154,7 @@ onBeforeUnmount(stopPolling)
           </div>
         </section>
 
-        <section v-if="activeRun.summary?.by_category && (isAsknumReport || isNumberCheckReport || isWorkflowReport)" class="section">
+        <section v-if="activeRun.summary?.by_category && (isAsknumReport || isNumberCheckReport || isWorkflowReport || isStrategyReport || isAbReport)" class="section">
           <h3>分题型</h3>
           <div class="table-wrap">
             <table class="data-table">
@@ -1190,7 +1273,7 @@ onBeforeUnmount(stopPolling)
                   </template>
                   <template v-else>
                     <th>问题</th>
-                    <th v-if="isW1ChatReport || isAsknumReport || isNumberCheckReport || isWorkflowReport">题型</th>
+                    <th v-if="isW1ChatReport || isAsknumReport || isNumberCheckReport || isWorkflowReport || isStrategyReport || isAbReport">题型</th>
                     <th v-if="isWorkflowReport">节点</th>
                     <th v-if="isRagReport">Gold 页</th>
                     <th v-if="isRagReport">命中页</th>
@@ -1216,7 +1299,7 @@ onBeforeUnmount(stopPolling)
                   </template>
                   <template v-else>
                     <td class="question">{{ row.question }}</td>
-                    <td v-if="isW1ChatReport || isAsknumReport || isNumberCheckReport || isWorkflowReport">{{ row.category }}</td>
+                    <td v-if="isW1ChatReport || isAsknumReport || isNumberCheckReport || isWorkflowReport || isStrategyReport || isAbReport">{{ row.category }}</td>
                     <td v-if="isWorkflowReport" class="mono">{{ String(row.fail_node || '—') }}</td>
                     <template v-if="isRagReport">
                       <td class="mono">{{ (row.gold_pages as number[])?.join(', ') }}</td>
@@ -1680,6 +1763,14 @@ tr.disagree td {
 .hint {
   color: var(--text-muted);
   font-size: 14px;
+}
+
+.hint-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .error {

@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: python-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-ai
+  labels:
+    app: python-ai
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: python-ai
+  template:
+    metadata:
+      labels:
+        app: python-ai
+    spec:
+      initContainers:
+        - name: wait-db
+          image: pgvector/pgvector:pg16
+          imagePullPolicy: IfNotPresent
+          command:
+            [
+              "sh",
+              "-c",
+              "until pg_isready -h postgres -U regops -d regops_db; do sleep 2; done",
+            ]
+      containers:
+        - name: python-ai
+          image: regops/python-ai:local
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: regops-config
+            - secretRef:
+                name: regops-secrets
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 18
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: python-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-ai
+  labels:
+    app: python-ai
+spec:
+  type: ClusterIP
+  selector:
+    app: python-ai
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

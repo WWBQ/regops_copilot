@@ -43,7 +43,7 @@ onMounted(refresh)
         <h1>审计追踪</h1>
         <p>
           每笔工单动作留下操作人、角色、部门、原因、前后快照和 <code>X-Request-ID</code>。
-          客户经理不能看这条链路。
+          客户经理不能看这条链路。本页只打 Java，不经过 python-ai。
         </p>
       </div>
       <button type="button" class="ghost-btn" :disabled="!loggedIn || loading" @click="refresh">刷新</button>

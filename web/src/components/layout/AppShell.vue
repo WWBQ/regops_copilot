@@ -1,17 +1,24 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, provide, ref } from 'vue'
+import { computed, inject, onMounted, onUnmounted, provide, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import PageSidebar from './PageSidebar.vue'
 import UserAccountBar from './UserAccountBar.vue'
 import { NAV_GROUPS, type NavItem } from '../../config/nav'
 import { CHAT_BRIDGE_KEY, createEmptyChatBridge } from '../../composables/chatBridge'
+import { SERVICE_HEALTH_KEY } from '../../composables/useServiceHealth'
 
 const route = useRoute()
 const router = useRouter()
 
 const chatBridge = ref(createEmptyChatBridge())
 provide(CHAT_BRIDGE_KEY, chatBridge)
+
+const health = inject(SERVICE_HEALTH_KEY, null)
+const javaDown = computed(() => health?.javaOk.value === false)
+const pythonDegraded = computed(
+  () => health?.javaOk.value === true && health?.pythonOk.value === false,
+)
 
 const headerRef = ref<HTMLElement | null>(null)
 const hoverOpen = ref(false)
@@ -155,6 +162,17 @@ onUnmounted(() => {
       </Transition>
     </header>
 
+    <div v-if="javaDown" class="degrade-banner bad" role="status">
+      Java BFF 连不上。登录、复核、审计也会失败。
+    </div>
+    <div v-else-if="pythonDegraded" class="degrade-banner warn" role="status">
+      问答 / 问数暂不可用。
+      <router-link to="/compliance/review">合规复核</router-link>
+      ·
+      <router-link to="/compliance/audit">审计追踪</router-link>
+      仍可用。
+    </div>
+
     <div class="shell-body">
       <PageSidebar />
       <main class="main">
@@ -165,6 +183,30 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.degrade-banner {
+  flex-shrink: 0;
+  padding: 8px 20px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.degrade-banner.warn {
+  background: #fffbeb;
+  color: #92400e;
+  border-bottom: 1px solid #fde68a;
+}
+
+.degrade-banner.bad {
+  background: #fef2f2;
+  color: #991b1b;
+  border-bottom: 1px solid #fecaca;
+}
+
+.degrade-banner a {
+  color: inherit;
+  font-weight: 700;
+}
+
 .topbar {
   position: sticky;
   top: 0;

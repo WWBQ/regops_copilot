@@ -27,5 +27,19 @@ RAG 检索集生成：`python-ai/.venv/bin/python eval/scripts/build_rag_retriev
 W4 问数黄金集评测：`python-ai/.venv/bin/python eval/run_asknum.py --fail-on-regression`
 （长度边界样例需字符级精确，故用脚本生成而非手写 JSON）
 
+W8 Prompt 黄金集生成：`python-ai/.venv/bin/python eval/scripts/build_w8_prompt_golden.py`
+
+W8 四策略对照：`python-ai/.venv/bin/python eval/run_w8_strategy.py`
+
+W8 Prompt A/B：`python-ai/.venv/bin/python eval/run_w8_ab.py --write-example`
+
+Prompt 钉扎/回滚：`python-ai/.venv/bin/python eval/run_w8_prompt_pin.py list`
+
+W9-1 双栈五条链路冒烟：`python-ai/.venv/bin/python eval/run_w9_e2e.py`
+
+W9-2 金融红队：`python-ai/.venv/bin/python eval/run_w9_redteam.py --fail-on-regression`
+
+W9-4 Compose 冒烟：`./scripts/compose-smoke.sh`
+
 DeepSeek / Qwen 选型对照：`python-ai/.venv/bin/python eval/scripts/run_model_selection.py`
 （写 `eval/reports/model_selection_w1/raw.json`，结论见 `docs/model_selection_w1.md`）

@@ -18,6 +18,7 @@ from app.agents.evidence import apply_checked_reply, pack_from_tool_trace
 from app.asknum.citations import facts_href
 from app.asknum.slots import CONCEPT_LABELS, company_display_name
 from app.models.base import ChatResult, LLMClient, ToolCallRequest
+from app.prompts.library import render_system
 from app.schemas.chat import Citation
 from app.schemas.tools import ToolContext, ToolInvokeResponse
 from app.tools.registry import invoke_tool, openai_tool_schemas
@@ -42,22 +43,8 @@ _TOOL_STATUS = {
     "verify_number": "正在核对金额…",
     "rag_search": "正在检索年报…",
 }
-TOOL_LOOP_SYSTEM = (
-    "你是 RegOps Copilot。根据只读工具决定查什么，但不要穷尽扫描。"
-    "只使用提供的只读工具。数字必须来自 lookup_metric / compare_peers / verify_number 的返回值，"
-    "不得手算比率、差额或编造。"
-    "未知公司或指标先 list_scope 一次。"
-    "经营概况：只调用一次 lookup_metric，concepts 传列表（最多 5 个，优先 revenue、net_profit_attributable、operating_cash_flow，"
-    "可加 total_assets 或 eps）。单科也用同一工具，列表里只放一个。"
-    "然后必须 rag_search 一次年报管理层概述，再综合作答；不要只列数字就停。"
-    "禁止对每个科目再调一次 lookup_metric。"
-    "revenue 若缺失或 human_review，不要反复重试，改在 rag_search 里引用管理层表述，并标明非已核对数字。"
-    "库外科目（研发投入、毛利率、分红）直接 rag_search。"
-    "同业对比用 compare_peers，不要对每家各查一遍。"
-    "lookup 待复核或缺失时解释质量门，不要补数。"
-    "不要自己写 doc_id 或文末出处列表。用到数字或年报叙述时在句末写 [n] 角标。"
-    "不要调用写操作或未提供的工具。"
-)
+def _tool_loop_system() -> str:
+    return render_system("tools.loop")
 
 
 @dataclass
@@ -506,7 +493,7 @@ async def _run_tool_loop(
     meter=None,
 ) -> ToolLoopResult:
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": TOOL_LOOP_SYSTEM},
+        {"role": "system", "content": _tool_loop_system()},
         {"role": "user", "content": question},
     ]
     tools = _openai_tools()

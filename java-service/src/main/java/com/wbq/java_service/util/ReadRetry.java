@@ -27,6 +27,9 @@ public final class ReadRetry {
     }
 
     static boolean isRetryable(PythonAiException ex) {
+        if (ex.getStatusCode() == 504 || "upstream_timeout".equals(ex.getErrorCode())) {
+            return false;
+        }
         return ex.getStatusCode() >= 500;
     }
 }

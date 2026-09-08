@@ -4,8 +4,23 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import chat, documents, eval_ops, health, labeling, models, mcp, ops, quality, sessions, storage, tools
+from app.api import (
+    chat,
+    documents,
+    eval_ops,
+    health,
+    labeling,
+    models,
+    mcp,
+    ops,
+    prompts,
+    quality,
+    sessions,
+    storage,
+    tools,
+)
 from app.logging_config import setup_logging
+from app.request_id import RequestIdMiddleware
 
 
 @asynccontextmanager
@@ -27,11 +42,17 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:8088",
+        "http://127.0.0.1:8088",
+        "http://localhost",
+        "http://127.0.0.1",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID", "traceparent"],
 )
+app.add_middleware(RequestIdMiddleware)
 
 app.include_router(health.router)
 app.include_router(chat.router)
@@ -43,6 +64,7 @@ app.include_router(storage.router)
 app.include_router(ops.router)
 app.include_router(quality.router)
 app.include_router(eval_ops.router)
+app.include_router(prompts.router)
 app.include_router(tools.router)
 app.include_router(mcp.router)
 

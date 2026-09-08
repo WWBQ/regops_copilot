@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
 
 import {
   ASKNUM_LOOKUP_LABELS,
@@ -8,6 +8,8 @@ import {
   type AsknumOverview,
   type AsknumTraceItem,
 } from '../../api/ops'
+import { formatUserFacingError } from '../../api/client'
+import { SERVICE_HEALTH_KEY } from '../../composables/useServiceHealth'
 
 const CONCEPT_LABELS: Record<string, string> = {
   revenue: '营业收入',
@@ -19,6 +21,9 @@ const CONCEPT_LABELS: Record<string, string> = {
   operating_cash_flow: '经营现金流',
   eps: '每股收益',
 }
+
+const health = inject(SERVICE_HEALTH_KEY, null)
+const pythonDown = computed(() => health?.javaOk.value === true && health?.pythonOk.value === false)
 
 const items = ref<AsknumTraceItem[]>([])
 const total = ref(0)
@@ -48,7 +53,7 @@ async function refresh() {
     total.value = response.total
     overview.value = response.summary ?? null
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '加载失败'
+    error.value = formatUserFacingError(err)
   } finally {
     loading.value = false
   }
@@ -111,7 +116,14 @@ onMounted(refresh)
         <h1>问数监控</h1>
         <p>
           记录首页真实提问里走 <code>fin_metric</code> 的 trace（命中 / 拦截 / 反问 / 叙述跳过）。
-          「你好」不会落库。与评估报告 20 题黄金集不是同一回事。
+          「你好」不会落库。与评估报告 20 题黄金集不是同一回事。问数结果也出现在首页引用气泡。
+          本页读 python-ai；问答挂了会空，复核和审计仍可用。
+        </p>
+        <p v-if="pythonDown" class="head-link">
+          python-ai 当前不可用。
+          <router-link to="/compliance/review">去合规复核</router-link>
+          ·
+          <router-link to="/compliance/audit">审计追踪</router-link>
         </p>
         <p class="head-link">
           <router-link to="/ops/eval">→ 跑 W4 问数 20 题评测</router-link>

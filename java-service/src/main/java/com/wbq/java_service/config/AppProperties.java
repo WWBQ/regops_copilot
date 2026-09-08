@@ -15,6 +15,8 @@ public record AppProperties(PythonAiProperties pythonAi, AuthProperties auth) {
             String baseUrl,
             long connectTimeoutMs,
             long readTimeoutMs,
+            Long streamTimeoutMs,
+            Long healthTimeoutMs,
             String serviceName,
             String serviceToken,
             Integer readRetryCount
@@ -30,6 +32,15 @@ public record AppProperties(PythonAiProperties pythonAi, AuthProperties auth) {
 
         public int resolvedReadRetryCount() {
             return readRetryCount == null ? 2 : Math.max(0, readRetryCount);
+        }
+
+        public long resolvedHealthTimeoutMs() {
+            return healthTimeoutMs == null || healthTimeoutMs <= 0 ? 2_500L : healthTimeoutMs;
+        }
+
+        public long resolvedStreamTimeoutMs() {
+            long stream = streamTimeoutMs == null || streamTimeoutMs <= 0 ? 180_000L : streamTimeoutMs;
+            return Math.max(readTimeoutMs, stream);
         }
     }
 

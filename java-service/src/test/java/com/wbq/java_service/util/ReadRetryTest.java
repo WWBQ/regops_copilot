@@ -25,11 +25,11 @@ class ReadRetryTest {
     }
 
     @Test
-    void doesNotRetryOn400() {
+    void doesNotRetryOn504Timeout() {
         AtomicInteger attempts = new AtomicInteger();
         assertThrows(PythonAiException.class, () -> ReadRetry.call(2, () -> {
             attempts.incrementAndGet();
-            throw new PythonAiException(400, "bad");
+            throw new PythonAiException(504, "python-ai timeout", "upstream_timeout");
         }));
         assertEquals(1, attempts.get());
     }

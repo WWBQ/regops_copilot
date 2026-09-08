@@ -1,33 +1,37 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, provide } from 'vue'
 
-import { getHealth, getModels } from './api/chat'
 import AppShell from './components/layout/AppShell.vue'
+import { SERVICE_HEALTH_KEY, createServiceHealth } from './composables/useServiceHealth'
 
-const backendOk = ref<boolean | null>(null)
-const modelName = ref<string | null>(null)
+const health = createServiceHealth()
+provide(SERVICE_HEALTH_KEY, health)
 
-async function refreshStatus() {
-  try {
-    const [health, models] = await Promise.all([getHealth(), getModels()])
-    backendOk.value = health.status === 'ok'
-    modelName.value = models.available[0] ?? null
-  } catch {
-    backendOk.value = false
-    modelName.value = null
-  }
-}
+const backendOk = computed(() => health.javaOk.value)
 
 function onConnected(model: string) {
-  backendOk.value = true
-  modelName.value = model
+  health.javaOk.value = true
+  health.pythonOk.value = true
+  health.pythonError.value = null
+  health.modelName.value = model
 }
 
 function onDisconnected() {
-  backendOk.value = false
+  health.pythonOk.value = false
 }
 
-onMounted(refreshStatus)
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+onMounted(() => {
+  void health.refresh()
+  pollTimer = setInterval(() => void health.refresh(), 20000)
+})
+
+onBeforeUnmount(() => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+  }
+})
 </script>
 
 <template>
@@ -36,10 +40,10 @@ onMounted(refreshStatus)
       <component
         :is="Component"
         :backend-ok="backendOk"
-        :model-name="modelName"
+        :model-name="health.modelName.value"
         @connected="onConnected"
         @disconnected="onDisconnected"
-        @refresh="refreshStatus"
+        @refresh="health.refresh"
       />
     </router-view>
   </AppShell>

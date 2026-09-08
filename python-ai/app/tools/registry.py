@@ -25,7 +25,7 @@ from app.tools.conclusion import emit_conclusion_description, run_emit_conclusio
 from app.tools.draft import create_review_draft_description, run_create_review_draft
 from app.tools.lookup import lookup_metric_description, run_lookup_metric
 from app.tools.mock import replay_or_run
-from app.tools.pii import mask_pii
+from app.tools.pii import mask_for_log
 from app.tools.rag import rag_search_description, run_rag_search
 from app.tools.scope import list_scope_description, run_list_scope
 from app.tools.verify import verify_number_description, run_verify_number
@@ -153,7 +153,7 @@ def invoke_tool(
         "invoke_tool name=%s request_id=%s args=%s",
         name,
         ctx.request_id,
-        mask_pii(str(arguments or {})),
+        mask_for_log(str(arguments or {})),
     )
     arguments = dict(arguments or {})
     if name == "create_review_draft":
