@@ -201,10 +201,11 @@ regops-copilot/
 │   └── Dockerfile                        # Python 服务 Dockerfile
 │
 ├── eval/                                  # 评测资产（可复跑、版本固定）
-│   ├── golden/                           # 黄金集：RAG 80–100 · 问数 20 · Agent 20 · 安全 25
-│   ├── reports/                          # 消融与回归报告（按日期与版本归档）
+│   ├── golden/                           # 8 类黄金集：RAG 100 · 对话 30 · Schema 20 · 问数 20
+│   │                                     #   · 数字回溯 20 · 工作流 20 · Prompt 30 · 红队 25
+│   ├── reports/                          # 回归报告（按任务 / 时间戳归档）
 │   ├── prompt_ab/                        # Prompt A/B 实验脚本与结果
-│   └── badcases/                         # 坏例库与层级归因
+│   └── scripts/                          # 公开基准下载脚本（不提交原数据）
 │
 ├── web/                                   # 前端 (Vue3 + Vite)
 │   ├── src/
@@ -223,13 +224,12 @@ regops-copilot/
 │   └── Dockerfile                        # Vue 前端 Dockerfile
 │
 ├── docs/                                  # 文档目录
-│   ├── architecture.md                   # 系统架构设计
 │   ├── api-spec.md                       # API 规范（Java + Python）
-│   ├── ai-design.md                      # AI 设计（RAG、问数、Agent）
 │   ├── DATA_SOURCES.md                   # 公开数据源清单与使用边界声明
-│   ├── benchmarks/                       # w1-6 公开基准选型卡（不提交原数据）
+│   ├── BUG_NOTES.md                      # 坏例记录与已知限制（编号 + 归因层）
+│   ├── W4_ASKNUM.md ~ W9_UX.md           # 各周专题：问数 / 工具 / 状态图 / RBAC / Prompt / 交付
+│   ├── benchmarks/                       # 公开基准选型卡（不提交原数据）
 │   ├── security.md                       # 安全边界：SQL 只读、PII、注入红队
-│   ├── dify-comparison.md                # Dify 对照实现与选型判断
 │   └── deployment.md                     # 部署文档（Compose、K8s、信创适配）
 │
 ├── k8s/                                   # 最小 K8s 清单（kind / minikube 可跑）
