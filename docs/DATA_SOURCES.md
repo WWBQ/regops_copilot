@@ -17,25 +17,35 @@
 
 ### 1.1 上市公司年度报告（PDF，RAG 主语料）
 
-| doc_id | 公司 | 代码 | 报告期 | 页数 | 披露渠道 |
-|--------|------|------|--------|------|----------|
-| `002594_2024` | 比亚迪 | 002594 | 2024 年度 | 290 | 巨潮资讯网 |
-| `601633_2024` | 长城汽车 | 601633 | 2024 年度 | 330 | 巨潮资讯网 |
-| `000333_2024` | 美的集团 | 000333 | 2024 年度 | 295 | 巨潮资讯网 |
-| `000651_2024` | 格力电器 | 000651 | 2024 年度 | 248 | 巨潮资讯网 |
-| `600031_2024` | 三一重工 | 600031 | 2024 年度 | 255 | 巨潮资讯网 |
+| doc_id | 公司 | 代码 | 报告期 | 披露日 | 页数 | 披露渠道 |
+|--------|------|------|--------|--------|------|----------|
+| `002594_2024` | 比亚迪 | 002594 | 2024 年度 | 2025-03-25 | 290 | 巨潮资讯网 |
+| `002594_2023` | 比亚迪 | 002594 | 2023 年度 | 2024-03-27 | 266 | 巨潮资讯网 |
+| `601633_2024` | 长城汽车 | 601633 | 2024 年度 | 2025-03-29 | 330 | 巨潮资讯网 |
+| `601633_2023` | 长城汽车 | 601633 | 2023 年度 | 2024-03-29 | 326 | 巨潮资讯网 |
+| `000333_2024` | 美的集团 | 000333 | 2024 年度 | 2025-03-29 | 295 | 巨潮资讯网 |
+| `000333_2023` | 美的集团 | 000333 | 2023 年度 | 2024-03-28 | 291 | 巨潮资讯网 |
+| `000651_2024` | 格力电器 | 000651 | 2024 年度 | 2025-04-28 | 248 | 巨潮资讯网 |
+| `000651_2023` | 格力电器 | 000651 | 2023 年度 | 2024-04-30 | 249 | 巨潮资讯网 |
+| `600031_2024` | 三一重工 | 600031 | 2024 年度 | 2025-04-18 | 255 | 巨潮资讯网 |
+| `600031_2023` | 三一重工 | 600031 | 2023 年度 | 2024-04-29 | 247 | 巨潮资讯网 |
+| `300750_2024` | 宁德时代 | 300750 | 2024 年度 | 2025-03-15 | 229 | 巨潮资讯网 |
+| `600519_2024` | 贵州茅台 | 600519 | 2024 年度 | 2025-04-03 | 143 | 巨潮资讯网 |
 
 - **渠道**：巨潮资讯网（<http://www.cninfo.com.cn>），深交所/上交所指定信息披露平台。
 - **性质**：上市公司依法公开披露的年度报告全文，任何人可自由查阅下载。
-- **落地位置**：`data/raw/<code>_2024_annual.pdf`（**不入版本库**，见第 3 节）。
-- **入库记录**：`pdf_document` 表，`source_site = 'cninfo'`，含 `content_hash`、`page_count`、`doc_type = 'annual_report'`。
-- **为什么选 2024 年报**：2025 年才披露，晚于 FinQA / CFLUE 等公开基准的主要构造期，
-  降低「模型训练时已见过原题」的污染风险。
+- **落地位置**：`data/raw/<code>_<year>_annual.pdf`（**不入版本库**，见第 3 节）。
+- **获取脚本**：`python-ai/scripts/download_annual_pdfs.py`（巨潮 `hisAnnouncement` → `static.cninfo.com.cn`）。
+- **入库记录**：`pdf_document` 表，`source_site = 'cninfo'`，含 `content_hash`、`page_count`、`doc_type = 'annual_report'`、`disclosure_date`（巨潮公告日，见 `app/ingest/disclosure_dates.py`）。
+- **报告期 vs 披露日**：表中「报告期」是会计期间；「披露日」是巨潮全文年报公告日（如比亚迪 2024 年报于 2025-03-25 披露）。二者不可混用。
+- **为什么选 2024 + 2023 年报**：2024 年报晚于 FinQA / CFLUE 等公开基准的主要构造期；
+  原五家另入库 2023 年报与 F10，便于问「同比 / 近两年」（检索会同时带上当年与上一年文档）。
+  宁德时代、贵州茅台目前仍只有 2024。
 
 ### 1.2 结构化财务数据（JSON，`fin_metric` 原型用）
 
 - **来源**：东方财富 F10 公开财务报表接口（资产负债表 / 利润表 / 现金流量表）。
-- **落地位置**：`data/raw/xbrl/<code>_2024/{balance,income,cashflow}.json`，
+- **落地位置**：`data/raw/xbrl/<code>_<year>/{balance,income,cashflow}.json`，
   同目录 `manifest.json` 记录 `stock_code`、`org_id`、`exchange`、`report_year`、
   `report_date`、`downloaded_at`。
 - **获取脚本**：`python-ai/scripts/download_xbrl.py`。
@@ -81,11 +91,11 @@
 
 ### 已知溯源缺口
 
-- `pdf_document.disclosure_date` 字段已建但**五条记录均为空**——年报的实际披露日期
-  尚未回填（可从巨潮公告页取得，如 002594 为 2025-03-25）。
-  在补齐前，本文档表格中的「报告期」只表示会计期间，不代表披露日期。
 - 年报取数不在 `w1_chat` 范围内。问具体公司某年数字，应走 `rag_retrieval_100.json`
-  （带 `doc_id` / 页码）或 W4 `fin_metric` 问数；当前入库主体是上表五家制造业公司。
+  （带 `doc_id` / 页码）或 W4 `fin_metric` 问数；当前入库主体是上表七家公司。
+  检索 100 题黄金集仍覆盖原五家制造业年报。
+- 已入库行若 `disclosure_date` 仍为空，跑一次
+  `python-ai/.venv/bin/python python-ai/scripts/backfill_disclosure_dates.py`（新 ingest 会自动写入）。
 
 ---
 
@@ -116,7 +126,7 @@ data/objects/        # 本地对象存储
 ```
 
 仓库中保留的是**可复现的路径**：下载脚本、黄金集 JSON、评测报告、以及
-`manifest.json` 形式的溯源信息。他人克隆后按 `python-ai/scripts/download_xbrl.py`
+`manifest.json` 形式的溯源信息。他人克隆后按 `python-ai/scripts/download_annual_pdfs.py`、`python-ai/scripts/download_xbrl.py`
 与巨潮公开页面即可自行获取同一批数据。
 
 ---
@@ -126,5 +136,6 @@ data/objects/        # 本地对象存储
 - API 契约与服务边界：[`api-spec.md`](./api-spec.md)
 - W1 评测基线：[`eval_w1_baseline.md`](./eval_w1_baseline.md)
 - RAG 检索评测：[`eval_rag_retrieval.md`](./eval_rag_retrieval.md)
+- RAG 检索消融（baseline / hybrid / rerank）：[`eval_rag_ablation.md`](./eval_rag_ablation.md)
 - 入库校验规则：[`INGEST_VALIDATION.md`](./INGEST_VALIDATION.md)
 - 公开基准选型（不提交原数据）：[`benchmarks/README.md`](./benchmarks/README.md)

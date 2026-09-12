@@ -29,6 +29,9 @@ async def test_list_eval_tasks():
     assert "w8_strategy" in ids
     assert "w8_ab" in ids
     assert "w9_redteam" in ids
+    assert "rag_acl" in ids
+    assert "rag_refuse" in ids
+    assert "rag_support" in ids
     asknum = next(item for item in body["items"] if item["id"] == "w4_asknum")
     assert "leak_rate" in asknum["metrics"]
     numbers = next(item for item in body["items"] if item["id"] == "w6_number_check")
@@ -44,6 +47,15 @@ async def test_list_eval_tasks():
     redteam = next(item for item in body["items"] if item["id"] == "w9_redteam")
     assert "sql_leak_rate" in redteam["metrics"]
     assert "acl_leak_rate" in redteam["metrics"]
+    retrieval = next(item for item in body["items"] if item["id"] == "rag_retrieval")
+    assert "ndcg_at_k" in retrieval["metrics"]
+    assert "citation_accuracy" in retrieval["metrics"]
+    acl = next(item for item in body["items"] if item["id"] == "rag_acl")
+    assert "leak_rate" in acl["metrics"]
+    refuse = next(item for item in body["items"] if item["id"] == "rag_refuse")
+    assert "false_accept_rate" in refuse["metrics"]
+    support = next(item for item in body["items"] if item["id"] == "rag_support")
+    assert "support_hit_rate" in support["metrics"]
     w1 = next(item for item in body["items"] if item["id"] == "w1_chat")
     assert "refuse_rate" in w1["metrics"]
     assert "number_error_rate" not in w1["metrics"]

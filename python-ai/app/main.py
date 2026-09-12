@@ -9,6 +9,7 @@ from app.api import (
     documents,
     eval_ops,
     health,
+    ingest,
     labeling,
     models,
     mcp,
@@ -60,6 +61,7 @@ app.include_router(sessions.router)
 app.include_router(models.router)
 app.include_router(labeling.router)
 app.include_router(documents.router)
+app.include_router(ingest.router)
 app.include_router(storage.router)
 app.include_router(ops.router)
 app.include_router(quality.router)

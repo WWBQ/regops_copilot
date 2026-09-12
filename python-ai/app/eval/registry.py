@@ -23,10 +23,12 @@ RUNNERS = (
     "w8_strategy",
     "w8_ab",
     "w9_redteam",
+    "rag_acl",
+    "rag_refuse",
+    "rag_support",
 )
 RUNNER_DEFAULT_METRICS: dict[str, tuple[str, ...]] = {
     "w1_chat": ("accuracy", "refuse_rate", "latency_p50_ms"),
-    "rag_retrieval": ("recall_at_k", "mrr"),
     "compliance_schema": ("accuracy", "false_accept_rate", "false_reject_rate"),
     "w4_asknum": ("accuracy", "route_accuracy", "leak_rate"),
     "w6_number_check": ("accuracy", "false_accept_rate", "number_error_rate", "unit_error_rate"),
@@ -34,6 +36,10 @@ RUNNER_DEFAULT_METRICS: dict[str, tuple[str, ...]] = {
     "w8_strategy": ("accuracy", "number_error_rate", "avg_tokens", "latency_p50_ms"),
     "w8_ab": ("accuracy", "delta", "mcnemar_p", "credible"),
     "w9_redteam": ("accuracy", "sql_leak_rate", "acl_leak_rate", "number_error_rate"),
+    "rag_retrieval": ("recall_at_k", "mrr", "ndcg_at_k", "citation_accuracy"),
+    "rag_acl": ("accuracy", "false_accept_rate", "leak_rate"),
+    "rag_refuse": ("accuracy", "false_accept_rate"),
+    "rag_support": ("support_hit_rate", "support_coverage"),
 }
 _TASK_ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,48}$")
 
@@ -69,7 +75,7 @@ def _default_tasks_payload() -> dict:
             {
                 "id": "rag_retrieval",
                 "name": "RAG 检索评测",
-                "description": "100 题：Hybrid 检索 page 粒度 Recall@k / MRR",
+                "description": "100 题：Hybrid 检索 page 粒度 Recall@k / MRR / nDCG@k / citation_accuracy",
                 "golden_file": "rag_retrieval_100.json",
                 "runner": "rag_retrieval",
                 "metrics": list(RUNNER_DEFAULT_METRICS["rag_retrieval"]),
@@ -136,6 +142,33 @@ def _default_tasks_payload() -> dict:
                 "golden_file": "w9_redteam_25.json",
                 "runner": "w9_redteam",
                 "metrics": list(RUNNER_DEFAULT_METRICS["w9_redteam"]),
+                "builtin": True,
+            },
+            {
+                "id": "rag_acl",
+                "name": "RAG 部门 ACL",
+                "description": "20 题：检索层按部门裁剪公司年报；越权不得落到禁止的 company_code（不调 LLM）",
+                "golden_file": "rag_acl_20.json",
+                "runner": "rag_acl",
+                "metrics": list(RUNNER_DEFAULT_METRICS["rag_acl"]),
+                "builtin": True,
+            },
+            {
+                "id": "rag_refuse",
+                "name": "RAG 无答案拒答",
+                "description": "20 题：寒暄 no_intent；库外公司 / 缺少年报年份 no_docs（不调 LLM）",
+                "golden_file": "rag_refuse_20.json",
+                "runner": "rag_refuse",
+                "metrics": list(RUNNER_DEFAULT_METRICS["rag_refuse"]),
+                "builtin": True,
+            },
+            {
+                "id": "rag_support",
+                "name": "RAG 引用片段撑住答案",
+                "description": "20 题：检索片段是否覆盖 must_contain；与页级 Recall 分开，不调 LLM",
+                "golden_file": "rag_support_20.json",
+                "runner": "rag_support",
+                "metrics": list(RUNNER_DEFAULT_METRICS["rag_support"]),
                 "builtin": True,
             },
         ],
@@ -354,6 +387,12 @@ def validate_golden_payload(content: dict, *, runner: str | None = None) -> int:
             continue
         if not str(item.get("question") or "").strip():
             raise ValueError(f"items[{index}] 缺少 question")
+        if runner == "rag_support":
+            if not item.get("doc_id"):
+                raise ValueError(f"items[{index}] 缺少 doc_id")
+            must = item.get("must_contain")
+            if not isinstance(must, list) or not must:
+                raise ValueError(f"items[{index}] 缺少 must_contain")
         if runner == "rag_retrieval":
             if not item.get("doc_id"):
                 raise ValueError(f"items[{index}] 缺少 doc_id（RAG 检索集必填）")
@@ -408,6 +447,13 @@ def validate_golden_payload(content: dict, *, runner: str | None = None) -> int:
                     raise ValueError(f"items[{index}] expected_ok 须为布尔值")
             elif not isinstance(item.get("expect"), dict):
                 raise ValueError(f"items[{index}] 缺少 expect")
+        if runner in {"rag_acl", "rag_refuse"}:
+            if item.get("expected_outcome") not in {"no_intent", "no_docs", "retrieve"}:
+                raise ValueError(
+                    f"items[{index}] expected_outcome 须为 no_intent / no_docs / retrieve"
+                )
+            if runner == "rag_acl" and "dept" not in item:
+                raise ValueError(f"items[{index}] 缺少 dept（ACL 集可为空字符串/null）")
     return len(items)
 
 
@@ -424,6 +470,9 @@ def save_golden_set(*, filename: str, content: dict, runner: str | None = None) 
         "w6_workflow_20.json",
         "w8_prompt_30.json",
         "w9_redteam_25.json",
+        "rag_acl_20.json",
+        "rag_refuse_20.json",
+        "rag_support_20.json",
     }:
         raise ValueError("内置黄金集不可覆盖，请使用新文件名")
     item_count = validate_golden_payload(content, runner=runner)

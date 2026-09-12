@@ -36,7 +36,7 @@
 | 模型 | DeepSeek `deepseek-chat`（默认）/ Qwen `qwen-plus`；bge-m3 + bge-reranker-v2-m3 | Qwen2.5-7B-Instruct + LoRA |
 | 规模 | Python 约 1.9 万行 / Java 约 5.5 千行 / 前端约 1.3 万行；Python 侧 222 个测试函数 | 5.2 万条训练集，单卡 3090 |
 | 我的角色 | 全栈独立开发 | 数据、训练、评测、导出全流程 |
-| 最能讲的 | 引用不可编造、结论强校验、双栈降级、八类黄金集回归门禁 | 失败归因、数据重建、三方对比评测 |
+| 最能讲的 | 引用不可编造、结论强校验、双栈降级、黄金集回归门禁 | 失败归因、数据重建、三方对比评测 |
 | 边界 | 学习作品，不是生产系统；数据全部公开披露 | 不是母语级，也没有全面超过基座 |
 
 ---
@@ -89,15 +89,17 @@ RAG、Agent、评测是 **AI 侧**，迭代快、依赖 Python 生态。
 |---|---|
 | 切块 | `chunk_size=512`，`chunk_overlap=128`（上限 2000） |
 | 向量 | `BAAI/bge-m3`，1024 维，取 top 80 |
-| 关键词 | ILIKE 取 top 30 |
+| 关键词 | Okapi BM25，问题短语 TF，取 top 30（k1=1.2, b=0.75） |
 | 融合 | RRF `k=60`，向量权重 2.0 / 关键词 1.0 |
 | 精排 | `BAAI/bge-reranker-v2-m3`，候选 80 |
-| 最终 | `top_k=12`，同页去重 `max_chunks_per_page=1` |
+| 最终 | `top_k=12`，同页最多 2 条 `max_chunks_per_page=2` |
 | 拒答阈值 | `min_score=0.42` |
 
 关键不在于用了哪个算法，而在于：**引用是检索结果的结构化字段透传上去的，不是让模型自己写出处**。
 引用体只有 `doc_id`、`page`、`snippet`（前 240 字）、`viewer_url`、`title`；
 没有任何一条超过阈值的命中，链路直接标 `outcome = "low_score"`，**不进 LLM**。
+登录后检索还会按部门裁剪年报（研究岗只能碰到比亚迪/长城；未登录不裁剪），
+越权或库外公司走 `no_docs`，20+20 题脚本门禁泄露率为 0。
 
 面试可以这样讲差别：
 让模型「顺便带上出处」，它会编一个看起来合理的页码；
@@ -169,22 +171,26 @@ classify → list_scope → compare → verify → rag → (conclude | stop)
 
 ### 2.4 评测体系
 
-八类黄金集，报告落在 `eval/reports/<任务>/<时间戳>/`（`report.json` + `report.md`）：
+黄金集报告落在 `eval/reports/<任务>/<时间戳>/`（`report.json` + `report.md`）：
 
 | 任务 | 题量 | 主要指标 | 实测 |
 |---|---:|---|---|
-| `rag_retrieval` | 100 | recall@k, MRR | **0.82 / 0.5303** |
+| `rag_retrieval` | 100 | recall@k, MRR, nDCG@k, citation_accuracy | **0.79 / 0.4991 / 0.336 / 0.155**（现网 BM25+rerank+同页上限 2 · [`eval_rag_retrieval.md`](./eval_rag_retrieval.md)） |
+| 检索消融 | 同 100 | baseline → hybrid → rerank | **0.69 / 0.70 / 0.76**（当时同页不限；现网再把 rerank 从 0.76 抬到 0.79。MRR 0.28 / 0.39 / 0.50；nDCG 0.21 / 0.26 / 0.33） |
+| `rag_acl` | 20 | accuracy, 误放行, 泄露 | **1.0 / 0 / 0** |
+| `rag_refuse` | 20 | accuracy, 误放行 | **1.0 / 0** |
+| `rag_support` | 20 | support_hit_rate, support_coverage | **0.55 / 0.60**（页到了不等于词在片段里） |
 | `w1_chat` | 30 | accuracy, refuse_rate, 延迟 | 0.833 / 0.10 / p50 1250 ms |
 | `compliance_schema` | 20 | accuracy, 误收/误拒率 | **1.0 / 0 / 0** |
 | `w4_asknum` | 20 | accuracy, route_accuracy, leak_rate | 1.0 / 1.0 / **0** |
-| `w6_number_check` | 20 | accuracy, 数字/单位错误率 | 门禁在测试里（无归档报告） |
+| `w6_number_check` | 20 | accuracy, 数字/单位错误率 | **1.0 / 误放行 0**（归档 [`eval_w6_number_check.md`](./eval_w6_number_check.md)） |
 | `w6_workflow` | 20 | accuracy, param, avg_steps, 确认率 | 1.0 / 1.0 / 4.8 / **1.0** |
 | `w8_prompt` | 30 | 四策略对比 + A/B | **fixture 模拟，见下** |
 | `w9_redteam` | 25 | SQL / ACL 泄露率 | **全部 0** |
 
 外加 W9 端到端冒烟：五条链路 **5/5 通过**。
 
-**主要评测刻意不依赖 LLM**（Schema 校验、数字回溯、工作流轨迹、红队都是脚本判定）：
+**主要评测刻意不依赖 LLM**（Schema 校验、数字回溯、工作流轨迹、红队、检索 ACL / 拒答都是脚本判定）：
 稳定、可进 CI、不烧钱。`--fail-on-regression` 是重点——
 **评测不是跑个分，是回归门禁**，改 Prompt、换检索参数、调模型之后掉了就该拦住。
 
@@ -206,8 +212,8 @@ A/B 那一轮更值得讲：n=30，A 0.700 vs B 0.733，Δ=3.3%，McNemar p=1.0�
 **能测出「这个提升不可信、不该上线」，比测出一个好看的提升更有价值。**
 
 坏例归因记在 `docs/BUG_NOTES.md`，按编号 + 状态管理，且明确定位到检索层：
-BUG-009 车型列举 recall 回退、BUG-011 节标题被埋进块内（待修）、
-BUG-012 `max_chunks_per_page=1` 对列举题的固有限制（已知限制，不修）。
+BUG-009 车型列举 recall 回退（关键词已补上市/发布）、BUG-011 节标题被埋进块内（chunker 已按节切并 re-ingest）、
+BUG-012 同页上限现为 2（一页一条会丢掉清单细节，完全不限会占满 top-k）。
 分类召回也拆开看：`numeric_financial` 只有 0.619，`product_enum` 是 1.0——
 **总分掉了你不知道该改哪层，分类和坏例才能。**
 
@@ -253,8 +259,8 @@ BUG-012 `max_chunks_per_page=1` 对列举题的固有限制（已知限制，不
 - **W5 的工具目录 / MCP 尚未接入主 `/chat` 循环**，是并行能力；MCP 只实现 JSON-RPC 子集
   （`initialize` / `tools/list` / `tools/call`），不是完整 SDK，Java 也不是 MCP server。
 - **W8-4 Dify 对照没做**，只有计划（记在 `docs/W8_PROMPTS.md` 末尾）。
-- `recall@k = 0.82` 是**页面命中**，不等于线上回答完整性；有 4 家公司还没用新切块器重新入库。
-- **没有 citation_accuracy 这个指标**——引用正确性目前靠机制保证（字段透传）+ 坏例复盘，不是量化指标。
+- `recall@k = 0.79` 是**页面命中**，不等于线上回答完整性；同一次现网跑的 **citation_accuracy 只有 0.155**（top-k 去重页里 gold 页占比），检索很吵时 recall 仍可能为 1。
+- 引用组装本身仍是检索侧字段透传，模型不能手写出处。
 - 没有独立的 `eval/badcases/` 目录，坏例统一记在 `docs/BUG_NOTES.md`（按编号 + 归因层）。
 - 前端没有自动化测试；K8s 只到「最小可跑」，没有 HPA / Ingress 灰度。
 - 分级退出码用的是稳定 `error_code`（`missing` / `unauthorized` / `timeout` / `forbidden_write` / `budget_exceeded`），不是进程退出码。
@@ -430,14 +436,21 @@ PEFT / bitsandbytes 经常直接报错或留下残留 `quantization_config`；
 
 **Q：为什么混合检索 + RRF + rerank，不直接向量检索？**
 纯向量对条款编号、专有名词这类精确匹配不友好（「第十二条」容易被语义近邻淹没）；
-纯关键词抓不到同义表述。所以向量 top 80 + 关键词 top 30，RRF（k=60，权重 2:1）融合，
-再用 bge-reranker-v2-m3 精排到 top 12。代价是多一次模型调用和延迟，只在需要的链路开。
+纯关键词抓不到同义表述。所以向量 top 80 + **BM25 关键词** top 30，RRF（k=60，权重 2:1）融合，
+再用 bge-reranker-v2-m3 精排到 top 12。
+100 题消融（Okapi BM25 + 节标题提名，当时 `max_chunks_per_page=0`）把贡献拆开了：
+向量-only Recall 0.69 / MRR 0.28 / CiteAcc 0.12；加上 hybrid 到 0.70 / 0.39 / 0.12（+25ms）；
+再精排到 0.76 / 0.50 / 0.157，但 P50 从 82ms 跳到约 8.8s。这一轮召回增益几乎全在精排（hybrid 只 +1pp、rerank +6pp）；
+CiteAcc 也几乎全是精排给的。数字题 hybrid 之后 rerank 回落（0.619→0.524），所以财务直读分流问数，而不是继续堆 rerank。
+更早一次 ILIKE + 同页=1 对照是 0.82。在今天语料上把同页拧回 1 能拿到 0.80，所以那 8 个点里 6 个是「一页只留一条」关掉导致的，其余三样挤在 2 个点的残差里。同页=1 不能改回去——一页里车型清单和详情是两个切块，只留一条就丢数据。生产默认改成上限 **2**：Recall **0.79**，gold 切块只丢 8%。
 
-**Q：recall@k 0.82 算好吗？**
-要看分类。整体 0.82、MRR 0.53，但 `product_enum` 是 1.0，`numeric_financial` 只有 0.619。
+**Q：recall@k 0.79 算好吗？**
+要看分类，也要看是哪一档，还要看 CiteAcc。生产 rerank 整体 0.79、MRR 0.50，但 CiteAcc 只有 0.155；
+`governance` / `product_enum` Recall 1.00，`numeric_ratio` 0.80，`numeric_financial` 只有 0.524。
+消融里向量-only 的数字题 0.476，hybrid 才拉到 0.62——0.79 不是 Cross-Encoder 单独刷出来的，精排甚至把数字题召回打回去。
 这说明瓶颈在数字类检索，而这类问题我本来就分流去了 Text2SQL。
-另外这个 recall 是**页面命中**，不等于线上回答完整性——我在文档里明确写了这点，
-`docs/BUG_NOTES.md` 里 BUG-012 就是同页去重对列举题的固有限制。
+另外这个 recall 是**页面命中**，不等于线上回答完整性——我在文档里明确写了这点。
+同页上限（BUG-012）是 `rag_max_chunks_per_page=2`：一页可以留清单和详情，又不会被少数页占满 top-12。
 
 **Q：拒答率高了用户会不满意，怎么平衡？**
 看场景成本。合规场景里，一个错误但自信的答案代价远高于「我查不到」。
@@ -564,7 +577,7 @@ JDK 换龙井 / 毕昇 21 基本平替。我**不做等保或信创认证的宣�
 |---|---|
 | 「做了一个金融合规生产系统」 | 「学习作品集项目，数据全部来自公开披露」 |
 | 「few-shot 准确率 96.7%」 | 「那是 fixture 模拟的管线验证，不是真实 LLM 能力」 |
-| 「RAG 准确率很高」 | 「recall@k 0.82、MRR 0.53，且是页面命中；数字类只有 0.62，所以分流去了 Text2SQL」 |
+| 「RAG 准确率很高」 | 「现网 recall@k 0.79、MRR 0.50、CiteAcc 0.155，且是页面命中；数字类 rerank 后只有 0.52。消融 0.69→0.70→0.76（当时同页不限），同页上限 2 再把 rerank 抬到 0.79；精排贵 8.8s」 |
 | 「Prompt 优化带来 3.3% 提升」 | 「n=30、p=1.0，判定不可信，所以没上线」 |
 | 「实现了完整 Agent 自主决策」 | 「读自动、写要人确认，`interrupt_before` 卡在结论前」 |
 | 「接入了 MCP」 | 「实现了 JSON-RPC 子集，未接入主 chat 循环，不是完整 SDK」 |
@@ -582,9 +595,11 @@ JDK 换龙井 / 毕昇 21 基本平替。我**不做等保或信创认证的宣�
 
 **RegOps Copilot · 合规问答与审查系统**（FastAPI · Spring Boot/JDK 21 · Vue 3 · Postgres+pgvector · LangGraph）
 
-- 构建可追溯 RAG 问答：bge-m3 向量检索 + 关键词 ILIKE 经 RRF 融合、bge-reranker-v2-m3 精排至 top-12，
+- 构建可追溯 RAG 问答：bge-m3 向量检索 + Okapi BM25 经 RRF 融合、bge-reranker-v2-m3 精排至 top-12，
   引用以 `doc_id`/页码/原文片段结构化透传（模型无法自拟出处），低于分数阈值即拒答且不进 LLM；
-  100 题黄金集 recall@k 0.82 / MRR 0.53，并按题型归因（列举 1.0、数字类 0.62）。
+  100 题黄金集 recall@k 0.79 / MRR 0.50 / citation_accuracy 0.155，并按题型归因（治理/列举 1.00、比率 0.80、数字类 0.52）；
+  三档消融：向量-only 0.69 → hybrid 0.70 → rerank 0.76（当时同页不限），同页上限 2 后再到 0.79；精排 P50 约 +8.7s，数字题 hybrid 后 rerank 回落；
+  检索层按部门裁剪年报，越权 / 无答案 20+20 题准确率 1.0、泄露 0。
 - 合规结论走 Pydantic DTO 强校验（风险等级枚举、条款编号至少一条、置信度上下界、
   「高风险不得高置信度」跨字段规则），不合规直接拒绝产出；20 题正反用例误收率与误拒率均为 0。
 - 财务数字改走受控 Text2SQL（Schema 检索 → 生成 → `EXPLAIN` 校验 + 只读约束），
@@ -592,7 +607,7 @@ JDK 换龙井 / 毕昇 21 基本平替。我**不做等保或信创认证的宣�
 - 用 LangGraph 实现审查工作流并在结论节点前 `interrupt_before` 中断，输出草稿预览、
   人工确认后才落 `PENDING` 工单（maker-checker，确认率 1.0）；Java 侧承担 RBAC、
   四态复核流转、禁止自审与乐观锁并发控制、全量审计，`X-Request-ID` + W3C traceparent 全链路关联。
-- 自建 8 类黄金集（合计 265 题）与落盘报告，主要评测不依赖 LLM 以进 CI，
+- 自建黄金集（合计 305 题）与落盘报告，主要评测不依赖 LLM 以进 CI，
   `--fail-on-regression` 作为回归门禁；25 题金融红队 SQL/ACL 泄露率 0，五条链路端到端 5/5；
   Prompt A/B 依 Wilson CI + McNemar 判定 Δ3.3%（n=30）不可信而未上线。
 - 交付 Compose 四容器编排与 Kustomize 最小 K8s 清单（含 readiness/liveness 探针），

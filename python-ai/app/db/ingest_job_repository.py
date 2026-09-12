@@ -30,6 +30,20 @@ def create_job(
     return job_id
 
 
+def get_job(conn: psycopg.Connection, job_id: str) -> tuple | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT job_id::text, target_type, target_doc_id, status,
+                   error_message, retry_count, created_at, updated_at, finished_at
+            FROM ingest_job
+            WHERE job_id = %s::uuid
+            """,
+            (job_id,),
+        )
+        return cur.fetchone()
+
+
 def update_job_status(
     conn: psycopg.Connection,
     *,

@@ -8,7 +8,9 @@
 |------|------|
 | `eval/golden/rag_retrieval_100.json` | 100 条检索题，含 `gold_pages` |
 | `eval/scripts/build_rag_retrieval_golden.py` | 从 DB 重新探测并生成 JSON |
-| `eval/run_rag_retrieval.py` | 跑 Recall@k / MRR 并输出报告 |
+| `eval/run_rag_retrieval.py` | 跑 Recall@k / MRR / nDCG@k / citation_accuracy 并输出报告 |
+| `eval/run_rag_ablation.py` | 同一黄金集连跑 baseline / hybrid / rerank（现网数字见 [`eval_rag_ablation.md`](./eval_rag_ablation.md)） |
+| `eval/run_rag_support.py` | **另 20 题**：片段里有没有答题用的词，见 [`eval_rag_support.md`](./eval_rag_support.md)，不和 Recall 混报 |
 
 ## 2. 覆盖范围
 
@@ -56,7 +58,8 @@
 }
 ```
 
-- **gold_pages**：可接受证据页列表，命中任一即算 Recall@k 成功
+- **gold_pages**：可接受证据页列表；命中任一即算 Recall@k 成功；nDCG@k 把这些页视为同等相关
+- **citation_accuracy**：top-k **去重页**中属于 `gold_pages` 的比例（页级引用准确率）。与 Recall@k 互补：检索很吵时 recall 仍可能为 1
 - **k**：默认 12，与 `rag_top_k` 对齐
 - **页码说明**：`gold_pages` 使用 PDF 解析器物理页码（从文件第 1 页起计），与年报正文脚注/印刷页码可能相差若干页；人工标注请以 `doc_chunks` 内容为准对照 PDF
 
@@ -108,30 +111,56 @@ RAG 检索集每题必须有 `question`、`doc_id`、`gold_pages`。上传后在
 
 | 对象 | 规则 |
 |------|------|
-| **任务** | 仅自定义任务可删；内置 `w1_chat` / `rag_retrieval` 不可删 |
+| **任务** | 仅自定义任务可删；内置 `w1_chat` / `rag_retrieval` / `rag_acl` / `rag_refuse` 不可删 |
 | **历史报告** | 运行中的不可删；删除后 `eval/reports/{task_id}/{run_id}/` 目录移除 |
 
 ### CLI
 
 ```bash
 cd /Users/chengfeng/Desktop/AI/regops_copilot
-python eval/run_rag_retrieval.py
+python-ai/.venv/bin/python eval/run_rag_retrieval.py
 
 # 调试
-python eval/run_rag_retrieval.py --limit 5
-python eval/run_rag_retrieval.py --category product_enum
+python-ai/.venv/bin/python eval/run_rag_retrieval.py --limit 5
+python-ai/.venv/bin/python eval/run_rag_retrieval.py --category product_enum
+
+# 单档消融（不改 .env）
+python-ai/.venv/bin/python eval/run_rag_retrieval.py --mode baseline --label baseline
+python-ai/.venv/bin/python eval/run_rag_retrieval.py --mode hybrid --label hybrid
+python-ai/.venv/bin/python eval/run_rag_retrieval.py --mode rerank --label rerank
+
+# 三档一次跑完（Recall@k / MRR / nDCG@k / citation_accuracy / 延迟）
+python-ai/.venv/bin/python eval/run_rag_ablation.py --label bm25-w3-5
 ```
 
-报告目录：`eval/reports/{task_id}/{run_id}/report.json`
+报告目录：`eval/reports/{task_id}/{run_id}/report.json`。三档对照口径见 [`eval_rag_ablation.md`](./eval_rag_ablation.md)。部门 ACL / 无答案拒答见 [`eval_rag_guard.md`](./eval_rag_guard.md)。
 
 ## 5. 指标
 
 | 指标 | 定义 |
 |------|------|
-| **Recall@k** | top-k 检索结果页码中，是否出现任一 `gold_pages` |
+| **Recall@k** | top-k 检索结果页码中，是否出现任一 `gold_pages`（题级 page_hit） |
 | **MRR** | 第一个 gold page 出现位次的倒数均值 |
+| **nDCG@k** | gold 页同等相关的二元 nDCG；页码去重后按首次出现排序。奖励全部 gold 页的位次，不只看第一命中 |
+| **citation_accuracy** | top-k **去重页**中属于 `gold_pages` 的比例（页级引用准确率）。与 Recall@k 互补：检索很吵时 recall 仍可能为 1 |
 
-## 6. 重新生成 gold page
+## 6. 最新一次生产路径（100 题 · BM25 + 节标题提名 + 同页上限 2 · 2026-09-11）
+
+空 `--mode` = 现网：向量 + Okapi BM25 + RRF + `bge-reranker-v2-m3` + 节标题提名（`rag_section_title_boost=3`）+ **`rag_max_chunks_per_page=2`**，`top_k=12`。run：`eval/reports/rag_retrieval/20260911_200702_w14-cap2-boost3/`（gitignore）。
+
+| 档位 | Recall@12 | MRR | nDCG@12 | CiteAcc |
+|------|----------:|----:|--------:|--------:|
+| 同页不限（消融 rerank 档） | 76.0% | 0.4954 | 0.3260 | 15.74% |
+| **现网 cap=2** | **79.0%** | **0.4991** | **0.3364** | **15.48%** |
+| 同页=1（对照） | 80.0% | 0.5051 | 0.3491 | 13.75% |
+
+三档消融（baseline / hybrid / rerank）是同一天在 **cap=0** 下跑的，见 [`eval_rag_ablation.md`](./eval_rag_ablation.md) §2：0.69 / 0.70 / 0.76。现网是在那次 rerank 上把同页上限改成 2。
+
+现网分题型（cap=2）：`governance` / `product_enum` **100%**，`numeric_ratio` **80%**，`segment_business` / `cross_year_compare` 90%；`numeric_financial` **52.4%**（hybrid 档曾到 61.9%，精排后回落）。同页=1 再多 1pp 召回，但会砍掉 30% 的 gold 切块（一页里清单和详情只能留一条），所以不用。
+
+ILIKE 时代 rerank 是 82%；在今天语料上把上限拧回 1 能拿到 80%，所以 8 个点里 6 个是同页截断关掉导致的，其余三样挤在 2 个点。拆分见 [`eval_rag_ablation.md`](./eval_rag_ablation.md) §6。
+
+## 7. 重新生成 gold page
 
 入库或 re-ingest 后若 chunk 页码变化，可重跑：
 
@@ -143,4 +172,4 @@ cd python-ai && .venv/bin/python ../eval/scripts/build_rag_retrieval_golden.py
 
 ---
 
-*版本 rag-retrieval-v1 · 2026-08-21*
+*版本 rag-retrieval-v4 · 2026-09-11 · 现网数字 `20260911_200702_w14-cap2-boost3`*

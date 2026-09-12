@@ -407,7 +407,7 @@ app/ingest/
 | 数据源 | 在三道门中的角色 |
 |--------|------------------|
 | **PDF 解析** | 产生 fact + bbox；G1–G3 主战场（表格抽取仍可后补） |
-| **F10 JSON**（W2-2 原型） | 直读三表写入 `fin_metric`；G1 同 fact_key 冲突、G2 R01–R03、G3=`content_hash` |
+| **F10 JSON**（W2-2 原型） | 直读三表写入 `fin_metric`；G1 同 fact_key 冲突、G2 R01–R04、G3=`content_hash` |
 | **XBRL**（可选 W4+） | fact 的 concept/period/scope 可对齐 XBRL context；数字冲突时 **结构化源优先** |
 
 W2-2 落地：`python-ai/scripts/download_xbrl.py` 拉 F10，`scripts/ingest_fin_metric.py` 过门入库；看板 `/quality/gates`、`/quality/facts`。

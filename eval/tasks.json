@@ -17,12 +17,14 @@
     {
       "id": "rag_retrieval",
       "name": "RAG 检索评测",
-      "description": "100 题：Hybrid 检索 page 粒度 Recall@k / MRR",
+      "description": "100 题：Hybrid 检索 page 粒度 Recall@k / MRR / nDCG@k / citation_accuracy",
       "golden_file": "rag_retrieval_100.json",
       "runner": "rag_retrieval",
       "metrics": [
         "recall_at_k",
-        "mrr"
+        "mrr",
+        "ndcg_at_k",
+        "citation_accuracy"
       ],
       "builtin": true
     },
@@ -119,6 +121,43 @@
         "sql_leak_rate",
         "acl_leak_rate",
         "number_error_rate"
+      ],
+      "builtin": true
+    },
+    {
+      "id": "rag_acl",
+      "name": "RAG 部门 ACL",
+      "description": "20 题：检索层按部门裁剪公司年报；越权不得落到禁止的 company_code（不调 LLM）",
+      "golden_file": "rag_acl_20.json",
+      "runner": "rag_acl",
+      "metrics": [
+        "accuracy",
+        "false_accept_rate",
+        "leak_rate"
+      ],
+      "builtin": true
+    },
+    {
+      "id": "rag_refuse",
+      "name": "RAG 无答案拒答",
+      "description": "20 题：寒暄 no_intent；库外公司 / 缺少年报年份 no_docs（不调 LLM）",
+      "golden_file": "rag_refuse_20.json",
+      "runner": "rag_refuse",
+      "metrics": [
+        "accuracy",
+        "false_accept_rate"
+      ],
+      "builtin": true
+    },
+    {
+      "id": "rag_support",
+      "name": "RAG 引用片段撑住答案",
+      "description": "20 题：检索片段是否覆盖 must_contain；与页级 Recall 分开，不调 LLM",
+      "golden_file": "rag_support_20.json",
+      "runner": "rag_support",
+      "metrics": [
+        "support_hit_rate",
+        "support_coverage"
       ],
       "builtin": true
     }

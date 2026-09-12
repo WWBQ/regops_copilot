@@ -83,6 +83,7 @@ def test_prepare_chat_rag_skips_low_score_hits(monkeypatch):
 
 
 def test_prepare_chat_rag_keeps_relevant_hits(monkeypatch):
+    from contextlib import contextmanager
     from unittest.mock import MagicMock
 
     high_hit = ChunkHit(
@@ -96,6 +97,11 @@ def test_prepare_chat_rag_keeps_relevant_hits(monkeypatch):
     mock_service = MagicMock()
     mock_service.viewer_url.return_value = "http://test#page=12"
 
+    @contextmanager
+    def fake_conn():
+        yield MagicMock()
+
+    monkeypatch.setattr("app.rag.service.get_connection", fake_conn)
     monkeypatch.setattr("app.rag.service.collect_rag_doc_ids", lambda _: ["000333_2024"])
     monkeypatch.setattr(
         "app.rag.service.retrieve_hits_with_trace",
@@ -118,3 +124,41 @@ def test_prepare_chat_rag_keeps_relevant_hits(monkeypatch):
     assert result.answer.citations[0].title == "美的集团2024年年度报告"
     assert result.trace.outcome == "ok"
     assert result.trace.rag_used is True
+
+
+def test_prepare_chat_rag_acl_deny_skips_retrieve(monkeypatch):
+    from unittest.mock import MagicMock
+
+    retrieve = MagicMock()
+    monkeypatch.setattr(
+        "app.rag.service.collect_rag_doc_ids",
+        lambda _: ["002594_2024", "601633_2024", "000333_2024", "000651_2024", "600031_2024"],
+    )
+    monkeypatch.setattr("app.rag.service.retrieve_hits_with_trace", retrieve)
+    result = prepare_chat_rag(
+        session_id=None,
+        question="美的集团2024年营业收入是多少",
+        document_service=MagicMock(),
+        persist_trace=False,
+        dept="research",
+    )
+    assert result.answer is None
+    assert result.trace.outcome == "no_docs"
+    assert result.trace.scoped_doc_ids == []
+    retrieve.assert_not_called()
+
+
+def test_prepare_chat_rag_missing_year_is_no_docs(monkeypatch):
+    from unittest.mock import MagicMock
+
+    retrieve = MagicMock()
+    monkeypatch.setattr("app.rag.service.collect_rag_doc_ids", lambda _: ["002594_2024"])
+    monkeypatch.setattr("app.rag.service.retrieve_hits_with_trace", retrieve)
+    result = prepare_chat_rag(
+        session_id=None,
+        question="比亚迪2099年营业收入是多少",
+        document_service=MagicMock(),
+        persist_trace=False,
+    )
+    assert result.trace.outcome == "no_docs"
+    retrieve.assert_not_called()

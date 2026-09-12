@@ -42,6 +42,8 @@ def rag_config_snapshot() -> dict[str, Any]:
         "rag_min_score": settings.rag_min_score,
         "rag_vector_fetch_k": settings.rag_vector_fetch_k,
         "rag_keyword_top_k": settings.rag_keyword_top_k,
+        "rag_bm25_k1": settings.rag_bm25_k1,
+        "rag_bm25_b": settings.rag_bm25_b,
         "rag_rrf_k": settings.rag_rrf_k,
         "rag_vector_rrf_weight": settings.rag_vector_rrf_weight,
         "rag_keyword_rrf_weight": settings.rag_keyword_rrf_weight,

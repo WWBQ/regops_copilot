@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from uuid import UUID
+
 from fastapi import APIRouter, HTTPException, Query
 
 from app.db.asknum_trace_repository import (
@@ -153,6 +155,20 @@ def list_ingest_jobs_api(
         status=status,
         target_type=target_type,
     )
+
+
+@router.get("/ingest/jobs/{job_id}")
+def get_ingest_job_api(job_id: str) -> dict[str, Any]:
+    try:
+        job_id = str(UUID(job_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="invalid job_id") from exc
+    from app.ops.ingest_service import get_ingest_job
+
+    row = get_ingest_job(job_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="ingest job not found")
+    return row
 
 
 @router.get("/ingest/session-documents")

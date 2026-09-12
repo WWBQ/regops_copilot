@@ -10,7 +10,7 @@ import pytest
 
 from app.ingest.facts import FinancialFact
 from app.ingest.financial import apply_gates, extract_and_gate, extract_facts_from_bundle
-from app.ingest.reconciliation import check_r01, check_r02, check_r03, run_reconciliation
+from app.ingest.reconciliation import check_r01, check_r02, check_r03, check_r04, run_reconciliation
 from app.ingest.validation import (
     CRITICAL_CONCEPTS,
     amount_mismatch,
@@ -60,6 +60,7 @@ def _write_bundle(
             "INCOME_TAX": 20_000,
             "BASIC_EPS": "1.50",
             "PARENT_NETPROFIT": 55_000,
+            "MINORITY_INTEREST": 5_000,
             **(income or {}),
         },
         "cashflow": {
@@ -174,7 +175,7 @@ def test_g1_duplicate_fact_key_conflict():
     assert conflicts[0]["reason"] == "critical_amount_mismatch"
 
 
-def test_g2_pass_and_fail_r01_r02_r03():
+def test_g2_pass_and_fail_r01_r02_r03_r04():
     ok = {
         "total_assets": Decimal("1000"),
         "total_liabilities": Decimal("400"),
@@ -185,10 +186,13 @@ def test_g2_pass_and_fail_r01_r02_r03():
         "net_profit": Decimal("60"),
         "profit_before_tax": Decimal("80"),
         "income_tax": Decimal("20"),
+        "net_profit_attributable": Decimal("55"),
+        "minority_interest": Decimal("5"),
     }
     results = run_reconciliation(ok)
-    assert [item.rule_id for item in results] == ["R01", "R02", "R03"]
+    assert [item.rule_id for item in results] == ["R01", "R02", "R03", "R04"]
     assert all(item.passed for item in results)
+    assert not any(item.skipped for item in results)
 
     bad_equity = {**ok, "total_equity": Decimal("500")}
     r01 = check_r01(bad_equity)
@@ -199,6 +203,29 @@ def test_g2_pass_and_fail_r01_r02_r03():
     assert r02.passed is False
     r03 = check_r03({**ok, "net_profit": Decimal("1")})
     assert r03.passed is False
+    r04 = check_r04({**ok, "minority_interest": Decimal("1")})
+    assert r04.passed is False
+    assert "归母勾稽失败" in r04.message
+
+
+def test_r04_skips_when_minority_missing():
+    values = {
+        "net_profit": Decimal("60"),
+        "net_profit_attributable": Decimal("55"),
+    }
+    result = check_r04(values)
+    assert result.skipped is True
+    assert result.passed is True
+    assert "跳过" in result.message
+    results = run_reconciliation(values)
+    r04 = next(item for item in results if item.rule_id == "R04")
+    assert r04.skipped is True
+    assert r04.passed is True
+
+
+def test_resolve_minority_interest_alias():
+    assert resolve_concept("少数股东损益") == "minority_interest"
+    assert resolve_concept("MINORITY_INTEREST") == "minority_interest"
 
 
 def test_g3_pdf_bbox_required_web_hash_ok():

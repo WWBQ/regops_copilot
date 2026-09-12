@@ -3,6 +3,18 @@
 from pydantic import BaseModel, Field
 
 
+class IngestJobResponse(BaseModel):
+    job_id: str
+    doc_id: str
+    status: str
+    parse_cached: bool | None = None
+    pages: int | None = None
+    chunks: int | None = None
+    reused: bool | None = None
+    source_filename: str | None = None
+    message: str | None = None
+
+
 class DocumentUploadResponse(BaseModel):
     doc_id: str
     bucket: str

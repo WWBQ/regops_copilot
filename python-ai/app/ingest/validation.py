@@ -29,6 +29,7 @@ G2_CONCEPTS = frozenset(
         "profit_before_tax",
         "income_tax",
         "net_profit_attributable",
+        "minority_interest",
     }
 )
 
@@ -80,6 +81,10 @@ ALIASES: dict[str, str] = {
     "归属于母公司所有者的净利润": "net_profit_attributable",
     "PARENT_NETPROFIT": "net_profit_attributable",
     "PARENTNETPROFIT": "net_profit_attributable",
+    "少数股东损益": "minority_interest",
+    "少数股东净利润": "minority_interest",
+    "MINORITY_INTEREST": "minority_interest",
+    "MINORITYINTEREST": "minority_interest",
 }
 
 MISSING_TOKENS = frozenset({"", "-", "—", "--", "不适用", "N/A", "n/a", "None", "null"})

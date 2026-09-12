@@ -120,98 +120,60 @@ def search_keyword_chunks(
     *,
     source_type: str = "pdf",
     top_k: int = 5,
-    max_term_doc_frequency: int = 40,
+    k1: float = 1.2,
+    b: float = 0.75,
 ) -> list[ChunkHit]:
-    """关键词补检：ILIKE + 词频过滤（泛词降权），近似 BM25 的 IDF 效果。"""
+    """关键词补检：在已裁剪的 doc_id 语料上跑 Okapi BM25，取 top_k。"""
+    from app.rag.bm25 import build_stats, score_text
     from app.rag.retrieval import is_low_value_chunk
 
-    if not doc_ids or not terms:
+    query_terms = [term.strip() for term in terms if term and term.strip()]
+    query_terms = list(dict.fromkeys(query_terms))
+    if not doc_ids or not query_terms or top_k <= 0:
         return []
-
-    patterns = [f"%{term}%" for term in terms if term.strip()]
-    if not patterns:
-        return []
-
-    specific_patterns = _filter_specific_patterns(
-        conn,
-        doc_ids,
-        patterns,
-        source_type=source_type,
-        max_doc_frequency=max_term_doc_frequency,
-    )
-    if not specific_patterns:
-        specific_patterns = patterns[:3]
-
-    score_expr = " + ".join(
-        f"CASE WHEN content ILIKE %s THEN {max(3 - idx, 1)} ELSE 0 END"
-        for idx, _ in enumerate(specific_patterns)
-    )
-    where_clause = " OR ".join("content ILIKE %s" for _ in specific_patterns)
-    params: list[Any] = [
-        *specific_patterns,
-        source_type,
-        doc_ids,
-        *specific_patterns,
-        top_k,
-    ]
 
     with conn.cursor() as cur:
         cur.execute(
-            f"""
-            SELECT doc_id, chunk_index, content, metadata,
-                   ({score_expr})::float / {len(specific_patterns)} AS score
+            """
+            SELECT doc_id, chunk_index, content, metadata
             FROM doc_chunks
             WHERE source_type = %s
               AND doc_id = ANY(%s)
               AND embedding IS NOT NULL
-              AND ({where_clause})
-            ORDER BY score DESC, chunk_index
-            LIMIT %s
             """,
-            params,
+            (source_type, doc_ids),
         )
         rows = cur.fetchall()
 
-    hits: list[ChunkHit] = []
-    for doc_id, chunk_index, content, metadata, score in rows:
-        if is_low_value_chunk(content):
+    corpus: list[tuple[str, int, str, dict[str, Any]]] = []
+    for doc_id, chunk_index, content, metadata in rows:
+        text = content or ""
+        if is_low_value_chunk(text):
             continue
         meta = metadata if isinstance(metadata, dict) else json.loads(metadata or "{}")
+        corpus.append((str(doc_id), int(chunk_index), text, meta))
+
+    if not corpus:
+        return []
+
+    stats = build_stats([text for _doc_id, _idx, text, _meta in corpus], query_terms, k1=k1, b=b)
+    ranked: list[tuple[float, tuple[str, int, str, dict[str, Any]]]] = []
+    for row in corpus:
+        score = score_text(row[2], query_terms, stats)
+        if score > 0:
+            ranked.append((score, row))
+    ranked.sort(key=lambda item: (-item[0], item[1][1]))
+
+    hits: list[ChunkHit] = []
+    for score, (doc_id, chunk_index, text, meta) in ranked[:top_k]:
         hits.append(
             ChunkHit(
                 doc_id=doc_id,
-                chunk_index=int(chunk_index),
-                content=content,
+                chunk_index=chunk_index,
+                content=text,
                 metadata=meta,
-                score=float(score),
+                score=round(float(score), 6),
+                keyword_score=round(float(score), 6),
             )
         )
     return hits
-
-
-def _filter_specific_patterns(
-    conn: psycopg.Connection,
-    doc_ids: list[str],
-    patterns: list[str],
-    *,
-    source_type: str,
-    max_doc_frequency: int,
-) -> list[str]:
-    """去掉在语料中出现过多的泛词（通用 IDF 思想，非行业词表）。"""
-    specific: list[str] = []
-    with conn.cursor() as cur:
-        for pattern in patterns:
-            cur.execute(
-                """
-                SELECT COUNT(*)
-                FROM doc_chunks
-                WHERE source_type = %s
-                  AND doc_id = ANY(%s)
-                  AND content ILIKE %s
-                """,
-                (source_type, doc_ids, pattern),
-            )
-            count = int(cur.fetchone()[0])
-            if count <= max_doc_frequency:
-                specific.append(pattern)
-    return specific

@@ -234,6 +234,7 @@ def _prepare_llm_turn(
     session_id: str | None,
     document_service: DocumentService,
     request_id: str | None,
+    dept: str | None = None,
 ) -> LlmTurn:
     if not body.use_rag:
         return LlmTurn(
@@ -248,6 +249,7 @@ def _prepare_llm_turn(
         question=body.message,
         document_service=document_service,
         request_id=request_id,
+        dept=dept,
     )
     rag = rag_result.answer
     if rag is not None:
@@ -472,6 +474,7 @@ async def chat(
         session_id=session_id,
         document_service=document_service,
         request_id=x_request_id,
+        dept=x_regops_dept,
     )
     try:
         return await _complete_llm(
@@ -564,6 +567,7 @@ async def chat_stream(
                 session_id=session_id,
                 document_service=document_service,
                 request_id=x_request_id,
+                dept=x_regops_dept,
             )
             yield _sse("status", {"text": turn.status})
             yield _sse("meta", {"route": turn.route, "model": model_name})

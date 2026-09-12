@@ -3,7 +3,7 @@
 > 专门收集开发过程中遇到的问题：**现象 → 根因 → 修复 → 状态**。  
 > 新 bug 请按文末 [模板](#新增条目模板) 追加，已修复条目保留作复盘参考。
 
-**最后更新：** 2026-08-21
+**最后更新：** 2026-09-10
 
 ---
 
@@ -19,11 +19,11 @@
 | [BUG-006](#bug-006-顶部导航整栏-hover-触发菜单) | 前端 · 导航 | 顶部导航整栏 hover 触发菜单 | ✅ 已修复 |
 | [BUG-007](#bug-007-cleaner-未实现噪声清洗) | Ingest · 清洗 | cleaner 未实现噪声清洗 | ✅ 已修复 |
 | [BUG-008](#bug-008-rag-无公司年份范围过滤) | RAG · 检索 | RAG 无公司/年份范围过滤 | ✅ 已修复 |
-| [BUG-009](#bug-009-车型列举问题未命中第22页) | RAG · 检索 | 车型列举问题未命中第 22 页 | 🟡 回归（Hybrid 架构） |
-| [BUG-010](#bug-010-评测黄金集-gold_pages-自动探测误标) | Eval · 黄金集 | 评测黄金集 gold_pages 自动探测误标 | 🟡 部分修复 |
-| [BUG-011](#bug-011-节标题 buried-在-chunk-末尾) | Ingest · 分块 | 节标题 buried 在 chunk 末尾 | 🔴 待修 |
-| [BUG-012](#bug-012-同页去重导致列举题缺段) | RAG · 检索 | 同页去重导致列举题缺段 | ⏸ 已知限制 |
-| [BUG-013](#bug-013-rag-013-第一节风险-top5-未命中) | Eval · RAG | rag-013 第一节风险 top-5 未命中 | 🟡 部分修复 |
+| [BUG-009](#bug-009-车型列举问题未命中第22页) | RAG · 检索 | 车型列举问题未命中第 22 页 | 🟡 re-ingest 后待看 top-5 |
+| [BUG-010](#bug-010-评测黄金集-gold_pages-自动探测误标) | Eval · 黄金集 | 评测黄金集 gold_pages 自动探测误标 | 🟡 部分修复（探测加节标题加权） |
+| [BUG-011](#bug-011-节标题 buried-在-chunk-末尾) | Ingest · 分块 | 节标题 buried 在 chunk 末尾 | ✅ 已 re-ingest |
+| [BUG-012](#bug-012-同页去重导致列举题缺段) | RAG · 检索 | 同页去重导致列举题缺段 | ✅ 已关闭同页截断 |
+| [BUG-013](#bug-013-rag-013-第一节风险-top5-未命中) | Eval · RAG | rag-013 第一节风险 top-5 未命中 | ✅ 问句对齐第一节 |
 
 ---
 
@@ -118,9 +118,9 @@
 - **模块：** Ingest · `python-ai/app/ingest/cleaner.py`
 - **现象：** `NOISE_PATTERNS.md` 已定义页眉/Disclaimer 规则，但 cleaner 长期 **透传占位**。
 - **根因：** W2-1 清单未完成，`clean_page_blocks` 直接 return 原 blocks。
-- **修复：** 实现 `_ANNUAL_HEADER_LINE_RE`、免责声明行过滤；统计 `annual_header_lines` 命中数。
+- **修复：** 实现页眉/免责声明、元信息行、HTML 残留、双栏硬换行合并、跨页表头去重；命中写入 `CleanStats.hits`。样例见 `NOISE_PATTERNS.md`。
 - **状态：** ✅ 已修复
-- **后续：** 双栏硬换行、跨页表头 dedupe 仍待补充（见 `NOISE_PATTERNS.md` §1.3–1.5）。
+- **后续：** 更完整的双栏版面重建仍超出规则层；年报三表数字走 F10，不依赖 PDF 表格合并。
 
 ---
 
@@ -170,13 +170,17 @@
   print("keyword_terms:", pipe.get("keyword_terms"))
   PY
   ```
-- **状态：** 🟡 回归（Hybrid 架构下仍待优化）
-- **建议修复（优先级）：**
-  1. 节标题处切 chunk（[BUG-011](#bug-011-节标题-buried-在-chunk-末尾)）
-  2. 列举类问题关键词补充 `上市、新款、发布` 或车型 probe 词
-  3. 列举题 `rag_max_chunks_per_page=2` 或动态放宽（[BUG-012](#bug-012-同页去重导致列举题缺段)）
-- **相关文件：** `service.py`, `retrieval.py`, `reranker.py`, `config.py`, `eval/golden/rag_retrieval_100.json`（rag-027）
-- **备注：** 评测 gold `[21, 22, 23]` **正确**（跨页连续板块）；Recall@12 可命中，但 top-5 / 答全仍不足。
+- **状态：** 🟡 已 re-ingest；关掉同页截断后 p19/p20 会占满 top-k，车型列表在 p22 仍可能进不了 top-5
+- **修复（2026-09-10）：**
+  1. [BUG-011](#bug-011-节标题-buried-在-chunk-末尾) 按节切 + 页末标题下挂到下一页正文。
+  2. ~~`extract_keyword_terms`：问句含「车型 / 新推出 / 新品 / 新车」时补 `上市`、`发布`~~ → **2026-09-11 撤回**，见下。
+  3. [BUG-012](#bug-012-同页去重导致列举题缺段) 默认先改为 `rag_max_chunks_per_page=0`，后于 2026-09-11 改成 **2**（召回与同页细节折中）。
+- **修订（2026-09-11）：** 那条车企同义词正则只覆盖车企（10 道 `product_enum` 里只命中 3 道），已删除；`extract_keyword_terms` 现在只取问句里出现过的词，不注入同义词。改成通用的 **节标题提名**：chunk 的 `section_title` 命中问句词时名次提前 `rag_section_title_boost`（默认 3）位，在精排之后、`apply_page_diversity` 之前生效，与行业无关。
+  全量 100 题现网 Recall 74% → **76%**、MRR 0.4841 → **0.4954**、CiteAcc 15.4% → **15.7%**。扫参显示收益在 boost=2 到顶，2/3/5 无差别。
+  ⚠️ **删正则本身不提分**：100 题上 boost=0（已删正则）与带正则的旧跑四项指标全在噪声内，涨幅全部来自节标题提名。删它的理由是解除行业耦合。
+  同时加了列举句式判断 `is_enumeration_question`（`哪些|哪几|列举|分别是|包括|清单`）用于抬高关键词 RRF 权重，但实测 nDCG −0.035、CiteAcc −4.1pp，**默认关闭**（`rag_enum_keyword_rrf_weight=0.0`）。数字见 [`eval_rag_ablation.md`](./eval_rag_ablation.md) §4。
+- **相关文件：** `chunker.py`, `retrieval.py`, `service.py`, `reranker.py`, `config.py`, `eval/golden/rag_retrieval_100.json`（rag-027）
+- **备注：** 评测 gold `[21, 22, 23]` **正确**（跨页连续板块）。关键词补丁即时生效；分块修复需对长城年报 re-ingest 后再跑 rag-027。
 
 ---
 
@@ -193,8 +197,10 @@
   1. rag-008 改为 `MANUAL_GOLD_PAGES` → `[16, 17, 18, 19, 20]`；probe 词改为 `全新车型/正式上市/元UP/秦L`。
   2. rag-027 保持 `[21, 22, 23]`。
   3. `docs/eval_rag_retrieval.md` 补充：gold 用 **PDF 物理页码**，跨页段落需整段标注。
-- **验证：** 重新跑 `build_rag_retrieval_golden.py`，对照 PDF 抽检 product_enum 类 10 题。
-- **状态：** 🟡 部分修复（已知题已 override，其余 category 仍建议抽检）
+  4. （2026-09-10）`probe_pages` 同时搜 `section_title` / `clause_no` 并加权，目录页/页眉块降权；已知误标题仍以 `MANUAL_GOLD_PAGES` 为准。
+  5. （2026-09-11）`--dry-run` 对照三类 41 题，新探测改了 27 题，多数是摘要页/目录页挤进来，**没有整份覆盖**。只把格力新产品补上 p24（「董明珠健康家」），并把列举题现行 gold 冻进 `MANUAL_GOLD_PAGES`。
+- **验证：** `python-ai/.venv/bin/python eval/scripts/build_rag_retrieval_golden.py --dry-run --categories product_enum,compliance_risk,numeric_financial`
+- **状态：** 🟡 抽检过列举/合规/数字；未全量重标。脚本默认不再静默覆盖。
 - **相关文件：** `eval/scripts/build_rag_retrieval_golden.py`, `eval/golden/rag_retrieval_100.json`, `docs/eval_rag_retrieval.md`
 
 ---
@@ -205,10 +211,10 @@
 - **模块：** Ingest · 分块策略（`chunker.py` / 会话 pipeline）
 - **现象：** 长城年报 p21 **最后一行**为「本集团 2024 年新推出的车型 21/393」，但该 chunk（c36）主体是出海/GWM 战略（500+ 字）。检索时向量/关键词命中 chunk **前半**，RRF 把 p21 顶到 #1，LLM 上下文却几乎看不到节标题。
 - **根因：** 分块按固定长度/块边界切，**不在 MD 节标题 / 「新推出的车型」类小节边界切分**。
-- **修复：** 待做——入库或 chunk 阶段识别小节标题（正则或 parse 结构），**标题单独成 chunk 或与紧随正文合并**，避免标题落在长 chunk 末尾。
-- **状态：** 🔴 待修
-- **相关文件：** `python-ai/app/ingest/chunker.py`
-- **备注：** 比亚迪 p16「推出多款全新车型」+ 车型名列表同理，p16–20 为连续板块。
+- **修复（2026-09-10）：** `chunker.py` 按节切分：识别 `第X节/章/编/条`、`4、`、页末短标题（去 `21/393` 脚注）；节过长时窗口切 **正文**、每窗仍前缀标题；页末标题-only 在本页留 stub 并 **下挂下一页正文**；metadata 写 `section_title`，标题含「第X条/节」时写 `clause_no`，仅当出现 `YYYY年M月D日` 时写 `effective_date`（不把裸 `2024年` 当生效日）。`dept_acl` 仍在 `pdf_document`，不写入 chunk。
+- **状态：** ✅ 已改 chunker，原五家 + 宁德/茅台已按新块入库
+- **相关文件：** `python-ai/app/ingest/chunker.py`，单测 `python-ai/tests/test_chunker.py`
+- **备注：** 比亚迪 p16「推出多款全新车型」+ 车型名列表同理，p16–20 为连续板块。不全局放宽 [BUG-012](#bug-012-同页去重导致列举题缺段)。
 
 ---
 
@@ -218,11 +224,9 @@
 - **模块：** RAG · `python-ai/app/rag/retrieval.py` · `config.py`
 - **现象：** p22 有 c37（车型名列表）与 c38（H6/H9 上市详情）两条均高度相关；精排后 `apply_page_diversity(max_per_page=1)` **只留一条**，答「有哪些新车型」时可能缺 H6/H9 细节。p23 的 c39（灵魂跨页顶）与 c42（灵魂详情）同理。
 - **根因：** 设计取舍——`rag_max_chunks_per_page=1` 为避免 top-k 被少数页占满、减重复、控 token；**未区分「列举题需同页多条」**。
-- **修复（可选）：**
-  1. 配置 `rag_max_chunks_per_page: 2`；
-  2. 或检测「有哪些/列举/新车型」时动态放宽；
-  3. 或依赖 [BUG-011](#bug-011-节标题-buried-在-chunk-末尾) 让一页一条即够。
-- **状态：** ⏸ 已知限制（产品/评测目标不同：Recall@k 看页码，答全看 chunk）
+- **修复（2026-09-10）：** 默认改为 `rag_max_chunks_per_page=0`（同页不截断，仍截到 `rag_top_k`）。列举题可同页多 chunk；代价是少数页可能占满 top-k。
+- **修订（2026-09-11）：** 扫参后默认改为 **2**。cap=1 砍掉 30% gold 切块；cap=0 召回 76%；cap=2 召回 **79%**、gold 切块只丢 8%，列举题回到 100%。见 [`eval_rag_ablation.md`](./eval_rag_ablation.md) §6.2。
+- **状态：** ✅ 默认 `rag_max_chunks_per_page=2`
 - **相关文件：** `retrieval.py`（`apply_page_diversity`）, `config.py`
 
 ---
@@ -231,32 +235,22 @@
 
 - **发现时间：** 2026-08-21
 - **模块：** Eval · RAG · `rag_retrieval_runner.py` · `retrieval.py`
-- **评测条目：** **rag-013** —「比亚迪年报第一节披露了哪些主要风险」
+- **评测条目：** **rag-013** —「比亚迪年报第一节重要提示如何表述风险因素」（原问句「第一节披露了哪些主要风险」易被理解成经营风险清单）
 - **现象：** 明细里 gold **p5**，检索前几名 `97, 138, 140, 72, 100`（审计/内控/ESG 等含「风险」字样），**top-5 无 p5**；报告仍标 **page_hit_at_k=是**（因 p5 在 **top-12 第 10 位**，MRR=0.1）。
 - **gold p5 内容（第一节 重要提示）：**
   - 并非列举经营风险清单，而是声明：**「不存在…严重不利影响的有关风险因素」**；
-  - 并写明：**「可能面临的风险因素，详见本报告第三节管理层讨论与分析…」**。
-  - 故本题 gold **p5 对「第一节说了什么」是对的**；若用户期望的是**风险清单正文**，应在 **p13+（第三节）**，题目与 gold 需区分（见下）。
+  - 并写明：**「可能面临的风险因素，详见本报告第三节管理层讨论与分析」**之第一项行业情况（p13）、第二项主要业务（p22）、第十一项展望（p42）。
+  - 故本题 gold **p5 对「第一节说了什么」是对的**。
 - **根因：**
   1. **指标 vs 观感：** Recall@k（k=12）命中即「是」，前端/明细若只展示 top-5，会像「没命中」。
-  2. **关键词未抽「第一节」：** `extract_keyword_terms` 原先无 `第X节`，问句里的节次信息未参与 ILIKE；「风险」泛匹配到审计报告「信用风险」、内控「缺陷」、ESG 等（p97/138/140/72）。
+  2. **关键词未抽「第一节」：** 已补 `第X节`；问句若仍写「主要风险」，「风险」仍会泛匹配审计/内控。
   3. **向量：** p5 在向量 top-80 约 **#75**，精排后才进 top-12。
 - **修复：**
   1. `extract_keyword_terms` 增加 `第[一二…]+节` 抽取（已合入 `retrieval.py`）。
-  2. 黄金集 probe 词改为 `第一节/风险因素/可能面临`；`MANUAL_GOLD_PAGES` 保持 `[5]` 并加注释。
-  3. **待产品确认：** 是否另增一题「第三节经营面临的主要风险」gold **p13+**，与本题（第一节表述）拆开。
-- **验证：**
-  ```bash
-  cd python-ai && .venv/bin/python - <<'PY'
-  from app.rag.service import retrieve_hits_for_docs
-  hits = retrieve_hits_for_docs(
-      question="比亚迪年报第一节披露了哪些主要风险",
-      doc_ids=["002594_2024"], top_k=12)
-  pages = [h.metadata.get("page") for h in hits]
-  print(pages[:5], "p5@", pages.index(5)+1 if 5 in pages else None)
-  PY
-  ```
-- **状态：** 🟡 部分修复（关键词已补「第一节」；精排/top-5 仍待观察）
+  2. 问句改为「第一节**重要提示**如何表述风险因素」，probe 词 `第一节/风险因素/可能面临`，`MANUAL_GOLD_PAGES` 保持 `[5]`。
+  3. **不另占 100 题槽位**拆第三节题（避免破坏历史 100 题对照）；第三节对照页记为 **13 / 22 / 42**。
+- **状态：** ✅ 问句与 gold 对齐；top-5 位次仍受「风险」泛匹配影响，用 MRR / nDCG / citation_accuracy 看，不把 Recall@12 当成 top-5
+- **验证：** 评测问句已改为「第一节重要提示如何表述风险因素」；第三节对照页 13/22/42 不另占 100 题。
 - **相关文件：** `retrieval.py`, `eval/golden/rag_retrieval_100.json`, `eval/scripts/build_rag_retrieval_golden.py`
 
 ---
@@ -329,12 +323,12 @@
 
 ## 待观察 / 已知限制
 
-- [ ] 其他 4 家公司年报尚未用新 chunker（含表格）re-ingest，财务表格式问题可能复现
-- [ ] `NOISE_PATTERNS.md` 中双栏换行、跨页表头 dedupe 仍未实现
+- [x] 原五家 + 宁德/茅台已按新 chunker re-ingest（数字仍走 F10，不依赖年报 PDF 表格）
+- [x] `NOISE_PATTERNS.md` 双栏换行、跨页表头 dedupe 已有规则层实现（完整双栏版面重建不做）
 - [ ] 会话 PDF 与会司语料库检索仍为同一套 top-k，未对会话文档加权
 - [ ] 旧 localStorage 缓存消息可能仍带错误 `totalTokens` 数字，重新提问即正常
-- [ ] **BUG-009** 车型列举在 Hybrid（RRF + Cross-Encoder）下回归；top-12 可命中 p22，top-5 仍不足
-- [ ] **BUG-012** `rag_max_chunks_per_page=1`：列举题同页多条 relevant chunk 时故意只留 1 条
+- [ ] **BUG-009**：已 re-ingest；关掉同页截断后 rag-027 的 p22 可能被 p19/p20 挤出 top-12
+- [x] **BUG-012** 已改为 `rag_max_chunks_per_page=2`（同页最多 2 条）
 - [ ] 评测 **Recall@k**（页码命中）与线上 **答全**（chunk 内容完整）目标不一致
 - [ ] 黄金集 100 题中 product_enum 等仍建议按 PDF 抽检（BUG-010）
 

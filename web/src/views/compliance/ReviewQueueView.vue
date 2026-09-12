@@ -44,6 +44,9 @@ const companies = computed(() => {
     { code: '601633', name: '长城汽车' },
     { code: '000333', name: '美的集团' },
     { code: '000651', name: '格力电器' },
+    { code: '600031', name: '三一重工' },
+    { code: '300750', name: '宁德时代' },
+    { code: '600519', name: '贵州茅台' },
   ]
 })
 

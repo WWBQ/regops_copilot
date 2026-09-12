@@ -43,7 +43,7 @@ ITEM_SPECS: list[tuple[str, str, list[str], str | None]] = [
     ("segment_business", "比亚迪2024年境外收入占比或境外业务情况", ["境外", "海外"], None),
     ("segment_business", "比亚迪2024年分产品或分行业收入结构", ["分行业", "分产品"], None),
     ("compliance_risk", "比亚迪2024年内部控制评价报告结论", ["内部控制评价", "内部控制"], None),
-    ("compliance_risk", "比亚迪年报第一节披露了哪些主要风险", ["第一节", "风险因素", "可能面临"], None),
+    ("compliance_risk", "比亚迪年报第一节重要提示如何表述风险因素", ["第一节", "风险因素", "可能面临"], "第一节"),
     ("governance", "比亚迪2024年利润分配预案或分红方案", ["利润分配", "派发现金"], None),
     ("governance", "比亚迪2024年董事会成员有哪些", ["董事", "董事会成员"], None),
     ("esg_sustainability", "比亚迪2024年碳排放或温室气体排放披露", ["碳排放", "温室气体"], None),
@@ -141,25 +141,38 @@ ITEM_SPECS: list[tuple[str, str, list[str], str | None]] = [
 # 个别 chunk 分词/OCR 导致自动探测失败时的手工 gold page（需对照 PDF 抽检）
 MANUAL_GOLD_PAGES: dict[str, list[int]] = {
     "比亚迪2024年推出了哪些新车型或新产品": [16, 17, 18, 19, 20],
+    "比亚迪2024年新能源汽车销量是多少": [3, 15, 49, 2, 13],
     "美的集团2024年经营活动现金流量净额是多少": [9, 53],
+    "美的集团2024年归属于上市公司股东的净利润是多少": [10],
+    "美的集团2024年发布了哪些新品或新技术": [41, 23, 27, 37, 39],
+    "美的集团2024年COLMO或高端品牌情况": [33, 47, 63, 16, 21],
     "格力电器2024年归属于上市公司股东的净利润是多少": [6, 10],
     "格力电器2024年资产负债率是多少": [106, 117],
     "格力电器2024年分产品收入构成": [10, 25],
+    "格力电器2024年推出了哪些新产品": [12, 14, 15, 22, 23, 24],
+    "格力电器2024年工业制品或装备业务": [43, 235, 10, 12, 22],
     "三一重工2024年归属于上市公司股东的净利润是多少": [5, 6],
+    "三一重工2024年推出了哪些新机型或新产品": [11, 12, 14, 15, 57],
+    "三一重工2024年电动化或新能源产品": [8, 11, 12, 29, 13],
     "2024年长城新推出的车型有哪些": [21, 22, 23],
     "长城灵魂S2000摩托车2024年何时发布": [20, 23],
-    # p5=第一节重要提示（声明无严重风险+指向第三节）；若问「经营面临哪些风险」应以 p13+ 第三节为准
-    "比亚迪年报第一节披露了哪些主要风险": [5],
+    # p5=第一节重要提示（声明无严重风险+指向第三节 13/22/42）；问句已对齐第一节，不另占 100 题槽位
+    "比亚迪年报第一节重要提示如何表述风险因素": [5],
 }
 
 
 def probe_pages(doc_id: str, keywords: list[str], prefer_hint: str | None, limit: int = 5) -> list[int]:
     conditions = " OR ".join(["content ILIKE %s"] * len(keywords))
-    params: list[object] = [doc_id, *[f"%{kw}%" for kw in keywords]]
+    section_conditions = " OR ".join(["COALESCE(metadata->>'section_title','') ILIKE %s"] * len(keywords))
+    like_params = [f"%{kw}%" for kw in keywords]
+    params: list[object] = [doc_id, *like_params, *like_params]
     sql = f"""
-        SELECT DISTINCT (metadata->>'page')::int AS page, content
+        SELECT DISTINCT (metadata->>'page')::int AS page,
+               content,
+               COALESCE(metadata->>'section_title','') AS section_title,
+               COALESCE(metadata->>'clause_no','') AS clause_no
         FROM doc_chunks
-        WHERE doc_id = %s AND ({conditions})
+        WHERE doc_id = %s AND (({conditions}) OR ({section_conditions}))
         ORDER BY page
     """
     with get_connection() as conn:
@@ -171,16 +184,21 @@ def probe_pages(doc_id: str, keywords: list[str], prefer_hint: str | None, limit
         return []
 
     scored: list[tuple[int, int, int]] = []
-    for page, content in rows:
+    for page, content, section_title, clause_no in rows:
         if page is None:
             continue
         text = content or ""
+        title = section_title or ""
+        clause = clause_no or ""
         score = sum(1 for kw in keywords if kw in text)
-        if prefer_hint and prefer_hint in text:
+        score += sum(2 for kw in keywords if kw in title or kw in clause)
+        if prefer_hint and (prefer_hint in text or prefer_hint in title or prefer_hint in clause):
             score += 3
-        # 偏好较短、信息密度高的 chunk（非目录/页眉）
-        if "目录" in text[:40]:
-            score -= 2
+        # 目录页、页眉块容易被「第一节」之类词误中
+        if text.strip().startswith("目录") or "目录" in text[:40]:
+            score -= 4
+        if "年度报告全文" in text and len(text) < 80:
+            score -= 3
         if len(text) < 80:
             score -= 1
         scored.append((score, page, len(text)))
@@ -254,12 +272,61 @@ def build_items() -> list[dict]:
 
 
 def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="探测 gold_pages 并生成 / 对照 rag_retrieval_100.json")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="只打印与现文件的差，不覆盖。有把握的差异再写入 MANUAL_GOLD_PAGES 后 --write",
+    )
+    parser.add_argument(
+        "--write",
+        action="store_true",
+        help="覆盖写入黄金集。默认不写，避免一次静默改尺子",
+    )
+    parser.add_argument(
+        "--categories",
+        default="",
+        help="只对照这些题型，逗号分隔，如 product_enum,compliance_risk,numeric_financial",
+    )
+    args = parser.parse_args()
+    wanted = {item.strip() for item in args.categories.split(",") if item.strip()}
+
     items = build_items()
     missing = [item for item in items if not item["gold_pages"]]
     if missing:
         print(f"WARNING: {len(missing)} items without gold_pages:", file=sys.stderr)
         for item in missing:
             print(f"  {item['id']} {item['question']}", file=sys.stderr)
+
+    if args.dry_run or not args.write:
+        if not OUT_PATH.is_file():
+            print(f"no existing golden at {OUT_PATH}; pass --write to create")
+            if missing:
+                sys.exit(1)
+            return
+        current = json.loads(OUT_PATH.read_text(encoding="utf-8"))
+        current_by_id = {row["id"]: row for row in current.get("items") or []}
+        diffs = 0
+        for item in items:
+            if wanted and item["category"] not in wanted:
+                continue
+            old = current_by_id.get(item["id"])
+            old_pages = (old or {}).get("gold_pages")
+            new_pages = item["gold_pages"]
+            if old_pages != new_pages:
+                diffs += 1
+                print(
+                    f"{item['id']} {item['category']} {item['question']}\n"
+                    f"  old={old_pages}\n  new={new_pages}"
+                )
+        print(f"diff_count={diffs} compared={sum(1 for it in items if not wanted or it['category'] in wanted)}")
+        if not args.write:
+            print("not written (pass --write after reviewing MANUAL_GOLD_PAGES)")
+            if missing:
+                sys.exit(1)
+            return
 
     categories: dict[str, int] = {}
     for item in items:
@@ -270,12 +337,12 @@ def main() -> None:
         "description": (
             "RAG 检索评测黄金集 100 条：覆盖 5 家 2024 年报（比亚迪/长城/美的/格力/三一），"
             "含财务数字、比率、产品列举、分部业务、合规风险、治理、ESG、战略与同比等题型。"
-            "gold_pages 由 doc_chunks 关键词探测生成，评测指标为 Recall@k / MRR（page 粒度）。"
+            "gold_pages 由 doc_chunks 关键词探测 + 人工 override 生成，评测指标为 Recall@k / MRR / nDCG@k / citation_accuracy（page 粒度，gold 页同等相关）。"
         ),
         "default_params": {
             "top_k": 12,
             "min_score": 0.42,
-            "metrics": ["recall_at_k", "mrr", "page_hit_at_k"],
+            "metrics": ["recall_at_k", "mrr", "ndcg_at_k", "citation_accuracy", "page_hit_at_k"],
         },
         "category_counts": categories,
         "items": items,

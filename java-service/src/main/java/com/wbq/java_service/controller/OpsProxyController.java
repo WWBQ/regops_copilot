@@ -4,6 +4,7 @@ import java.util.Map;
 
 import com.wbq.java_service.client.PythonAiClient;
 
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/ops")
@@ -86,6 +88,20 @@ public class OpsProxyController {
             @RequestParam(value = "target_type", required = false) String targetType
     ) {
         return pythonAiClient.listIngestJobs(limit, offset, status, targetType);
+    }
+
+    @GetMapping("/ingest/jobs/{jobId}")
+    public Map<String, Object> getIngestJob(@PathVariable String jobId) {
+        return pythonAiClient.getIngestJob(jobId);
+    }
+
+    @PostMapping(value = "/ingest", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, Object> startPdfIngest(
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "doc_id", required = false) String docId,
+            @RequestParam(value = "use_parse_cache", required = false) Boolean useParseCache
+    ) {
+        return pythonAiClient.startPdfIngest(file, docId, useParseCache);
     }
 
     @GetMapping("/ingest/session-documents")

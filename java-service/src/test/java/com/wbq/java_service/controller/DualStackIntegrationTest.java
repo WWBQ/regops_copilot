@@ -14,6 +14,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -49,7 +52,7 @@ class DualStackIntegrationTest {
 
     @Test
     void chatTimeoutMapsTo504WithStableCode() throws Exception {
-        when(pythonAiClient.chat(any())).thenThrow(
+        when(pythonAiClient.chat(any(), nullable(String.class))).thenThrow(
                 new PythonAiException(504, "python-ai timeout", "upstream_timeout")
         );
         mvc.perform(post("/api/chat")
@@ -65,7 +68,7 @@ class DualStackIntegrationTest {
 
     @Test
     void chatUnavailableMapsTo502WithoutRawJson() throws Exception {
-        when(pythonAiClient.chat(any())).thenThrow(
+        when(pythonAiClient.chat(any(), nullable(String.class))).thenThrow(
                 new PythonAiException(502, "python-ai unavailable", "upstream_down")
         );
         mvc.perform(post("/api/chat")
@@ -79,7 +82,7 @@ class DualStackIntegrationTest {
 
     @Test
     void chatSuccessStillWorks() throws Exception {
-        when(pythonAiClient.chat(any())).thenReturn(new ChatResponse(
+        when(pythonAiClient.chat(any(), nullable(String.class))).thenReturn(new ChatResponse(
                 "hi",
                 "deepseek",
                 "disclaimer",
@@ -101,6 +104,31 @@ class DualStackIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("X-Request-ID", "e2e-chat-ok"))
                 .andExpect(jsonPath("$.reply").value("hi"));
+    }
+
+    @Test
+    void chatForwardsDeptHeader() throws Exception {
+        when(pythonAiClient.chat(any(), eq("research"))).thenReturn(new ChatResponse(
+                "hi",
+                "deepseek",
+                "disclaimer",
+                java.util.List.of(),
+                null,
+                false,
+                "chitchat",
+                1,
+                1,
+                2,
+                10.0,
+                null,
+                null
+        ));
+        mvc.perform(post("/api/chat")
+                        .header("X-Regops-Dept", "research")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"你好\",\"use_rag\":false}"))
+                .andExpect(status().isOk());
+        verify(pythonAiClient).chat(any(), eq("research"));
     }
 
     @Test

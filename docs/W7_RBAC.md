@@ -45,7 +45,7 @@ Agent 和 Python **仍然只写 `PENDING` 草稿**。提交、通过、驳回只
 
 JWT：HS256（nimbus-jose-jwt），`Authorization: Bearer …`。Claims：`uid` `name` `email` `role` `dept`。
 
-问答 / 评测 / 工具 capabilities **仍然可不登录**。带了 JWT 时，`X-Regops-Dept` 必须和 Token 部门一致。用户 JWT **不转发给 Python**。
+问答 / 评测 / 工具 capabilities **仍然可不登录**。带了 JWT 时，`X-Regops-Dept` 必须和 Token 部门一致。用户 JWT **不转发给 Python**；登录后 Java 把 **本部门** 写成 `X-Regops-Dept` 再调 `/chat`，Python RAG 按同一张部门公司表裁剪年报（未登录不裁剪）。越权题的评测见 [`eval_rag_guard.md`](./eval_rag_guard.md)。
 
 ## 数据域
 
@@ -53,7 +53,7 @@ JWT：HS256（nimbus-jose-jwt），`Authorization: Bearer …`。Claims：`uid` 
 |------|------|
 | research | 002594 比亚迪、601633 长城 |
 | rm | 000333 美的、000651 格力 |
-| compliance | 五家金样本 |
+| compliance | 原五家 + 宁德时代、茅台 |
 
 客户档案：`INTERNAL_RESEARCH` vs `CLIENT`。客户经理列表里没有内核行；用内核 `public_id` 取值返回 404，不 403。
 

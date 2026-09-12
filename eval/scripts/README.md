@@ -20,12 +20,24 @@ eval/scripts/download_finmteb.sh
 
 选型卡：[`docs/benchmarks/`](../../docs/benchmarks/README.md)
 
-RAG 检索集生成：`python-ai/.venv/bin/python eval/scripts/build_rag_retrieval_golden.py`
+RAG 检索集生成（默认只出 diff）：`python-ai/.venv/bin/python eval/scripts/build_rag_retrieval_golden.py --dry-run`
+
+覆盖写入须显式 `--write`。
+
+RAG 引用片段撑住答案（20 题，不和 Recall 混报）：`python-ai/.venv/bin/python eval/run_rag_support.py`
+
+RAG 检索消融（baseline / hybrid / rerank）：`python-ai/.venv/bin/python eval/run_rag_ablation.py`
+
+RAG 部门 ACL / 无答案拒答：`python-ai/.venv/bin/python eval/run_rag_acl.py --fail-on-regression`；
+`python-ai/.venv/bin/python eval/run_rag_refuse.py --fail-on-regression`
 
 合规 Schema 校验集生成：`python-ai/.venv/bin/python eval/scripts/build_compliance_schema_golden.py`
 
 W4 问数黄金集评测：`python-ai/.venv/bin/python eval/run_asknum.py --fail-on-regression`
 （长度边界样例需字符级精确，故用脚本生成而非手写 JSON）
+
+W6 数字校验：`python-ai/.venv/bin/python eval/run_w6_number_check.py --fail-on-regression`
+（归档说明 [`docs/eval_w6_number_check.md`](../../docs/eval_w6_number_check.md)）
 
 W8 Prompt 黄金集生成：`python-ai/.venv/bin/python eval/scripts/build_w8_prompt_golden.py`
 

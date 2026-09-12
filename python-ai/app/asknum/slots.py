@@ -42,6 +42,7 @@ CONCEPT_LABELS: dict[str, str] = {
     "revenue": "营业收入",
     "net_profit": "净利润",
     "net_profit_attributable": "归属于母公司股东的净利润",
+    "minority_interest": "少数股东损益",
     "profit_before_tax": "利润总额",
     "income_tax": "所得税费用",
     "total_assets": "资产总计",
@@ -114,7 +115,7 @@ def has_unsupported_period(question: str) -> bool:
 
 
 def parse_relative_year(question: str) -> int | None:
-    """相对年锚在默认报告期（当前库只有 2024），不跟日历年走。"""
+    """相对年锚在默认报告期：去年=2023，今年=2024。"""
     if _LAST_YEAR_RE.search(question):
         return DEFAULT_REPORT_YEAR - 1
     if _THIS_YEAR_RE.search(question):

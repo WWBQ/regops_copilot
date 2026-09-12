@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.documents.titles import COMPANY_DISPLAY_NAMES
+from app.rag.dept_scope import DEPT_COMPANY_ALLOW
 from app.schemas.tools import (
     ComparePeersArgs,
     EmitConclusionArgs,
@@ -19,11 +20,8 @@ from app.schemas.tools import (
 )
 from app.tools.verify import _same_amount, parse_claimed_yuan
 
-# research 只能看整车两家；compliance 看五家金样本
-DEPT_ALLOW: dict[str, frozenset[str]] = {
-    "research": frozenset({"002594", "601633"}),
-    "compliance": frozenset({"002594", "601633", "000333", "000651", "600031"}),
-}
+# research 整车两家；rm 家电两家；compliance 金样本 + 宁德时代 / 茅台
+DEPT_ALLOW = DEPT_COMPANY_ALLOW
 
 _LOOKUP: dict[tuple[str, str, int, str], dict[str, Any]] = {
     ("002594", "revenue", 2024, "consolidated"): {

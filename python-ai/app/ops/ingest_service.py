@@ -190,22 +190,35 @@ def list_ingest_jobs(
                 """,
                 [*params, limit, offset],
             )
-            items = [
-                {
-                    "job_id": row[0],
-                    "target_type": row[1],
-                    "target_doc_id": row[2],
-                    "status": row[3],
-                    "error_message": row[4],
-                    "retry_count": int(row[5] or 0),
-                    "created_at": _iso(row[6]),
-                    "updated_at": _iso(row[7]),
-                    "finished_at": _iso(row[8]),
-                }
-                for row in cur.fetchall()
-            ]
+            items = [_job_item(row) for row in cur.fetchall()]
 
     return {"total": total, "limit": limit, "offset": offset, "items": items}
+
+
+def _job_item(row: Any) -> dict[str, Any]:
+    return {
+        "job_id": row[0],
+        "target_type": row[1],
+        "target_doc_id": row[2],
+        "status": row[3],
+        "error_message": row[4],
+        "retry_count": int(row[5] or 0),
+        "created_at": _iso(row[6]),
+        "updated_at": _iso(row[7]),
+        "finished_at": _iso(row[8]),
+    }
+
+
+def get_ingest_job(job_id: str) -> dict[str, Any] | None:
+    from app.db.ingest_job_repository import get_job
+
+    with get_connection() as conn:
+        if not _table_exists(conn, "ingest_job"):
+            return None
+        row = get_job(conn, job_id)
+    if row is None:
+        return None
+    return _job_item(row)
 
 
 def list_session_ingest_documents(

@@ -177,9 +177,13 @@ public class PythonAiClient {
     }
 
     public ChatResponse chat(ChatRequest request) {
+        return chat(request, null);
+    }
+
+    public ChatResponse chat(ChatRequest request, String dept) {
         return exchange(() -> restClient.post()
                 .uri("/chat")
-                .headers(this::forwardRequestId)
+                .headers(headers -> forwardOutboundHeaders(headers, dept))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(request)
                 .retrieve()
@@ -187,6 +191,10 @@ public class PythonAiClient {
     }
 
     public void copyChatStream(ChatRequest request, OutputStream output) {
+        copyChatStream(request, output, null);
+    }
+
+    public void copyChatStream(ChatRequest request, OutputStream output, String dept) {
         try {
             String json = objectMapper.writeValueAsString(request);
             String base = properties.pythonAi().baseUrl();
@@ -200,6 +208,9 @@ public class PythonAiClient {
                     .header(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM_VALUE)
                     .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8));
             applyCorrelation(builder);
+            if (dept != null && !dept.isBlank()) {
+                builder.header("X-Regops-Dept", dept);
+            }
             var python = properties.pythonAi();
             if (python.serviceName() != null && !python.serviceName().isBlank()) {
                 builder.header("X-Regops-Service", python.serviceName());
@@ -527,6 +538,46 @@ public class PythonAiClient {
                 .headers(this::forwardRequestId)
                 .retrieve()
                 .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> getIngestJob(String jobId) {
+        return exchange(() -> restClient.get()
+                .uri("/ops/ingest/jobs/{jobId}", jobId)
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> startPdfIngest(MultipartFile file, String docId, Boolean useParseCache) {
+        try {
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            if (file != null && !file.isEmpty()) {
+                String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "upload.pdf";
+                body.add("file", new ByteArrayResource(file.getBytes()) {
+                    @Override
+                    public String getFilename() {
+                        return filename;
+                    }
+                });
+            }
+            if (docId != null && !docId.isBlank()) {
+                body.add("doc_id", docId);
+            }
+            if (useParseCache != null) {
+                body.add("use_parse_cache", String.valueOf(useParseCache));
+            }
+            return exchange(() -> restClient.post()
+                    .uri("/ingest")
+                    .headers(this::forwardRequestId)
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(body)
+                    .retrieve()
+                    .body(MAP_TYPE));
+        } catch (PythonAiException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw PythonErrorMapper.fromTransport(ex);
+        }
     }
 
     public Map<String, Object> listSessionIngestDocuments(Integer limit, Integer offset, String status) {

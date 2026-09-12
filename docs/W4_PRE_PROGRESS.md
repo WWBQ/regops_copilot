@@ -82,11 +82,11 @@ flowchart LR
 
 | 任务 | 计划交付 | 状态 | 证据 / 说明 |
 |------|----------|------|-------------|
-| **w2-1** 解析 + 噪声清单 | Docling 管线 + NOISE_PATTERNS.md | ⚠️ 大部分 | `ingest/parser.py`、`docs/NOISE_PATTERNS.md`；cleaner 已实现页眉/免责声明（BUG-007）；六类噪声多数仍「待填」；双栏合并/跨页表头 **未做** |
-| **w2-2** 三表 + G1/G2/G3 | F10 JSON → fin_metric | ✅ 完成 | `financial.py` / `reconciliation.py` / `facts.py`；R01–R03；G1 冲突进 review；G3：PDF bbox 或 F10 `content_hash`；CLI `ingest_fin_metric.py`；看板 `/quality/gates` `/quality/facts` |
-| **w2-3** 切分 + 条款元数据 | chunk + clause_no 等 | ⚠️ 部分 | `chunker.py` 可配置 size/overlap，metadata 含 page/doc_id/has_table；**无** clause_no、effective_date、dept_acl |
+| **w2-1** 解析 + 噪声清单 | Docling 管线 + NOISE_PATTERNS.md | ✅ 完成 | `ingest/parser.py`、`docs/NOISE_PATTERNS.md` 六类均有样例；cleaner：页眉/免责/元信息/HTML/双栏硬换行/跨页表头（BUG-007）；完整双栏版面重建不做 |
+| **w2-2** 三表 + G1/G2/G3 | F10 JSON → fin_metric | ✅ 完成 | `financial.py` / `reconciliation.py` / `facts.py`；R01–R04 见 `ACCOUNTING_RULES.md`；G1 冲突进 review；G3：PDF bbox 单测保留，年报数字走 F10 `content_hash`；CLI `ingest_fin_metric.py`；看板 `/quality/gates` `/quality/facts` |
+| **w2-3** 切分 + 条款元数据 | chunk + clause_no 等 | ✅ 完成 | `chunker.py` 按节切 + 跨页标题下挂；metadata 含 `section_title`/`clause_no`/`effective_date`（仅完整年月日）；**dept_acl 在文档层不写 chunk**；原五家 + 宁德/茅台已 re-ingest |
 | **w2-4** PG 表结构 | document/chunk/fin_metric/ingest_job | ✅ 完成 | `docs/sql/w2_tables.sql`、`w3_chat_sessions.sql`；compose 自动 init |
-| **w2-5** 幂等入库 + 状态机 | POST /ingest + ingest_job | ⚠️ 部分 | CLI `scripts/ingest_pdf_to_vectors.py` + 会话 `session_pipeline.py`（ingest_job）；**无** 批量 POST /ingest；批量 pipeline **不写** ingest_job 各阶段 |
+| **w2-5** 幂等入库 + 状态机 | POST /ingest + ingest_job | ✅ 完成 | CLI 与 `POST /ingest`（Java `/api/ops/ingest`）共用 `ingest_pdf_to_vectors`；阶段 PENDING→PARSING→CLEANING→CHUNKING→EMBEDDING→DONE/FAILED；`GET /ops/ingest/jobs/{job_id}` |
 | **w2-6** 基线 RAG + 30 条检索集 | Top-K + 引用 + 拒答 | ✅ 超额 | 被 W3 覆盖：100 题评测、Hybrid、引用页码、low_score 拒答 |
 
 **W2 附加已完成**：
@@ -95,10 +95,11 @@ flowchart LR
 - 日志监控：`/ops/logs`（ingest 失败、RAG 异常 trace 聚合）
 - parse 缓存：`ParseArtifactStore` + object store
 - 文档查看器：citation → PDF 页跳转（`/documents/viewer`）
+- 批量 `POST /ingest` + ingest_job 全阶段
 
 **W2 明确未做 / 占位**：
 
-- PDF 表格抽取与 Docling bbox 交叉验证（G3 的 PDF 分支已有单测，未接年报表格解析）
+- PDF 表格抽取与 Docling bbox 交叉验证（G3 的 PDF 分支已有单测，**有意不接年报表格**；数字走巨潮 F10 JSON）
 
 ---
 
@@ -106,25 +107,24 @@ flowchart LR
 
 | 任务 | 计划交付 | 状态 | 证据 / 说明 |
 |------|----------|------|-------------|
-| **w3-1** BM25 + Embedding 选型 | 稀疏检索 + FinMTEB 报告 | ⚠️ 部分 | BGE-M3 ✅；关键词路 `search_keyword_chunks`（ILIKE+词频，非真 BM25）；公司别名表 `company_scope.py` ✅；**无** FinMTEB 选型报告 |
+| **w3-1** BM25 + Embedding 选型 | 稀疏检索 + FinMTEB 报告 | ⚠️ 部分 | BGE-M3 ✅；关键词路 Okapi BM25（`app/rag/bm25.py`，问题短语 TF + IDF + 长度归一）✅；公司别名表 `company_scope.py` ✅；**无** FinMTEB 选型报告 |
 | **w3-2** Hybrid + RRF | 向量+关键词融合 | ✅ 完成 | `rag/retrieval.py`、`rag/service.py`；单测 `test_rag_retrieval.py` |
-| **w3-3** Reranker | Cross-Encoder + 对照报告 | ⚠️ 代码完成 | `bge-reranker-v2-m3` ✅，失败回退 RRF；**无** nDCG/延迟正式消融报告 |
-| **w3-4** 引用 + 拒答 + ACL | dept_acl 过滤 + 20 条拒答集 | ⚠️ 部分 | 页码引用 + 角标 + PDF 跳转 ✅；寒暄 skip / low_score 拒答 ✅；公司/年份 scope ✅；**dept_acl 检索未接**；**无** 越权测试集 / 无答案 20 题集 |
-| **w3-5** 评测 + 消融 + 对标 | 100 条 + baseline/hybrid/rerank 对比 | ⚠️ 部分 | `rag_retrieval_100.json` + UI 报告 ✅（Recall@k **82%**，MRR **0.53**，2026-08-21）；**无** 系统消融；**无** FinanceBench 对标；**无** nDCG |
+| **w3-3** Reranker | Cross-Encoder + 对照报告 | ⚠️ 部分 | `bge-reranker-v2-m3` ✅，失败回退 RRF；消融含延迟 + nDCG@k，见 [`eval_rag_ablation.md`](./eval_rag_ablation.md)；**无** 真 BM25 |
+| **w3-4** 引用 + 拒答 + ACL | dept_acl 过滤 + 20 条拒答集 | ✅ 完成 | 页码引用 + 角标 + PDF 跳转 ✅；寒暄 / 库外 / 缺年拒答 ✅；检索层 `dept_acl` + 越权 20 题，见 [`eval_rag_guard.md`](./eval_rag_guard.md) |
+| **w3-5** 评测 + 消融 + 对标 | 100 条 + baseline/hybrid/rerank 对比 | ⚠️ 部分 | 100 题 + 三档 CLI + nDCG@k ✅；**无** FinanceBench 全量复跑（选型卡在 `docs/benchmarks/`） |
 
 **W3 附加已完成**：
 
-- 会话级 PDF：`chat_session` / `session_document` + 后台 ingest
+- 会话级 PDF：文件和切块放会话目录，**不写入** `doc_chunks`；检索先搜上传、再搜年报
 - RAG trace：`rag_query_log` + `/ops/rag` 监控（向量/关键词/RRF/精排链路）
 - 系统健康：`/ops/health`（DB/pgvector/语料/配置概览）
 - 公司 scope 过滤：问题含「比亚迪/002594/2024」时收窄 doc_id（BUG-008 已修）
 
 **W3 检索质量已知问题**（见 `docs/BUG_NOTES.md`）：
 
-- rag-027：车型列举 top-12 可中 p22，top-5 / MRR 仍不足
-- rag-013：gold p5 在 top-12 rank 10
-- 节标题 buried 在 chunk 末尾（BUG-011）影响 product_enum
-- 当前 Recall@k = **题级 page_hit**（命中任一 gold 页即算），非经典 IR Recall
+- rag-027：按节切 + 跨页标题下挂已入库；`rag_max_chunks_per_page=2` 同页最多留 2 条
+- rag-013：问句已对齐第一节重要提示（gold p5）；第三节对照页 13/22/42 不另占 100 题
+- 当前 Recall@k = **题级 page_hit**（命中任一 gold 页即算），另报 **nDCG@k** 与 **citation_accuracy**（top-k 去重页中 gold 页占比）
 
 ---
 
@@ -150,7 +150,10 @@ flowchart LR
 | 任务 ID | 黄金集 | 指标 | 最近结果 |
 |---------|--------|------|----------|
 | `w1_chat` | `eval/golden/w1_chat_30.json`（30 题，w1-v2） | accuracy、refuse_rate、latency | 可跑（`use_rag=false`）；报告见 eval/reports/ |
-| `rag_retrieval` | `eval/golden/rag_retrieval_100.json`（100 题，5 家年报） | recall_at_k、mrr | **82% / 0.53**（20260821_174606） |
+| `rag_support` | `eval/golden/rag_support_20.json`（20 题） | support_hit_rate、support_coverage | 与页级 Recall 分开，见 [`eval_rag_support.md`](./eval_rag_support.md) |
+| `rag_acl` | `eval/golden/rag_acl_20.json` | accuracy、false_accept、leak | 脚本门禁 1.0 / 0 / 0 |
+| `rag_refuse` | `eval/golden/rag_refuse_20.json` | accuracy、false_accept | 脚本门禁 1.0 / 0 |
+| `rag_support` | `eval/golden/rag_support_20.json`（20 题） | support_hit_rate、support_coverage | **55% / 60%**（20260911_235731；与 79% 页命中分开） |
 
 **语料库**（RAG 评测覆盖）：
 
@@ -172,10 +175,13 @@ flowchart LR
 | `python-ai/app/rag/` | Hybrid 检索、RRF、Rerank、引用、拒答、trace |
 | `python-ai/app/eval/` | W1 聊天 / RAG 检索 runner |
 | `python-ai/app/ops/` | 系统健康、ingest、logs 聚合 |
-| `docs/NOISE_PATTERNS.md` | W2-1 噪声清单（待补样例） |
+| `docs/NOISE_PATTERNS.md` | W2-1 噪声清单（六类样例 + cleaner 规则） |
 | `docs/INGEST_VALIDATION.md` | W2-2 三道质量门设计 |
-| `docs/ACCOUNTING_RULES.md` | G2 勾稽规则索引（待实现） |
+| `docs/ACCOUNTING_RULES.md` | G2 勾稽规则索引（R01–R04 已实现） |
 | `docs/eval_rag_retrieval.md` | 100 题检索集说明 |
+| `docs/eval_rag_ablation.md` | baseline / hybrid / rerank 三档对照 |
+| `docs/eval_rag_guard.md` | 部门 ACL + 无答案拒答 |
+| `docs/eval_w6_number_check.md` | W6 数字校验归档报告 |
 | `docs/eval_w1_baseline.md` | W1 30 题说明 |
 | `docs/BUG_NOTES.md` | 已知问题与回归记录 |
 
@@ -187,20 +193,15 @@ flowchart LR
 
 | 项 | 说明 | 建议 |
 |----|------|------|
-| **fin_metric 已有 F10 原型** | 五家 2024 直读字段 + R01–R03 | W4 接 Schema / Text2SQL；PDF 交叉验证可后补 |
+| **fin_metric 已有 F10 原型** | 五家 2024 直读字段 + R01–R04 | W4 接 Schema / Text2SQL；PDF 交叉验证可后补 |
 | **口径说明** | 合并报表、元、不手算比率 | 问数时带 `concept` / `scope` / `status=auto_accepted` |
 
 ### 9.2 不阻塞 W4、但影响「W2/W3 通关」的项
 
 | 项 | 所属 |
 |----|------|
-| PDF 三表抽取 + Docling bbox 交叉验证 | W2-2 降级项（数字已走 F10） |
-| dept_acl 检索过滤 + 越权测试 | W3-4（完整 RBAC 在 W7） |
-| 消融报告（baseline / hybrid / rerank） | W3-5 |
+| PDF 三表抽取 + Docling bbox 交叉验证 | W2-2 有意降级（数字走 F10） |
 | FinanceBench / FinMTEB 外部对标 | W3-1 / w3-3 / w3-5（选型卡已在 `docs/benchmarks/`，不必全量复跑） |
-| NOISE 六类补样例 + 双栏合并 | W2-1 |
-| POST /ingest 批量 API + ingest_job 状态机 | W2-5 |
-| clause_no 元数据 + 按节切 chunk | W2-3 / RAG 质量 |
 
 ### 9.3 可复用的工作经验（未接入仓库）
 
@@ -214,15 +215,15 @@ flowchart LR
 
 1. **W4 Text2SQL**：查 `fin_metric`（status=auto_accepted）+ 口径说明
 2. **W3 最小通关**：dept_acl 过滤雏形 + 10 条 badcase 归因文档（1 天）
-3. **cleaner 增强**：双栏合并 / 节标题 chunk（可选，提升 RAG recall）
-4. **W3-5 消融报告**（文档向，可 W4 并行）
+3. ~~**cleaner / 按节切 / re-ingest**~~：噪声六类 + 节标题 chunk 已入库
+4. ~~**W3-5 消融报告**~~：已有 [`eval_rag_ablation.md`](./eval_rag_ablation.md)（100 题三档 + 延迟）
 
 ---
 
 ## 11. 一句话状态（对外 / 面试）
 
-> RegOps W1–W3 已完成 **金融 RAG 主链路**：5 份 A 股年报入库、Hybrid 检索（向量+关键词 RRF+Cross-Encoder）、会话 PDF 问答、100 题检索评测（Recall@12 **82%**）、全链路 trace 与运维看板。  
-> **未完成**：PDF 表格交叉验证、部门 ACL 与系统消融报告。  
+> RegOps W1–W3 已完成 **金融 RAG 主链路**：5 份 A 股年报入库、Hybrid 检索（向量+BM25 RRF+Cross-Encoder）、会话 PDF 问答、100 题检索评测（现网 Recall@12 **79%**、CiteAcc **15.5%**）与 baseline/hybrid/rerank 消融、全链路 trace 与运维看板。  
+> **未完成（有意降级）**：年报 PDF 表格 bbox 交叉验证、FinanceBench 全量复跑。  
 > **下一步 W4**：Schema 检索 + Text2SQL + 数字口径说明，查询 `fin_metric` 而非 PDF 抽表。  
 > **2026-09-05**：第一刀已改为受控 lookup（`app/asknum/`），开放 Text2SQL 不做主路径。
 

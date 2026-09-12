@@ -60,8 +60,12 @@ def is_low_value_chunk(content: str) -> bool:
     text = content.strip()
     if not text:
         return True
-    if len(text) < 25:
+    if len(text) < 12:
         return True
+    if len(text) < 25:
+        # 短节标题 stub（跨页标题页）允许进检索；纯页眉仍走下面的年报头规则
+        if re.search(r"[。；;]", text) or "|" in text or "年度报告全文" in text:
+            return True
     if _ANNUAL_HEADER_RE.match(text):
         return True
     if "年度报告全文" in text and len(text) < 100:
@@ -82,8 +86,17 @@ def _decompose_chinese_phrase(phrase: str) -> list[str]:
     return list(dict.fromkeys(parts))
 
 
+# 列举句式：靠问法判断，不用行业词表（「车型/新品」那种只覆盖车企）
+_ENUM_RE = re.compile(r"哪些|哪几|列举|分别是|包括|清单")
+
+
+def is_enumeration_question(question: str) -> bool:
+    """问句是否在要一份清单。用于抬高关键词权重，不改变召回集合。"""
+    return bool(_ENUM_RE.search(question or ""))
+
+
 def extract_keyword_terms(question: str) -> list[str]:
-    """从用户问题抽取检索词（不注入任何行业/品牌同义词）。"""
+    """从用户问题抽取检索词。只取问句里出现的词，不注入品牌/车名/同义词。"""
     normalized = re.sub(r"(\d+)\s+年", r"\1年", question.strip())
     normalized = re.sub(r"024年", "2024年", normalized)
 
@@ -158,13 +171,41 @@ def reciprocal_rank_fusion(
     return fused
 
 
+def apply_section_title_boost(
+    hits: list[ChunkHit],
+    terms: list[str],
+    *,
+    promote: int,
+) -> list[ChunkHit]:
+    """section_title 命中查询词的 chunk 提前 promote 名。
+
+    按名次调整而不是加分：RRF 分与 Cross-Encoder 分不同量纲，直接加权会破坏排序。
+    稳定排序，未命中的相对次序不变。
+    """
+    if promote <= 0 or not terms or not hits:
+        return hits
+
+    candidates = [term for term in terms if len(term) >= 2]
+    if not candidates:
+        return hits
+
+    def sort_key(item: tuple[int, ChunkHit]) -> tuple[int, int, int]:
+        index, hit = item
+        title = str(hit.metadata.get("section_title") or "")
+        matched = bool(title) and any(term in title for term in candidates)
+        # 名次相同时命中节标题的排前面，否则「提前 N 名」会被原次序抵消
+        return (index - promote if matched else index, 0 if matched else 1, index)
+
+    return [hit for _, hit in sorted(enumerate(hits), key=sort_key)]
+
+
 def apply_page_diversity(
     hits: list[ChunkHit],
     *,
     top_k: int,
-    max_per_page: int = 2,
+    max_per_page: int = 0,
 ) -> list[ChunkHit]:
-    """精排后限制同一页最多 N 条，提升上下文覆盖面（通用 MMR 简化版）。"""
+    """精排后按页截断。max_per_page<=0 表示同页不限制，只截到 top_k。"""
     if max_per_page <= 0 or top_k <= 0:
         return hits[:top_k]
 
@@ -182,6 +223,28 @@ def apply_page_diversity(
             page_counts[page] = page_counts.get(page, 0) + 1
 
     return selected
+
+
+def merge_session_first(
+    session_hits: list[ChunkHit],
+    corpus_hits: list[ChunkHit],
+    *,
+    top_k: int,
+) -> list[ChunkHit]:
+    """先放会话上传的切块，再用年报补满 top_k。两套结果不抢同一套名额。"""
+    if top_k <= 0:
+        return []
+    merged: list[ChunkHit] = []
+    seen: set[tuple[str, int]] = set()
+    for hit in list(session_hits) + list(corpus_hits):
+        key = (hit.doc_id, hit.chunk_index)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(hit)
+        if len(merged) >= top_k:
+            break
+    return merged
 
 
 def filter_substantive_hits(hits: list[ChunkHit], *, top_k: int | None = None) -> list[ChunkHit]:

@@ -519,8 +519,21 @@ const summaryCards = computed(() => {
     return [
       { label: 'Recall@k', value: formatPercent(summary.recall_at_k) },
       { label: 'MRR', value: summary.mrr?.toFixed(4) ?? '—' },
+      { label: 'nDCG@k', value: summary.ndcg_at_k?.toFixed(4) ?? '—' },
+      { label: 'Citation Acc.', value: formatPercent(summary.citation_accuracy) },
       { label: '样本数', value: String(summary.count ?? '—') },
     ]
+  }
+  if (isGuardReport.value) {
+    const cards = [
+      { label: '准确率', value: formatPercent(summary.accuracy) },
+      { label: '误放行率', value: formatPercent(summary.false_accept_rate) },
+      { label: '样本数', value: String(summary.total ?? '—') },
+    ]
+    if (selectedTask.value?.runner === 'rag_acl' || activeRun.value?.task_id === 'rag_acl') {
+      cards.splice(2, 0, { label: '泄露率', value: formatPercent(summary.leak_rate) })
+    }
+    return cards
   }
   if (isComplianceSchemaReport.value) {
     return [
@@ -636,6 +649,13 @@ const isRagReport = computed(
     selectedTask.value?.runner === 'rag_retrieval' ||
     tasks.value.find((t) => t.id === activeRun.value?.task_id)?.runner === 'rag_retrieval',
 )
+
+const isGuardReport = computed(() => {
+  const runner =
+    selectedTask.value?.runner ||
+    tasks.value.find((t) => t.id === activeRun.value?.task_id)?.runner
+  return runner === 'rag_acl' || runner === 'rag_refuse'
+})
 
 const isW1ChatReport = computed(
   () =>
@@ -1135,6 +1155,8 @@ onBeforeUnmount(stopPolling)
                   <th>数量</th>
                   <th>Recall@k</th>
                   <th>MRR</th>
+                  <th>nDCG@k</th>
+                  <th>Citation Acc.</th>
                 </tr>
               </thead>
               <tbody>
@@ -1148,13 +1170,15 @@ onBeforeUnmount(stopPolling)
                   <td>{{ metrics.count }}</td>
                   <td>{{ formatPercent(metrics.recall_at_k) }}</td>
                   <td>{{ metrics.mrr?.toFixed(4) ?? '—' }}</td>
+                  <td>{{ metrics.ndcg_at_k?.toFixed(4) ?? '—' }}</td>
+                  <td>{{ formatPercent(metrics.citation_accuracy) }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </section>
 
-        <section v-if="activeRun.summary?.by_category && (isAsknumReport || isNumberCheckReport || isWorkflowReport || isStrategyReport || isAbReport)" class="section">
+        <section v-if="activeRun.summary?.by_category && (isAsknumReport || isNumberCheckReport || isWorkflowReport || isStrategyReport || isAbReport || isGuardReport)" class="section">
           <h3>分题型</h3>
           <div class="table-wrap">
             <table class="data-table">
@@ -1273,11 +1297,16 @@ onBeforeUnmount(stopPolling)
                   </template>
                   <template v-else>
                     <th>问题</th>
-                    <th v-if="isW1ChatReport || isAsknumReport || isNumberCheckReport || isWorkflowReport || isStrategyReport || isAbReport">题型</th>
+                    <th v-if="isW1ChatReport || isAsknumReport || isNumberCheckReport || isWorkflowReport || isStrategyReport || isAbReport || isGuardReport">题型</th>
                     <th v-if="isWorkflowReport">节点</th>
                     <th v-if="isRagReport">Gold 页</th>
                     <th v-if="isRagReport">命中页</th>
                     <th v-if="isRagReport">命中</th>
+                    <th v-if="isRagReport">nDCG</th>
+                    <th v-if="isRagReport">引用准确</th>
+                    <th v-if="isGuardReport">部门</th>
+                    <th v-if="isGuardReport">期望</th>
+                    <th v-if="isGuardReport">实际</th>
                     <th v-if="!isRagReport">状态</th>
                     <th v-if="!isRagReport">说明</th>
                   </template>
@@ -1299,7 +1328,7 @@ onBeforeUnmount(stopPolling)
                   </template>
                   <template v-else>
                     <td class="question">{{ row.question }}</td>
-                    <td v-if="isW1ChatReport || isAsknumReport || isNumberCheckReport || isWorkflowReport || isStrategyReport || isAbReport">{{ row.category }}</td>
+                    <td v-if="isW1ChatReport || isAsknumReport || isNumberCheckReport || isWorkflowReport || isStrategyReport || isAbReport || isGuardReport">{{ row.category }}</td>
                     <td v-if="isWorkflowReport" class="mono">{{ String(row.fail_node || '—') }}</td>
                     <template v-if="isRagReport">
                       <td class="mono">{{ (row.gold_pages as number[])?.join(', ') }}</td>
@@ -1308,6 +1337,25 @@ onBeforeUnmount(stopPolling)
                         <span :class="row.page_hit_at_k ? 'tag ok' : 'tag fail'">
                           {{ row.page_hit_at_k ? '是' : '否' }}
                         </span>
+                      </td>
+                      <td class="mono">{{ typeof row.ndcg_at_k === 'number' ? row.ndcg_at_k.toFixed(4) : '—' }}</td>
+                      <td class="mono">{{ formatPercent(row.citation_accuracy as number | undefined) }}</td>
+                    </template>
+                    <template v-else-if="isGuardReport">
+                      <td class="mono">{{ row.dept == null || row.dept === '' ? '（未登录）' : String(row.dept) }}</td>
+                      <td class="mono">{{ row.expected_outcome }}</td>
+                      <td class="mono">{{ row.actual_outcome }}</td>
+                      <td>
+                        <span :class="row.passed ? 'tag ok' : 'tag fail'">
+                          {{ row.passed ? '通过' : '失败' }}
+                        </span>
+                      </td>
+                      <td class="detail">
+                        期望 {{ Array.isArray(row.expected_companies) ? (row.expected_companies as string[]).join(',') || '—' : '—' }}
+                        · 实际 {{ Array.isArray(row.actual_companies) ? (row.actual_companies as string[]).join(',') || '—' : '—' }}
+                        <template v-if="Array.isArray(row.leaked_companies) && row.leaked_companies.length">
+                          · 泄露 {{ (row.leaked_companies as string[]).join(',') }}
+                        </template>
                       </td>
                     </template>
                     <template v-else>

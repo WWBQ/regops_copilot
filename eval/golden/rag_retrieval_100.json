@@ -1,12 +1,14 @@
 {
   "version": "rag-retrieval-v1",
-  "description": "RAG 检索评测黄金集 100 条：覆盖 5 家 2024 年报（比亚迪/长城/美的/格力/三一），含财务数字、比率、产品列举、分部业务、合规风险、治理、ESG、战略与同比等题型。gold_pages 由 doc_chunks 关键词探测生成，评测指标为 Recall@k / MRR（page 粒度）。",
+  "description": "RAG 检索评测黄金集 100 条：覆盖 5 家 2024 年报（比亚迪/长城/美的/格力/三一），含财务数字、比率、产品列举、分部业务、合规风险、治理、ESG、战略与同比等题型。gold_pages 由 doc_chunks 关键词探测 + 人工 override 生成，评测指标为 Recall@k / MRR / nDCG@k / citation_accuracy（page 粒度，gold 页同等相关）。",
   "default_params": {
     "top_k": 12,
     "min_score": 0.42,
     "metrics": [
       "recall_at_k",
       "mrr",
+      "ndcg_at_k",
+      "citation_accuracy",
       "page_hit_at_k"
     ]
   },
@@ -299,7 +301,7 @@
     {
       "id": "rag-013",
       "category": "compliance_risk",
-      "question": "比亚迪年报第一节披露了哪些主要风险",
+      "question": "比亚迪年报第一节重要提示如何表述风险因素",
       "doc_id": "002594_2024",
       "company_code": "002594",
       "company_name": "比亚迪",
@@ -308,13 +310,14 @@
         5
       ],
       "probe_keywords": [
+        "第一节",
         "风险因素",
-        "重大风险"
+        "可能面临"
       ],
       "grading": "page_hit_at_k",
       "k": 12,
-      "evidence_hint": "风险因素",
-      "why_clean": "2024年报已入库 doc_id=002594_2024；gold page 由 doc_chunks 关键词探测"
+      "evidence_hint": "第一节",
+      "why_clean": "gold=p5 第一节重要提示（声明无严重风险并指向第三节 p13/22/42）；问句已对齐第一节，避免与经营风险清单混题"
     },
     {
       "id": "rag-014",
@@ -1555,7 +1558,8 @@
         14,
         15,
         22,
-        23
+        23,
+        24
       ],
       "probe_keywords": [
         "推出",

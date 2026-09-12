@@ -29,6 +29,7 @@ def run_rag_search(
         question=args.question,
         document_service=service,
         persist_trace=persist_trace,
+        dept=args.dept,
     )
     outcome = prepared.trace.outcome
     citations: list[RagSearchHit] = []

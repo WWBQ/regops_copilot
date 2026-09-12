@@ -89,6 +89,8 @@ function statusClass(value: string) {
         <option value="000333">美的集团 000333</option>
         <option value="000651">格力电器 000651</option>
         <option value="600031">三一重工 600031</option>
+        <option value="300750">宁德时代 300750</option>
+        <option value="600519">贵州茅台 600519</option>
       </select>
       <select v-model="statement" class="filter-select">
         <option value="">全部报表</option>

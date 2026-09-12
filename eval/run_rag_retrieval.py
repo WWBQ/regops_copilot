@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "python-ai"))
 
 from app.eval.rag_retrieval_runner import run_rag_retrieval_eval  # noqa: E402
 from app.eval.registry import GOLDEN_DIR, REPORTS_DIR  # noqa: E402
+from app.rag.modes import parse_retrieval_mode  # noqa: E402
 
 
 def main() -> int:
@@ -23,8 +24,15 @@ def main() -> int:
     parser.add_argument("--category", type=str, default="")
     parser.add_argument("--top-k", type=int, default=0)
     parser.add_argument("--label", type=str, default="", help="可读标签，写入 report.provenance.label")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="",
+        help="消融档位：baseline / hybrid / rerank；默认走生产配置",
+    )
     parser.add_argument("--out-dir", type=Path, default=None)
     args = parser.parse_args()
+    mode = parse_retrieval_mode(args.mode or None)
 
     report = run_rag_retrieval_eval(
         golden_path=args.golden,
@@ -32,6 +40,7 @@ def main() -> int:
         category=args.category,
         top_k=args.top_k,
         label=args.label,
+        mode=mode,
     )
     label_slug = args.label.strip().replace(" ", "-") if args.label.strip() else None
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")

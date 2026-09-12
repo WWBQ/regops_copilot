@@ -112,6 +112,19 @@ CONCEPT_SPECS: tuple[ConceptSpec, ...] = (
         "归属于母公司股东的净利润",
     ),
     ConceptSpec(
+        "minority_interest",
+        "income",
+        "income",
+        (
+            "少数股东损益",
+            "少数股东净利润",
+            "MINORITY_INTEREST",
+            "MINORITYINTEREST",
+            "MINORITY_PROFIT",
+        ),
+        "少数股东损益",
+    ),
+    ConceptSpec(
         "profit_before_tax",
         "income",
         "income",
@@ -208,7 +221,7 @@ class GateReport:
 
     @property
     def g2_passed(self) -> bool:
-        return all(item.passed for item in self.g2_results)
+        return all(item.passed or item.skipped for item in self.g2_results)
 
     @property
     def g3_passed(self) -> bool:
@@ -431,7 +444,12 @@ def apply_gates(
     g1_conflicts = detect_amount_conflicts(gate_dicts)
 
     g2_results = run_reconciliation(_concept_values(facts), display_unit=unit)
-    failed_g2_concepts = {concept for item in g2_results if not item.passed for concept in item.concepts}
+    failed_g2_concepts = {
+        concept
+        for item in g2_results
+        if not item.passed and not item.skipped
+        for concept in item.concepts
+    }
 
     g3_failures: list[dict[str, Any]] = []
     g3_failed_keys: set[str] = set()

@@ -1,4 +1,4 @@
-"""会话级 PDF ingest：parse → chunk → embed，仅本会话 RAG 可用。"""
+"""会话级 PDF ingest：parse → chunk → embed，切块写入会话目录，不进 doc_chunks。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from app.config import get_settings
-from app.db.chunk_repository import delete_chunks, insert_chunks
+from app.db.chunk_repository import delete_chunks
 from app.db.connection import get_connection
 from app.db.ingest_job_repository import update_job_status
 from app.db.session_repository import update_document_status
@@ -20,6 +20,7 @@ from app.ingest.embeddings import embed_texts, get_embedding_model
 from app.ingest.models import PageBlock
 from app.ingest.parser import parse_pdf
 from app.ingest.parse_store import ParseArtifactStore
+from app.rag.session_index import save_session_chunks
 from app.storage.local import LocalObjectStore
 
 logger = logging.getLogger(__name__)
@@ -110,6 +111,7 @@ def ingest_session_pdf(
             blocks = _parse_pdf_bytes(body, source_filename=source_filename)
             parse_store.save_blocks(doc_id, blocks, source_type="pdf")
 
+        _set_status("CLEANING", "PROCESSING")
         blocks, _ = clean_page_blocks(blocks)
 
         _set_status("CHUNKING", "PROCESSING")
@@ -127,10 +129,16 @@ def ingest_session_pdf(
 
         _set_status("EMBEDDING", "PROCESSING")
         vectors = embed_texts([chunk.content for chunk in chunks], model=get_embedding_model())
+        inserted = save_session_chunks(
+            session_id=session_id,
+            doc_id=doc_id,
+            chunks=chunks,
+            vectors=vectors,
+        )
 
         with get_connection() as conn:
+            # 清掉历史误写入公司检索表的会话切块
             delete_chunks(conn, doc_id=doc_id, source_type="pdf")
-            inserted = insert_chunks(conn, chunks, vectors, source_type="pdf")
             update_job_status(conn, job_id=job_id, status="DONE")
             update_document_status(
                 conn,

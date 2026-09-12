@@ -1,0 +1,163 @@
+{
+  "version": "rag-refuse-v1",
+  "description": "20 题无答案拒答：寒暄走 no_intent；库外公司或没有对应年份的年报走 no_docs。不调 LLM、不连向量库。",
+  "default_params": {
+    "corpus_doc_ids": [
+      "002594_2024",
+      "002594_2023",
+      "601633_2024",
+      "601633_2023",
+      "000333_2024",
+      "000333_2023",
+      "000651_2024",
+      "000651_2023",
+      "600031_2024",
+      "600031_2023",
+      "300750_2024",
+      "600519_2024"
+    ],
+    "metrics": ["accuracy", "false_accept_rate"]
+  },
+  "items": [
+    {
+      "id": "refuse-001",
+      "category": "chitchat",
+      "question": "你好",
+      "expected_outcome": "no_intent",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-002",
+      "category": "chitchat",
+      "question": "您好！",
+      "expected_outcome": "no_intent",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-003",
+      "category": "chitchat",
+      "question": "谢谢",
+      "expected_outcome": "no_intent",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-004",
+      "category": "chitchat",
+      "question": "hi",
+      "expected_outcome": "no_intent",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-005",
+      "category": "chitchat",
+      "question": "再见",
+      "expected_outcome": "no_intent",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-006",
+      "category": "chitchat",
+      "question": "你是谁",
+      "expected_outcome": "no_intent",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-007",
+      "category": "chitchat",
+      "question": "介绍一下",
+      "expected_outcome": "no_intent",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-008",
+      "category": "off_topic",
+      "question": "今天天气怎么样",
+      "expected_outcome": "no_intent",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-009",
+      "category": "off_corpus",
+      "question": "海康威视（002415）2024年净利润是多少",
+      "expected_outcome": "no_docs",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-010",
+      "category": "off_corpus",
+      "question": "药明康德（603259）2024年营业收入是多少",
+      "expected_outcome": "no_docs",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-011",
+      "category": "off_corpus",
+      "question": "工商银行（601398）2024年不良贷款率是多少",
+      "expected_outcome": "no_docs",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-012",
+      "category": "off_corpus",
+      "question": "中国平安（601318）2024年净利润是多少",
+      "expected_outcome": "no_docs",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-013",
+      "category": "off_corpus",
+      "question": "招商银行（600036）2024年净息差是多少",
+      "expected_outcome": "no_docs",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-014",
+      "category": "off_corpus",
+      "question": "恒瑞医药（600276）2024年研发费用是多少",
+      "expected_outcome": "no_docs",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-015",
+      "category": "off_corpus",
+      "question": "中石油（601857）2024年营业收入是多少",
+      "expected_outcome": "no_docs",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-016",
+      "category": "off_corpus",
+      "question": "隆基绿能（601012）2024年净利润是多少",
+      "expected_outcome": "no_docs",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-017",
+      "category": "missing_year",
+      "question": "比亚迪2099年营业收入是多少",
+      "expected_outcome": "no_docs",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-018",
+      "category": "missing_year",
+      "question": "长城汽车2099年净利润是多少",
+      "expected_outcome": "no_docs",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-019",
+      "category": "missing_year",
+      "question": "美的集团2010年营业收入是多少",
+      "expected_outcome": "no_docs",
+      "expected_companies": []
+    },
+    {
+      "id": "refuse-020",
+      "category": "missing_year",
+      "question": "三一重工2030年营收目标是多少",
+      "expected_outcome": "no_docs",
+      "expected_companies": []
+    }
+  ]
+}

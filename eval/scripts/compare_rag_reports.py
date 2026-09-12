@@ -89,6 +89,9 @@ def compare_reports(baseline: dict, candidate: dict) -> dict:
         category_delta[cat] = {
             "recall_at_k_delta": round(float(c_cat.get("recall_at_k") or 0) - float(b_cat.get("recall_at_k") or 0), 4),
             "mrr_delta": round(float(c_cat.get("mrr") or 0) - float(b_cat.get("mrr") or 0), 4),
+            "ndcg_at_k_delta": round(
+                float(c_cat.get("ndcg_at_k") or 0) - float(b_cat.get("ndcg_at_k") or 0), 4
+            ),
             "baseline_recall": b_cat.get("recall_at_k"),
             "candidate_recall": c_cat.get("recall_at_k"),
         }
@@ -99,14 +102,19 @@ def compare_reports(baseline: dict, candidate: dict) -> dict:
         "summary_delta": {
             "recall_at_k_delta": round(float(cand_sum.get("recall_at_k") or 0) - float(base_sum.get("recall_at_k") or 0), 4),
             "mrr_delta": round(float(cand_sum.get("mrr") or 0) - float(base_sum.get("mrr") or 0), 4),
+            "ndcg_at_k_delta": round(
+                float(cand_sum.get("ndcg_at_k") or 0) - float(base_sum.get("ndcg_at_k") or 0), 4
+            ),
             "baseline": {
                 "recall_at_k": base_sum.get("recall_at_k"),
                 "mrr": base_sum.get("mrr"),
+                "ndcg_at_k": base_sum.get("ndcg_at_k"),
                 "count": base_sum.get("count"),
             },
             "candidate": {
                 "recall_at_k": cand_sum.get("recall_at_k"),
                 "mrr": cand_sum.get("mrr"),
+                "ndcg_at_k": cand_sum.get("ndcg_at_k"),
                 "count": cand_sum.get("count"),
             },
         },
@@ -129,13 +137,18 @@ def print_human(diff: dict) -> None:
         f"(Δ {sd['recall_at_k_delta']:+.4f})"
     )
     print(f"MRR:      {sd['baseline']['mrr']} → {sd['candidate']['mrr']} (Δ {sd['mrr_delta']:+.4f})")
+    print(
+        f"nDCG@k:   {sd['baseline'].get('ndcg_at_k')} → {sd['candidate'].get('ndcg_at_k')} "
+        f"(Δ {sd.get('ndcg_at_k_delta', 0):+.4f})"
+    )
     print()
     if diff["by_category"]:
         print("--- 分题型 Δ ---")
         for cat, row in diff["by_category"].items():
             print(
                 f"  {cat}: recall Δ {row['recall_at_k_delta']:+.4f}, "
-                f"mrr Δ {row['mrr_delta']:+.4f}"
+                f"mrr Δ {row['mrr_delta']:+.4f}, "
+                f"ndcg Δ {row.get('ndcg_at_k_delta', 0):+.4f}"
             )
         print()
     print(f"回归（命中→未命中）: {len(diff['regressions'])} 题")

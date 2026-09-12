@@ -16,15 +16,21 @@ from app.db.session_repository import get_ready_doc_ids
 from app.documents.service import DocumentService
 from app.documents.titles import resolve_document_titles
 from app.ingest.embeddings import embed_text
-from app.rag.company_scope import filter_doc_ids_for_question
+from app.rag.company_scope import is_session_doc
+from app.rag.dept_scope import apply_retrieval_scope
+from app.rag.modes import RetrievalMode, resolve_retrieval_flags
 from app.rag.reranker import rerank_with_cross_encoder
 from app.rag.retrieval import (
     apply_page_diversity,
+    apply_section_title_boost,
     extract_keyword_terms,
     filter_substantive_hits,
     hit_passes_relevance_threshold,
+    is_enumeration_question,
+    merge_session_first,
     reciprocal_rank_fusion,
 )
+from app.rag.session_index import search_session_keyword, search_session_similar
 from app.prompts.library import render_system
 from app.rag.trace import RagPrepareResult, RagTrace
 
@@ -118,15 +124,83 @@ def _max_vector_score(hits: list[ChunkHit]) -> float | None:
     return max(scores) if scores else None
 
 
+def _rank_pool(
+    *,
+    question: str,
+    query_terms: list[str],
+    vector_hits: list[ChunkHit],
+    keyword_hits: list[ChunkHit],
+    top_k: int,
+    use_keyword: bool,
+    use_rerank: bool,
+    pipeline: dict,
+    pool: str,
+) -> list[ChunkHit]:
+    settings = get_settings()
+    vector_substantive = filter_substantive_hits(vector_hits)
+    keyword_substantive = filter_substantive_hits(keyword_hits)
+    pipeline[f"{pool}_vector_hit_count"] = len(vector_substantive)
+    pipeline[f"{pool}_keyword_hit_count"] = len(keyword_substantive)
+
+    keyword_weight = settings.rag_keyword_rrf_weight
+    if is_enumeration_question(question) and settings.rag_enum_keyword_rrf_weight > 0:
+        keyword_weight = settings.rag_enum_keyword_rrf_weight
+
+    if use_keyword and keyword_substantive:
+        fused = reciprocal_rank_fusion(
+            vector_substantive,
+            keyword_substantive,
+            k=settings.rag_rrf_k,
+            weights=[settings.rag_vector_rrf_weight, keyword_weight],
+        )
+    else:
+        fused = vector_substantive
+
+    candidates = fused[: max(settings.rag_rerank_candidates, top_k)]
+    if use_rerank and candidates:
+        try:
+            t3 = time.perf_counter()
+            reranked = rerank_with_cross_encoder(
+                question,
+                candidates,
+                model_name=settings.rag_rerank_model,
+                top_k=len(candidates),
+            )
+            pipeline["timing_ms"][f"{pool}_rerank"] = round((time.perf_counter() - t3) * 1000, 2)
+            return apply_page_diversity(
+                apply_section_title_boost(
+                    reranked, query_terms, promote=settings.rag_section_title_boost
+                ),
+                top_k=top_k,
+                max_per_page=settings.rag_max_chunks_per_page,
+            )
+        except Exception:
+            pipeline["rerank_fallback"] = True
+            logger.exception("cross-encoder rerank failed (%s), falling back to RRF order", pool)
+
+    return apply_page_diversity(
+        apply_section_title_boost(
+            candidates, query_terms, promote=settings.rag_section_title_boost
+        ),
+        top_k=top_k,
+        max_per_page=settings.rag_max_chunks_per_page,
+    )
+
+
 def retrieve_hits_with_trace(
     *,
     question: str,
     doc_ids: list[str],
     top_k: int = 5,
+    mode: RetrievalMode | None = None,
 ) -> tuple[list[ChunkHit], dict]:
-    """Hybrid 检索并返回 pipeline 明细（供 trace 持久化）。"""
+    """检索并返回 pipeline 明细（供 trace / 消融评测）。mode=None 走生产配置。
+
+    会话上传与公司年报分开检索，再按「先上传、后年报」合并，避免抢同一套 top_k。
+    """
     pipeline: dict = {
         "top_k": top_k,
+        "mode": mode,
         "vector_top": [],
         "keyword_top": [],
         "rerank_enabled": False,
@@ -137,75 +211,118 @@ def retrieve_hits_with_trace(
         return [], pipeline
 
     settings = get_settings()
+    use_keyword, use_rerank = resolve_retrieval_flags(
+        mode, rerank_enabled=settings.rag_rerank_enabled
+    )
     vector_fetch_k = max(settings.rag_vector_fetch_k, top_k * 10)
-    keyword_top_k = max(settings.rag_keyword_top_k, top_k * 3)
-    keyword_terms = extract_keyword_terms(question)
+    keyword_top_k = max(settings.rag_keyword_top_k, top_k * 3) if use_keyword else 0
+    query_terms = extract_keyword_terms(question)
+    keyword_terms = query_terms if use_keyword else []
+    session_ids = [doc_id for doc_id in doc_ids if is_session_doc(doc_id)]
+    corpus_ids = [doc_id for doc_id in doc_ids if not is_session_doc(doc_id)]
+    pipeline["use_keyword"] = use_keyword
+    pipeline["use_rerank"] = use_rerank
     pipeline["keyword_terms"] = keyword_terms
+    pipeline["keyword_scorer"] = "bm25"
+    pipeline["section_title_boost"] = settings.rag_section_title_boost
+    pipeline["max_chunks_per_page"] = settings.rag_max_chunks_per_page
+    pipeline["bm25"] = {"k1": settings.rag_bm25_k1, "b": settings.rag_bm25_b}
     pipeline["vector_fetch_k"] = vector_fetch_k
     pipeline["keyword_top_k"] = keyword_top_k
+    pipeline["session_doc_ids"] = session_ids
+    pipeline["corpus_doc_ids"] = corpus_ids
+    pipeline["enumeration"] = is_enumeration_question(question)
+    pipeline["keyword_rrf_weight"] = (
+        settings.rag_enum_keyword_rrf_weight
+        if pipeline["enumeration"] and settings.rag_enum_keyword_rrf_weight > 0
+        else settings.rag_keyword_rrf_weight
+    )
 
     t0 = time.perf_counter()
     query_vector = embed_text(question)
     pipeline["timing_ms"]["embed"] = round((time.perf_counter() - t0) * 1000, 2)
 
-    with get_connection() as conn:
-        t1 = time.perf_counter()
-        vector_hits = search_similar_chunks(conn, query_vector, doc_ids, top_k=vector_fetch_k)
-        pipeline["timing_ms"]["vector_search"] = round((time.perf_counter() - t1) * 1000, 2)
-
-        keyword_hits: list[ChunkHit] = []
-        if keyword_terms:
-            t2 = time.perf_counter()
-            keyword_hits = search_keyword_chunks(
-                conn, doc_ids, keyword_terms, top_k=keyword_top_k
+    session_vector: list[ChunkHit] = []
+    session_keyword: list[ChunkHit] = []
+    if session_ids:
+        t_s = time.perf_counter()
+        session_vector = search_session_similar(query_vector, session_ids, top_k=vector_fetch_k)
+        if use_keyword and keyword_terms:
+            session_keyword = search_session_keyword(
+                session_ids,
+                keyword_terms,
+                top_k=keyword_top_k,
+                k1=settings.rag_bm25_k1,
+                b=settings.rag_bm25_b,
             )
-            pipeline["timing_ms"]["keyword_search"] = round((time.perf_counter() - t2) * 1000, 2)
+        pipeline["timing_ms"]["session_search"] = round((time.perf_counter() - t_s) * 1000, 2)
 
-    vector_substantive = filter_substantive_hits(vector_hits)
-    keyword_substantive = filter_substantive_hits(keyword_hits)
-    pipeline["vector_hit_count"] = len(vector_substantive)
-    pipeline["keyword_hit_count"] = len(keyword_substantive)
-    pipeline["vector_top"] = RagTrace.from_hits(vector_substantive, limit=5)
-    pipeline["keyword_top"] = RagTrace.from_hits(keyword_substantive, limit=5)
-
-    if keyword_substantive:
-        fused = reciprocal_rank_fusion(
-            vector_substantive,
-            keyword_substantive,
-            k=settings.rag_rrf_k,
-            weights=[settings.rag_vector_rrf_weight, settings.rag_keyword_rrf_weight],
-        )
-    else:
-        fused = vector_substantive
-
-    candidates = fused[: max(settings.rag_rerank_candidates, top_k)]
-    pipeline["rerank_enabled"] = settings.rag_rerank_enabled and bool(candidates)
-
-    if settings.rag_rerank_enabled and candidates:
-        try:
-            t3 = time.perf_counter()
-            reranked = rerank_with_cross_encoder(
-                question,
-                candidates,
-                model_name=settings.rag_rerank_model,
-                top_k=len(candidates),
+    corpus_vector: list[ChunkHit] = []
+    corpus_keyword: list[ChunkHit] = []
+    if corpus_ids:
+        with get_connection() as conn:
+            t1 = time.perf_counter()
+            corpus_vector = search_similar_chunks(
+                conn, query_vector, corpus_ids, top_k=vector_fetch_k
             )
-            pipeline["timing_ms"]["rerank"] = round((time.perf_counter() - t3) * 1000, 2)
-            hits = apply_page_diversity(
-                reranked,
-                top_k=top_k,
-                max_per_page=settings.rag_max_chunks_per_page,
-            )
-            return hits, pipeline
-        except Exception:
-            pipeline["rerank_fallback"] = True
-            logger.exception("cross-encoder rerank failed, falling back to RRF order")
+            pipeline["timing_ms"]["vector_search"] = round((time.perf_counter() - t1) * 1000, 2)
+            if use_keyword and keyword_terms:
+                t2 = time.perf_counter()
+                corpus_keyword = search_keyword_chunks(
+                    conn,
+                    corpus_ids,
+                    keyword_terms,
+                    top_k=keyword_top_k,
+                    k1=settings.rag_bm25_k1,
+                    b=settings.rag_bm25_b,
+                )
+                pipeline["timing_ms"]["keyword_search"] = round((time.perf_counter() - t2) * 1000, 2)
 
-    hits = apply_page_diversity(
-        candidates,
+    pipeline["rerank_enabled"] = use_rerank
+    session_ranked = _rank_pool(
+        question=question,
+        query_terms=query_terms,
+        vector_hits=session_vector,
+        keyword_hits=session_keyword,
         top_k=top_k,
-        max_per_page=settings.rag_max_chunks_per_page,
+        use_keyword=use_keyword,
+        use_rerank=use_rerank,
+        pipeline=pipeline,
+        pool="session",
+    ) if session_ids else []
+    corpus_ranked = _rank_pool(
+        question=question,
+        query_terms=query_terms,
+        vector_hits=corpus_vector,
+        keyword_hits=corpus_keyword,
+        top_k=top_k,
+        use_keyword=use_keyword,
+        use_rerank=use_rerank,
+        pipeline=pipeline,
+        pool="corpus",
+    ) if corpus_ids else []
+
+    if session_ids and corpus_ids:
+        hits = merge_session_first(session_ranked, corpus_ranked, top_k=top_k)
+    elif session_ids:
+        hits = session_ranked
+    else:
+        hits = corpus_ranked
+
+    vector_for_trace = session_vector + corpus_vector
+    keyword_for_trace = session_keyword + corpus_keyword
+    pipeline["vector_hit_count"] = pipeline.get("session_vector_hit_count", 0) + pipeline.get(
+        "corpus_vector_hit_count", 0
     )
+    pipeline["keyword_hit_count"] = pipeline.get("session_keyword_hit_count", 0) + pipeline.get(
+        "corpus_keyword_hit_count", 0
+    )
+    pipeline["vector_top"] = RagTrace.from_hits(filter_substantive_hits(vector_for_trace), limit=5)
+    pipeline["keyword_top"] = RagTrace.from_hits(filter_substantive_hits(keyword_for_trace), limit=5)
+    if "corpus_rerank" in pipeline["timing_ms"]:
+        pipeline["timing_ms"]["rerank"] = pipeline["timing_ms"]["corpus_rerank"]
+    elif "session_rerank" in pipeline["timing_ms"]:
+        pipeline["timing_ms"]["rerank"] = pipeline["timing_ms"]["session_rerank"]
     return hits, pipeline
 
 
@@ -214,8 +331,11 @@ def retrieve_hits_for_docs(
     question: str,
     doc_ids: list[str],
     top_k: int = 5,
+    mode: RetrievalMode | None = None,
 ) -> list[ChunkHit]:
-    hits, _ = retrieve_hits_with_trace(question=question, doc_ids=doc_ids, top_k=top_k)
+    hits, _ = retrieve_hits_with_trace(
+        question=question, doc_ids=doc_ids, top_k=top_k, mode=mode
+    )
     return hits
 
 
@@ -296,6 +416,7 @@ def prepare_chat_rag(
     min_score: float | None = None,
     request_id: str | None = None,
     persist_trace: bool = True,
+    dept: str | None = None,
 ) -> RagPrepareResult:
     """统一 RAG：会话 PDF + 公司年报库；返回答案与 trace。"""
     settings = get_settings()
@@ -327,9 +448,14 @@ def prepare_chat_rag(
             save_rag_trace(trace)
         return RagPrepareResult(answer=None, trace=trace)
 
-    with get_connection() as conn:
-        doc_ids = filter_doc_ids_for_question(conn, doc_ids, question)
+    doc_ids = apply_retrieval_scope(doc_ids, question, dept)
     trace.scoped_doc_ids = doc_ids
+    if not doc_ids:
+        trace.outcome = "no_docs"
+        trace.total_rag_ms = round((time.perf_counter() - started) * 1000, 2)
+        if persist_trace:
+            save_rag_trace(trace)
+        return RagPrepareResult(answer=None, trace=trace)
 
     hits, pipeline = retrieve_hits_with_trace(
         question=question, doc_ids=doc_ids, top_k=resolved_top_k
@@ -378,6 +504,8 @@ def prepare_session_rag(
     document_service: DocumentService,
     top_k: int | None = None,
     min_score: float | None = None,
+    persist_trace: bool = True,
+    dept: str | None = None,
 ) -> RagPrepareResult:
     return prepare_chat_rag(
         session_id=session_id,
@@ -385,4 +513,6 @@ def prepare_session_rag(
         document_service=document_service,
         top_k=top_k,
         min_score=min_score,
+        persist_trace=persist_trace,
+        dept=dept,
     )

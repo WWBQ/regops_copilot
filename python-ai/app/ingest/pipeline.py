@@ -1,4 +1,9 @@
-"""单份 PDF：parse → clean → chunk → embed → pgvector。"""
+"""单份 PDF：parse → clean → chunk → embed → pgvector。
+
+批量 CLI 与 POST /ingest 共用；各阶段写入 ingest_job
+（PENDING → PARSING → CLEANING → CHUNKING → EMBEDDING → DONE/FAILED）。
+年报数字抽取走 F10，不经过 EXTRACTING。
+"""
 
 from __future__ import annotations
 
@@ -9,6 +14,7 @@ from pathlib import Path
 from app.config import get_settings
 from app.db.chunk_repository import delete_chunks, insert_chunks
 from app.db.connection import get_connection
+from app.db.ingest_job_repository import create_job, update_job_status
 from app.db.pdf_document_repository import infer_doc_id, upsert_pdf_document
 from app.documents.registry import DocumentRegistry
 from app.documents.service import DocumentService
@@ -30,6 +36,7 @@ class IngestResult:
     chunks: int
     deleted_chunks: int
     parse_cached: bool
+    job_id: str | None = None
 
 
 def _build_document_service() -> DocumentService:
@@ -42,6 +49,23 @@ def _build_document_service() -> DocumentService:
     )
     registry = DocumentRegistry(Path(settings.object_store_root) / "_registry" / "documents.json")
     return DocumentService(store, registry, default_bucket=settings.object_store_bucket)
+
+
+def _set_job_status(job_id: str | None, status: str, error_message: str | None = None) -> None:
+    if not job_id:
+        return
+    with get_connection() as conn:
+        update_job_status(conn, job_id=job_id, status=status, error_message=error_message)
+        conn.commit()
+
+
+def _ensure_job(job_id: str | None, doc_id: str) -> str:
+    if job_id:
+        return job_id
+    with get_connection() as conn:
+        created = create_job(conn, target_type="pdf", target_doc_id=doc_id, status="PENDING")
+        conn.commit()
+    return created
 
 
 def _parse_or_load(
@@ -69,12 +93,14 @@ def ingest_pdf_to_vectors(
     use_parse_cache: bool = True,
     chunk_size: int = 512,
     chunk_overlap: int = 128,
+    job_id: str | None = None,
 ) -> IngestResult:
     pdf_path = pdf_path.resolve()
     if not pdf_path.is_file():
         raise FileNotFoundError(pdf_path)
 
     resolved_doc_id = doc_id or infer_doc_id(pdf_path)
+    job_id = _ensure_job(job_id, resolved_doc_id)
     settings = get_settings()
     store = LocalObjectStore(
         Path(settings.object_store_root),
@@ -85,63 +111,78 @@ def ingest_pdf_to_vectors(
     parse_store = ParseArtifactStore(store, default_bucket=settings.object_store_bucket)
     doc_service = _build_document_service()
 
-    body = pdf_path.read_bytes()
-    upload = doc_service.upload_pdf(body, pdf_path.name, doc_id=resolved_doc_id)
+    try:
+        body = pdf_path.read_bytes()
+        upload = doc_service.upload_pdf(body, pdf_path.name, doc_id=resolved_doc_id)
 
-    blocks, parse_cached = _parse_or_load(
-        pdf_path,
-        resolved_doc_id,
-        use_parse_cache=use_parse_cache,
-        parse_store=parse_store,
-    )
-    blocks, _clean_stats = clean_page_blocks(blocks)
-    parse_object_key = parse_store.object_key_for(resolved_doc_id, upload.content_hash, source_type="pdf")
-
-    chunks: list[TextChunk] = chunk_page_blocks(
-        blocks,
-        doc_id=resolved_doc_id,
-        source_file=pdf_path.name,
-        content_hash=upload.content_hash,
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-    )
-    if not chunks:
-        raise ValueError(f"no chunks produced for {pdf_path.name}")
-
-    texts = [chunk.content for chunk in chunks]
-    embedder = get_embedding_model()
-    logger.info("embedding doc_id=%s chunks=%d", resolved_doc_id, len(texts))
-    vectors = embed_texts(texts, model=embedder)
-
-    with get_connection() as conn:
-        deleted = delete_chunks(conn, doc_id=resolved_doc_id, source_type="pdf")
-        inserted = insert_chunks(conn, chunks, vectors, source_type="pdf")
-        upsert_pdf_document(
-            conn,
-            doc_id=resolved_doc_id,
-            pdf_path=pdf_path,
-            content_hash=upload.content_hash,
-            bucket=upload.bucket,
-            object_key=upload.object_key,
-            page_count=len(blocks),
-            parse_object_key=parse_object_key,
-            ingest_status="ready",
+        _set_job_status(job_id, "PARSING")
+        blocks, parse_cached = _parse_or_load(
+            pdf_path,
+            resolved_doc_id,
+            use_parse_cache=use_parse_cache,
+            parse_store=parse_store,
         )
-        doc_service.save_parse_artifact(resolved_doc_id, blocks)
-        conn.commit()
+        parse_object_key = parse_store.object_key_for(
+            resolved_doc_id, upload.content_hash, source_type="pdf"
+        )
 
-    logger.info(
-        "ingest done doc_id=%s pages=%d chunks=%d deleted=%d cached=%s",
-        resolved_doc_id,
-        len(blocks),
-        inserted,
-        deleted,
-        parse_cached,
-    )
-    return IngestResult(
-        doc_id=resolved_doc_id,
-        pages=len(blocks),
-        chunks=inserted,
-        deleted_chunks=deleted,
-        parse_cached=parse_cached,
-    )
+        _set_job_status(job_id, "CLEANING")
+        blocks, _clean_stats = clean_page_blocks(blocks)
+
+        _set_job_status(job_id, "CHUNKING")
+        chunks: list[TextChunk] = chunk_page_blocks(
+            blocks,
+            doc_id=resolved_doc_id,
+            source_file=pdf_path.name,
+            content_hash=upload.content_hash,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+        )
+        if not chunks:
+            raise ValueError(f"no chunks produced for {pdf_path.name}")
+
+        _set_job_status(job_id, "EMBEDDING")
+        texts = [chunk.content for chunk in chunks]
+        embedder = get_embedding_model()
+        logger.info("embedding doc_id=%s chunks=%d", resolved_doc_id, len(texts))
+        vectors = embed_texts(texts, model=embedder)
+
+        with get_connection() as conn:
+            deleted = delete_chunks(conn, doc_id=resolved_doc_id, source_type="pdf")
+            inserted = insert_chunks(conn, chunks, vectors, source_type="pdf")
+            upsert_pdf_document(
+                conn,
+                doc_id=resolved_doc_id,
+                pdf_path=pdf_path,
+                content_hash=upload.content_hash,
+                bucket=upload.bucket,
+                object_key=upload.object_key,
+                page_count=len(blocks),
+                parse_object_key=parse_object_key,
+                ingest_status="ready",
+            )
+            doc_service.save_parse_artifact(resolved_doc_id, blocks)
+            update_job_status(conn, job_id=job_id, status="DONE")
+            conn.commit()
+
+        logger.info(
+            "ingest done doc_id=%s job_id=%s pages=%d chunks=%d deleted=%d cached=%s",
+            resolved_doc_id,
+            job_id,
+            len(blocks),
+            inserted,
+            deleted,
+            parse_cached,
+        )
+        return IngestResult(
+            doc_id=resolved_doc_id,
+            pages=len(blocks),
+            chunks=inserted,
+            deleted_chunks=deleted,
+            parse_cached=parse_cached,
+            job_id=job_id,
+        )
+    except Exception as exc:
+        logger.exception("ingest failed doc_id=%s job_id=%s", resolved_doc_id, job_id)
+        _set_job_status(job_id, "FAILED", error_message=str(exc))
+        raise

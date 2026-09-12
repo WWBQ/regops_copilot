@@ -36,7 +36,7 @@
 | 超时 | `inject=timeout`（立刻返回，不 sleep） |
 | 重复请求 | 相同 `idempotency_key` → `replayed=true` |
 
-`research` 只能看 002594 / 601633；`compliance` 看五家金样本。Python mock 允许不带 dept；**Java 入口必须带 `X-Regops-Dept`**。
+`research` 只能看 002594 / 601633；`compliance` 看金样本加宁德时代、茅台。Python mock 允许不带 dept；**Java 入口必须带 `X-Regops-Dept`**。
 
 ## w5-3 MCP 最小闭环
 

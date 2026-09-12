@@ -41,6 +41,20 @@ class DeptAclTest {
     }
 
     @Test
+    void complianceCanReadCatl() {
+        DeptAcl.requireCompany("compliance", "300750");
+    }
+
+    @Test
+    void researchCannotReadCatl() {
+        ToolAccessException ex = assertThrows(
+                ToolAccessException.class,
+                () -> DeptAcl.requireCompany("research", "300750")
+        );
+        assertEquals("unauthorized", ex.getErrorCode());
+    }
+
+    @Test
     void illegalCompanyCodeIs400() {
         ToolAccessException ex = assertThrows(
                 ToolAccessException.class,

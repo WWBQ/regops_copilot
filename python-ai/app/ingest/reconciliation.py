@@ -1,4 +1,4 @@
-"""G2 财务勾稽：ACCOUNTING_RULES R01–R03。"""
+"""G2 财务勾稽：ACCOUNTING_RULES R01–R04。"""
 
 from __future__ import annotations
 
@@ -20,12 +20,14 @@ class RuleResult:
     concepts: tuple[str, ...]
     left: str | None = None
     right: str | None = None
+    skipped: bool = False
 
     def to_dict(self) -> dict[str, str | bool | None | list[str]]:
         return {
             "rule_id": self.rule_id,
             "name": self.name,
             "passed": self.passed,
+            "skipped": self.skipped,
             "message": self.message,
             "concepts": list(self.concepts),
             "left": self.left,
@@ -161,7 +163,62 @@ def check_r03(
     )
 
 
-RULE_CHECKERS = (check_r01, check_r02, check_r03)
+def check_r04(
+    values: Mapping[str, Decimal | None],
+    *,
+    display_unit: Decimal = DISPLAY_UNIT_YUAN,
+) -> RuleResult:
+    """净利润 = 归母净利润 + 少数股东损益。缺任一字段则 skip，不 fail、不反算。"""
+    concepts = ("net_profit", "net_profit_attributable", "minority_interest")
+    net_profit = _get(values, "net_profit")
+    attributable = _get(values, "net_profit_attributable")
+    minority = _get(values, "minority_interest")
+    if net_profit is None or attributable is None or minority is None:
+        return RuleResult(
+            rule_id="R04",
+            name="归母 vs 净利润",
+            passed=True,
+            skipped=True,
+            message="R04：少数股东损益或归母净利润缺失，跳过（不反算）",
+            concepts=concepts,
+            left=_fmt(net_profit),
+            right=_fmt(
+                None
+                if attributable is None or minority is None
+                else attributable + minority
+            ),
+        )
+    passed, err = check_equation(
+        "R04 归母勾稽",
+        net_profit,
+        [attributable, minority],
+        display_unit,
+    )
+    if passed:
+        message = ""
+    elif err.endswith("必要字段缺失"):
+        message = err
+    else:
+        right = attributable + minority
+        diff = abs(net_profit - right)
+        message = (
+            f"归母勾稽失败：净利润 {_fmt(net_profit)} ≠ "
+            f"归母净利润 {_fmt(attributable)} + 少数股东损益 {_fmt(minority)}，"
+            f"差额 {format(diff, 'f')}"
+            f"（允许误差 {format((Decimal(3) * display_unit / Decimal('2')), 'f')}）"
+        )
+    return RuleResult(
+        rule_id="R04",
+        name="归母 vs 净利润",
+        passed=passed,
+        message=message,
+        concepts=concepts,
+        left=_fmt(net_profit),
+        right=_fmt(attributable + minority),
+    )
+
+
+RULE_CHECKERS = (check_r01, check_r02, check_r03, check_r04)
 
 
 def run_reconciliation(

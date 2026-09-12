@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from pathlib import Path
 
 import psycopg
+
+from app.ingest.disclosure_dates import disclosure_date_for
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +44,10 @@ def upsert_pdf_document(
 ) -> None:
     company_code, report_year = infer_company_year(pdf_path)
     file_size = pdf_path.stat().st_size
+    disclosure_date = disclosure_date_for(doc_id)
+    from app.rag.dept_scope import depts_for_company
+
+    dept_acl = json.dumps(depts_for_company(company_code), ensure_ascii=False)
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -48,12 +55,12 @@ def upsert_pdf_document(
                 doc_id, company_code, report_year, doc_type, title, source_filename,
                 content_type, content_hash, storage_backend, bucket, object_key,
                 parse_object_key, file_size_bytes, page_count, version, is_active,
-                ingest_status, source_site, meta, dept_acl
+                ingest_status, disclosure_date, source_site, meta, dept_acl
             ) VALUES (
                 %s, %s, %s, 'annual_report', %s, %s,
                 'application/pdf', %s, 'local', %s, %s,
                 %s, %s, %s, 1, TRUE,
-                %s, 'cninfo', '{}'::jsonb, '[]'::jsonb
+                %s, %s, 'cninfo', '{}'::jsonb, %s::jsonb
             )
             ON CONFLICT (doc_id, version) DO UPDATE SET
                 content_hash = EXCLUDED.content_hash,
@@ -62,6 +69,8 @@ def upsert_pdf_document(
                 file_size_bytes = EXCLUDED.file_size_bytes,
                 page_count = EXCLUDED.page_count,
                 ingest_status = EXCLUDED.ingest_status,
+                disclosure_date = COALESCE(EXCLUDED.disclosure_date, pdf_document.disclosure_date),
+                dept_acl = EXCLUDED.dept_acl,
                 updated_at = NOW()
             """,
             (
@@ -77,9 +86,36 @@ def upsert_pdf_document(
                 file_size,
                 page_count,
                 ingest_status,
+                disclosure_date,
+                dept_acl,
             ),
         )
-    logger.info("upserted pdf_document doc_id=%s pages=%d", doc_id, page_count)
+    logger.info(
+        "upserted pdf_document doc_id=%s pages=%d disclosure_date=%s",
+        doc_id,
+        page_count,
+        disclosure_date,
+    )
+
+
+def backfill_disclosure_dates(conn: psycopg.Connection) -> int:
+    """按 DISCLOSURE_DATES 回填已入库行（仅覆盖 disclosure_date 为空或与表不一致的）。"""
+    from app.ingest.disclosure_dates import DISCLOSURE_DATES
+
+    updated = 0
+    with conn.cursor() as cur:
+        for doc_id, day in DISCLOSURE_DATES.items():
+            cur.execute(
+                """
+                UPDATE pdf_document
+                SET disclosure_date = %s, updated_at = NOW()
+                WHERE doc_id = %s
+                  AND (disclosure_date IS DISTINCT FROM %s)
+                """,
+                (day, doc_id, day),
+            )
+            updated += cur.rowcount
+    return updated
 
 
 def list_company_ready_doc_ids(conn: psycopg.Connection) -> list[str]:

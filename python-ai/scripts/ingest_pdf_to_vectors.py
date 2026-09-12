@@ -71,7 +71,7 @@ def main() -> int:
             )
             print(
                 f"OK {result.doc_id}: pages={result.pages} chunks={result.chunks} "
-                f"parse_cached={result.parse_cached}"
+                f"parse_cached={result.parse_cached} job_id={result.job_id}"
             )
             ok += 1
         except Exception:

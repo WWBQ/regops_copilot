@@ -1,0 +1,203 @@
+{
+  "version": "rag-acl-v1",
+  "description": "检索层部门 ACL：未登录不裁剪；登录后只检索本部门公司年报，越权题不得落到禁止的 company_code。不调 LLM。",
+  "default_params": {
+    "corpus_doc_ids": [
+      "002594_2024",
+      "002594_2023",
+      "601633_2024",
+      "601633_2023",
+      "000333_2024",
+      "000333_2023",
+      "000651_2024",
+      "000651_2023",
+      "600031_2024",
+      "600031_2023",
+      "300750_2024",
+      "600519_2024"
+    ],
+    "metrics": ["accuracy", "false_accept_rate", "leak_rate"]
+  },
+  "items": [
+    {
+      "id": "acl-001",
+      "category": "allow",
+      "question": "比亚迪2024年营业收入是多少",
+      "dept": "research",
+      "expected_outcome": "retrieve",
+      "expected_companies": ["002594"],
+      "forbidden_companies": ["000333", "000651", "600031"]
+    },
+    {
+      "id": "acl-002",
+      "category": "allow",
+      "question": "长城汽车2024年净利润是多少",
+      "dept": "research",
+      "expected_outcome": "retrieve",
+      "expected_companies": ["601633"],
+      "forbidden_companies": ["000333", "000651", "600031"]
+    },
+    {
+      "id": "acl-003",
+      "category": "allow",
+      "question": "美的集团2024年营业收入是多少",
+      "dept": "rm",
+      "expected_outcome": "retrieve",
+      "expected_companies": ["000333"],
+      "forbidden_companies": ["002594", "601633", "600031"]
+    },
+    {
+      "id": "acl-004",
+      "category": "allow",
+      "question": "格力电器2024年净利润是多少",
+      "dept": "rm",
+      "expected_outcome": "retrieve",
+      "expected_companies": ["000651"],
+      "forbidden_companies": ["002594", "601633", "600031"]
+    },
+    {
+      "id": "acl-005",
+      "category": "allow",
+      "question": "比亚迪2024年研发投入是多少",
+      "dept": "compliance",
+      "expected_outcome": "retrieve",
+      "expected_companies": ["002594"],
+      "forbidden_companies": []
+    },
+    {
+      "id": "acl-006",
+      "category": "allow",
+      "question": "长城汽车2024年毛利率是多少",
+      "dept": "compliance",
+      "expected_outcome": "retrieve",
+      "expected_companies": ["601633"],
+      "forbidden_companies": []
+    },
+    {
+      "id": "acl-007",
+      "category": "allow",
+      "question": "美的集团2024年分红方案",
+      "dept": "compliance",
+      "expected_outcome": "retrieve",
+      "expected_companies": ["000333"],
+      "forbidden_companies": []
+    },
+    {
+      "id": "acl-008",
+      "category": "allow",
+      "question": "格力电器2024年内控评价",
+      "dept": "compliance",
+      "expected_outcome": "retrieve",
+      "expected_companies": ["000651"],
+      "forbidden_companies": []
+    },
+    {
+      "id": "acl-009",
+      "category": "allow",
+      "question": "三一重工2024年营业收入是多少",
+      "dept": "compliance",
+      "expected_outcome": "retrieve",
+      "expected_companies": ["600031"],
+      "forbidden_companies": []
+    },
+    {
+      "id": "acl-010",
+      "category": "open_chat",
+      "question": "美的集团2024年营业收入是多少",
+      "dept": null,
+      "expected_outcome": "retrieve",
+      "expected_companies": ["000333"],
+      "forbidden_companies": []
+    },
+    {
+      "id": "acl-011",
+      "category": "deny",
+      "question": "美的集团2024年营业收入是多少",
+      "dept": "research",
+      "expected_outcome": "no_docs",
+      "expected_companies": [],
+      "forbidden_companies": ["000333", "000651", "600031"]
+    },
+    {
+      "id": "acl-012",
+      "category": "deny",
+      "question": "格力电器2024年净利润是多少",
+      "dept": "research",
+      "expected_outcome": "no_docs",
+      "expected_companies": [],
+      "forbidden_companies": ["000333", "000651", "600031"]
+    },
+    {
+      "id": "acl-013",
+      "category": "deny",
+      "question": "三一重工2024年营业收入是多少",
+      "dept": "research",
+      "expected_outcome": "no_docs",
+      "expected_companies": [],
+      "forbidden_companies": ["000333", "000651", "600031"]
+    },
+    {
+      "id": "acl-014",
+      "category": "deny",
+      "question": "比亚迪2024年营业收入是多少",
+      "dept": "rm",
+      "expected_outcome": "no_docs",
+      "expected_companies": [],
+      "forbidden_companies": ["002594", "601633", "600031"]
+    },
+    {
+      "id": "acl-015",
+      "category": "deny",
+      "question": "长城汽车2024年净利润是多少",
+      "dept": "rm",
+      "expected_outcome": "no_docs",
+      "expected_companies": [],
+      "forbidden_companies": ["002594", "601633", "600031"]
+    },
+    {
+      "id": "acl-016",
+      "category": "deny",
+      "question": "三一重工2024年研发投入是多少",
+      "dept": "rm",
+      "expected_outcome": "no_docs",
+      "expected_companies": [],
+      "forbidden_companies": ["002594", "601633", "600031"]
+    },
+    {
+      "id": "acl-017",
+      "category": "deny",
+      "question": "比亚迪2024年营业收入是多少",
+      "dept": "unknown",
+      "expected_outcome": "no_docs",
+      "expected_companies": [],
+      "forbidden_companies": ["002594", "601633", "000333", "000651", "600031"]
+    },
+    {
+      "id": "acl-018",
+      "category": "deny",
+      "question": "宁德时代2024年净利润是多少",
+      "dept": "research",
+      "expected_outcome": "no_docs",
+      "expected_companies": [],
+      "forbidden_companies": ["002594", "601633"]
+    },
+    {
+      "id": "acl-019",
+      "category": "deny",
+      "question": "工商银行（601398）2024年不良贷款率是多少",
+      "dept": "compliance",
+      "expected_outcome": "no_docs",
+      "expected_companies": [],
+      "forbidden_companies": ["002594", "601633", "000333", "000651", "600031", "300750", "600519"]
+    },
+    {
+      "id": "acl-020",
+      "category": "open_chat",
+      "question": "比亚迪2024年营业收入是多少",
+      "dept": null,
+      "expected_outcome": "retrieve",
+      "expected_companies": ["002594"],
+      "forbidden_companies": []
+    }
+  ]
+}

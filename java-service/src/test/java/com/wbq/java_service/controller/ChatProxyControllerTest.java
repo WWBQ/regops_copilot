@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -40,7 +41,7 @@ class ChatProxyControllerTest {
             OutputStream out = invocation.getArgument(1);
             out.write("event: done\ndata: {\"reply\":\"hi\",\"model\":\"deepseek\"}\n\n".getBytes(StandardCharsets.UTF_8));
             return null;
-        }).when(pythonAiClient).copyChatStream(any(), any());
+        }).when(pythonAiClient).copyChatStream(any(), any(), nullable(String.class));
 
         MvcResult result = mvc.perform(post("/api/chat/stream")
                         .contentType(MediaType.APPLICATION_JSON)

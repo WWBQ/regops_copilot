@@ -25,6 +25,9 @@ const jobStatusOptions = [
   { value: '', label: '全部状态' },
   { value: 'PENDING', label: '待处理' },
   { value: 'PARSING', label: '解析中' },
+  { value: 'CLEANING', label: '清洗中' },
+  { value: 'CHUNKING', label: '分块中' },
+  { value: 'EMBEDDING', label: '向量化中' },
   { value: 'DONE', label: '完成' },
   { value: 'FAILED', label: '失败' },
 ]
@@ -59,7 +62,10 @@ function statusLabel(status: string) {
 function statusClass(status: string) {
   if (status === 'ready' || status === 'READY' || status === 'DONE') return 'tag ok'
   if (status === 'failed' || status === 'FAILED') return 'tag fail'
-  if (status === 'processing' || status === 'PROCESSING' || status.startsWith('PAR')) return 'tag warn'
+  if (status === 'processing' || status === 'PROCESSING' || status === 'PENDING') return 'tag warn'
+  if (status === 'PARSING' || status === 'CLEANING' || status === 'CHUNKING' || status === 'EMBEDDING' || status === 'EXTRACTING') {
+    return 'tag warn'
+  }
   return 'tag muted'
 }
 

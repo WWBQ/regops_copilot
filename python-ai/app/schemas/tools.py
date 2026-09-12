@@ -114,6 +114,7 @@ class ListScopeResult(BaseModel):
 class RagSearchArgs(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
     session_id: str | None = None
+    dept: str | None = Field(default=None, max_length=32)
 
 
 class RagSearchHit(BaseModel):

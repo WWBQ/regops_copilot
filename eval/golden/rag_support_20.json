@@ -1,0 +1,150 @@
+{
+  "version": "rag-support-v1",
+  "description": "20 题：检索到的原文片段是否覆盖答题所需证据词。与 rag_retrieval 的页级 Recall@k 分开，不混报、不调 LLM。must_contain 均从入库年报正文抽检。",
+  "default_params": {
+    "top_k": 12,
+    "metrics": ["support_hit_rate", "support_coverage"]
+  },
+  "items": [
+    {
+      "id": "sup-001",
+      "category": "product_enum",
+      "question": "比亚迪2024年推出了哪些新车型或新产品",
+      "doc_id": "002594_2024",
+      "must_contain": ["元UP", "秦L", "海狮07EV"]
+    },
+    {
+      "id": "sup-002",
+      "category": "product_enum",
+      "question": "2024年长城新推出的车型有哪些",
+      "doc_id": "601633_2024",
+      "must_contain": ["坦克 700", "哈弗 H6", "哈弗 H9"]
+    },
+    {
+      "id": "sup-003",
+      "category": "product_enum",
+      "question": "长城灵魂S2000摩托车2024年何时发布",
+      "doc_id": "601633_2024",
+      "must_contain": ["S2000"]
+    },
+    {
+      "id": "sup-004",
+      "category": "product_enum",
+      "question": "美的集团2024年发布了哪些新品或新技术",
+      "doc_id": "000333_2024",
+      "must_contain": ["KR CYBERTECH", "MegaStore"]
+    },
+    {
+      "id": "sup-005",
+      "category": "product_enum",
+      "question": "格力电器2024年推出了哪些新产品",
+      "doc_id": "000651_2024",
+      "must_contain": ["董明珠健康家"]
+    },
+    {
+      "id": "sup-006",
+      "category": "product_enum",
+      "question": "三一重工2024年推出了哪些新机型或新产品",
+      "doc_id": "600031_2024",
+      "must_contain": ["远程遥控挖掘机"]
+    },
+    {
+      "id": "sup-007",
+      "category": "product_enum",
+      "question": "三一重工2024年电动化或新能源产品",
+      "doc_id": "600031_2024",
+      "must_contain": ["iSEE 电动搅拌车", "电动化"]
+    },
+    {
+      "id": "sup-008",
+      "category": "product_enum",
+      "question": "比亚迪2024年推出了哪些新车型或新产品",
+      "doc_id": "002594_2024",
+      "must_contain": ["第五代DM技术", "海獅05"]
+    },
+    {
+      "id": "sup-009",
+      "category": "product_enum",
+      "question": "2024年长城新推出的车型有哪些",
+      "doc_id": "601633_2024",
+      "must_contain": ["蓝山高阶智驾版", "坦克 500"]
+    },
+    {
+      "id": "sup-010",
+      "category": "product_enum",
+      "question": "美的集团2024年发布了哪些新品或新技术",
+      "doc_id": "000333_2024",
+      "must_contain": ["无烟感烟机"]
+    },
+    {
+      "id": "sup-011",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年研发投入约为多少",
+      "doc_id": "002594_2024",
+      "must_contain": ["542亿元"]
+    },
+    {
+      "id": "sup-012",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年末总资产是多少",
+      "doc_id": "002594_2024",
+      "must_contain": ["783,355,855,000"]
+    },
+    {
+      "id": "sup-013",
+      "category": "numeric_financial",
+      "question": "比亚迪2024年营业收入是多少",
+      "doc_id": "002594_2024",
+      "must_contain": ["777,102,455,000"]
+    },
+    {
+      "id": "sup-014",
+      "category": "compliance_risk",
+      "question": "格力电器2024年内部控制评价",
+      "doc_id": "000651_2024",
+      "must_contain": ["不存在财务报告内部控制重大缺陷"]
+    },
+    {
+      "id": "sup-015",
+      "category": "compliance_risk",
+      "question": "比亚迪2024年内部控制评价报告结论",
+      "doc_id": "002594_2024",
+      "must_contain": ["内部控制评价报告"]
+    },
+    {
+      "id": "sup-016",
+      "category": "compliance_risk",
+      "question": "比亚迪年报第一节重要提示如何表述风险因素",
+      "doc_id": "002594_2024",
+      "must_contain": ["第一节", "风险因素"]
+    },
+    {
+      "id": "sup-017",
+      "category": "product_enum",
+      "question": "格力电器2024年推出了哪些新产品",
+      "doc_id": "000651_2024",
+      "must_contain": ["190多个国家和地区"]
+    },
+    {
+      "id": "sup-018",
+      "category": "product_enum",
+      "question": "三一重工2024年推出了哪些新机型或新产品",
+      "doc_id": "600031_2024",
+      "must_contain": ["人机协同4.0"]
+    },
+    {
+      "id": "sup-019",
+      "category": "product_enum",
+      "question": "三一重工2024年电动化或新能源产品",
+      "doc_id": "600031_2024",
+      "must_contain": ["新能源技术委员会"]
+    },
+    {
+      "id": "sup-020",
+      "category": "product_enum",
+      "question": "比亚迪2024年推出了哪些新车型或新产品",
+      "doc_id": "002594_2024",
+      "must_contain": ["宋L DM-i", "海豹06"]
+    }
+  ]
+}

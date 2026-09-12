@@ -109,6 +109,13 @@ python-ai/.venv/bin/python eval/run_w6_number_check.py
 # 5c. W6-6 审查工作流轨迹黄金集（节点/参数/确认率，脚本工具，不调 LLM）
 python-ai/.venv/bin/python eval/run_w6_workflow.py --fail-on-regression
 
+# 5d. W3-5 RAG 检索消融（baseline / hybrid / rerank；需入库年报）
+python-ai/.venv/bin/python eval/run_rag_ablation.py
+
+# 5e. W3-4 检索层部门 ACL / 无答案拒答（不调 LLM）
+python-ai/.venv/bin/python eval/run_rag_acl.py --fail-on-regression
+python-ai/.venv/bin/python eval/run_rag_refuse.py --fail-on-regression
+
 # 6. W5 工具目录 / 自省 / MCP（未接入 /chat 循环）
 curl -s http://localhost:8000/tools
 curl -s http://localhost:8000/tools/capabilities
@@ -162,6 +169,8 @@ python-ai/.venv/bin/python eval/run_w9_redteam.py --fail-on-regression
 评测报告落在 `eval/reports/<任务>/<时间戳>/`，含 `report.json` 与 `report.md`。
 基线与口径说明见 [`docs/eval_w1_baseline.md`](./docs/eval_w1_baseline.md)、
 [`docs/eval_rag_retrieval.md`](./docs/eval_rag_retrieval.md)、
+[`docs/eval_rag_ablation.md`](./docs/eval_rag_ablation.md)、
+[`docs/eval_rag_guard.md`](./docs/eval_rag_guard.md)、
 [`docs/W8_PROMPTS.md`](./docs/W8_PROMPTS.md)。
 
 ## 目录结构
