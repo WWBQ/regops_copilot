@@ -1,6 +1,7 @@
 package com.wbq.java_service.dto.chat;
 
 import java.util.List;
+import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -17,7 +18,8 @@ public record ChatResponse(
         @JsonProperty("total_tokens") int totalTokens,
         @JsonProperty("latency_ms") double latencyMs,
         @JsonProperty("thread_id") String threadId,
-        @JsonProperty("pending_node") String pendingNode
+        @JsonProperty("pending_node") String pendingNode,
+        @JsonProperty("pending_request") Map<String, Object> pendingRequest
 ) {
     public ChatResponse {
         if (citations == null) {

@@ -102,5 +102,5 @@ cd java-service && mvn test
 - 没有 `APPROVED` 状态
 - 不把 JWT 交给 Python
 - 不对全部 `/api/**` 强制登录（现有问答/运维不能先要求账号）
-- 不做 W8-4 Dify / W9 Langfuse
+- Dify 对照见 [`dify-comparison.md`](./dify-comparison.md)，不进本周 RBAC；不做 Langfuse
 - W8-1～8-3 Prompt 库与 A/B 见 [`W8_PROMPTS.md`](./W8_PROMPTS.md)

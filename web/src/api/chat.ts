@@ -19,6 +19,7 @@ function normalizeChatResponse(raw: RawChatResponse): ChatResponse {
     session_id: raw.session_id ?? (raw as { sessionId?: string }).sessionId,
     thread_id: raw.thread_id ?? (raw as { threadId?: string }).threadId,
     pending_node: raw.pending_node ?? (raw as { pendingNode?: string }).pendingNode,
+    pending_request: raw.pending_request ?? (raw as { pendingRequest?: ChatResponse['pending_request'] }).pendingRequest ?? null,
   }
 }
 

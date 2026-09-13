@@ -22,7 +22,7 @@ from app.agents.evidence import apply_checked_reply, pack_from_citations
 from app.agents.graph import WorkflowResult
 from app.agents.tool_loop import ToolLoopResult
 from app.api.deps import get_document_service, get_settings_dep
-from app.asknum import try_answer
+from app.asknum import should_continue_pending, try_answer
 from app.config import Settings
 from app.db.connection import get_connection
 from app.db.session_repository import list_session_documents, session_exists
@@ -195,6 +195,26 @@ def _try_asknum(
         session_id=session_id,
         rag_used=False,
         route=asknum.route,
+        pending_request=asknum.pending_request,
+    )
+
+
+def _try_pending_asknum(
+    body: ChatRequest,
+    *,
+    session_id: str | None,
+    request_id: str | None,
+    model_name: str,
+    document_service: DocumentService,
+) -> ChatResponse | None:
+    if not session_id or not should_continue_pending(body.message, session_id):
+        return None
+    return _try_asknum(
+        body,
+        session_id=session_id,
+        request_id=request_id,
+        model_name=model_name,
+        document_service=document_service,
     )
 
 
@@ -439,6 +459,16 @@ async def chat(
             workflow.pending_node,
         )
         return _observe(_from_workflow(workflow, model_name, session_id), message=body.message)
+    if body.use_rag:
+        pending_asknum = _try_pending_asknum(
+            body,
+            session_id=session_id,
+            request_id=x_request_id,
+            model_name=model_name,
+            document_service=document_service,
+        )
+        if pending_asknum is not None:
+            return _observe(pending_asknum, message=body.message)
     if body.use_rag and wants_tool_loop(body.message):
         loop = await run_tool_loop(
             body.message,
@@ -533,6 +563,19 @@ async def chat_stream(
                 yield _sse("delta", {"text": response.reply})
                 yield _sse("done", response.model_dump())
                 return
+            if body.use_rag:
+                pending_asknum = _try_pending_asknum(
+                    body,
+                    session_id=session_id,
+                    request_id=x_request_id,
+                    model_name=model_name,
+                    document_service=document_service,
+                )
+                if pending_asknum is not None:
+                    yield _sse("meta", {"route": pending_asknum.route})
+                    yield _sse("delta", {"text": pending_asknum.reply})
+                    yield _sse("done", _observe(pending_asknum, message=body.message, stream=True).model_dump())
+                    return
             if body.use_rag and wants_tool_loop(body.message):
                 async for chunk in _stream_tool_loop(
                     body,

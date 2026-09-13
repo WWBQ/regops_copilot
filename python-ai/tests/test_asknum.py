@@ -59,6 +59,7 @@ def test_parse_slots_metric_question():
     assert slots.company_codes == ("002594",)
     assert slots.concepts == ("revenue",)
     assert slots.year == 2024
+    assert slots.years == (2024,)
     assert slots.year_defaulted is False
     assert slots.scope == "consolidated"
     assert slots.narrative is False
@@ -108,6 +109,14 @@ def test_parse_slots_colloquial_profit():
     assert parse_slots("比亚迪进账多少").concepts == ("revenue",)
     assert parse_slots("格力股份家底多少").company_codes == ("000651",)
     assert parse_slots("格力股份家底多少").concepts == ("total_assets",)
+
+
+def test_parse_slots_two_years():
+    slots = parse_slots("比亚迪2023和2024的利润对比")
+    assert slots.company_codes == ("002594",)
+    assert slots.concepts == ()
+    assert slots.years == (2023, 2024)
+    assert slots.year_defaulted is False
 
 
 def test_parse_slots_relative_year():

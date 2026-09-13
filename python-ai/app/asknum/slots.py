@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from app.asknum.aliases import concept_aliases
 from app.documents.titles import COMPANY_DISPLAY_NAMES
-from app.rag.company_scope import mentioned_company_codes, mentioned_report_year
+from app.rag.company_scope import mentioned_company_codes, mentioned_report_years
 
 DEFAULT_REPORT_YEAR = 2024
 DEFAULT_SCOPE = "consolidated"
@@ -69,6 +69,13 @@ class AsknumSlots:
     year_defaulted: bool
     scope: str
     narrative: bool
+    years: tuple[int, ...] = ()
+    scope_explicit: bool = False
+
+    def __post_init__(self) -> None:
+        if self.years:
+            return
+        object.__setattr__(self, "years", (self.year,))
 
 
 def parse_concepts(question: str) -> list[str]:
@@ -83,10 +90,12 @@ def parse_concepts(question: str) -> list[str]:
     return found
 
 
-def parse_scope(question: str) -> str:
+def parse_scope(question: str) -> tuple[str, bool]:
     if "母公司" in question:
-        return "parent"
-    return DEFAULT_SCOPE
+        return "parent", True
+    if "合并" in question:
+        return DEFAULT_SCOPE, True
+    return DEFAULT_SCOPE, False
 
 
 def has_amount_intent(question: str) -> bool:
@@ -125,18 +134,80 @@ def parse_relative_year(question: str) -> int | None:
 
 def parse_slots(question: str) -> AsknumSlots:
     text = question.strip()
-    year = mentioned_report_year(text)
+    years_found = mentioned_report_years(text)
     relative = parse_relative_year(text)
-    resolved = year if year is not None else relative
+    if years_found:
+        years = tuple(years_found)
+        year_defaulted = False
+    elif relative is not None:
+        years = (relative,)
+        year_defaulted = False
+    else:
+        years = (DEFAULT_REPORT_YEAR,)
+        year_defaulted = True
     codes = tuple(sorted(mentioned_company_codes(text)))
+    scope, scope_explicit = parse_scope(text)
     return AsknumSlots(
         company_codes=codes,
         concepts=tuple(parse_concepts(text)),
-        year=resolved if resolved is not None else DEFAULT_REPORT_YEAR,
-        year_defaulted=year is None and relative is None,
-        scope=parse_scope(text),
+        year=years[0],
+        year_defaulted=year_defaulted,
+        scope=scope,
         narrative=bool(_NARRATIVE_RE.search(text)),
+        years=years,
+        scope_explicit=scope_explicit,
     )
+
+
+def missing_slot_names(slots: AsknumSlots) -> list[str]:
+    missing: list[str] = []
+    if not slots.company_codes:
+        missing.append("company")
+    if not slots.concepts:
+        missing.append("metric")
+    return missing
+
+
+def infer_asknum_intent(question: str, slots: AsknumSlots) -> str:
+    if "对比" in question or len(slots.years) > 1 or len(slots.company_codes) > 1:
+        return "asknum_compare"
+    return "asknum"
+
+
+def merge_slots(base: AsknumSlots, incoming: AsknumSlots) -> AsknumSlots:
+    companies = incoming.company_codes or base.company_codes
+    concepts = incoming.concepts or base.concepts
+    if incoming.year_defaulted:
+        years = base.years or (base.year,)
+        year_defaulted = base.year_defaulted
+    else:
+        years = incoming.years or (incoming.year,)
+        year_defaulted = False
+    if incoming.scope_explicit:
+        scope = incoming.scope
+        scope_explicit = True
+    else:
+        scope = base.scope
+        scope_explicit = base.scope_explicit
+    return AsknumSlots(
+        company_codes=companies,
+        concepts=concepts,
+        year=years[0],
+        year_defaulted=year_defaulted,
+        scope=scope,
+        narrative=False,
+        years=years,
+        scope_explicit=scope_explicit,
+    )
+
+
+def format_year_span(years: tuple[int, ...] | list[int]) -> str:
+    ordered = sorted({int(year) for year in years})
+    if not ordered:
+        return str(DEFAULT_REPORT_YEAR)
+    if len(ordered) == 1:
+        return str(ordered[0])
+    return f"{ordered[0]}–{ordered[-1]}"
 
 
 def company_display_name(code: str) -> str:

@@ -7,7 +7,7 @@
 `POST /chat` 且 `use_rag=true` 时，先走 `app/asknum/`：
 
 1. 抽出公司 + 标准 concept（营收 / 净利润 / 总资产等），且不是「为什么 / 风险 / 战略」叙述题 → 问数。
-2. 缺公司 → `route=metric_clarify`，反问，不回落 RAG。
+2. 缺公司或指标 → `route=metric_clarify`，只追问缺字段；未完成请求写入当前 `session.pending_asknum`（约 30 分钟）。下一轮只合并槽位，补齐后重新 `lookup_metric_batch`，不把上一轮数字当记忆。新对话、换话题或查完即清。
 3. 命中 `status=auto_accepted` → 模板答数 + `[1]` 引用（`route=metric`），**不调 LLM（0 token）**。
 4. `human_review` / 无记录 / 多值冲突 → 明说不返回数字（`route=metric_blocked`）。
 5. 同比 / 季度 / ROE / 毛利率先查组成科目，缺了就说「数据不完整，不能给出」，不直接拒、不回落 RAG。
@@ -37,7 +37,7 @@ hit = lookup_metric(company_code="002594", concept="revenue", year=2024)
 # hit.outcome: ok | human_review | missing | accepted_conflict | not_accepted
 ```
 
-`try_answer` = `parse_slots` → 循环公司 × 指标 → `lookup_metric` → 模板回复。
+`try_answer` = `parse_slots` → 与 `pending_asknum` 合并 → 公司 × 指标 × 年份 `lookup_metric_batch` → 模板回复。年份可写多个（如 2023 和 2024）。
 
 ## Trace
 
@@ -74,4 +74,4 @@ python-ai/.venv/bin/python eval/run_asknum.py --fail-on-regression
 - 不让 LLM 写 SQL，不做 EXPLAIN 校正循环。
 - 不手算 ROE / 毛利率 / 研发强度。
 - 不用 `human_review` 的数。
-- 单轮问数不上 LangGraph（W6-1 只接「对比 + 管理层/结论」）。
+- 问数缺槽时只把当前未完成请求记在 `session.pending_asknum`（约 30 分钟），补齐后重新查 `fin_metric`，不把旧数字当记忆，也不上 LangGraph。W6-1 只接「对比 + 管理层/结论」。

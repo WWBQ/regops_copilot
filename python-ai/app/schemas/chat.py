@@ -35,3 +35,4 @@ class ChatResponse(BaseModel):
     total_tokens: int = 0
     latency_ms: float = 0.0
     tool_trace: list[dict] = Field(default_factory=list)
+    pending_request: dict | None = None

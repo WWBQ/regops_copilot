@@ -258,7 +258,7 @@ BUG-012 同页上限现为 2（一页一条会丢掉清单细节，完全不限�
 - **W8 四策略与 A/B 是 fixture 模拟**，不是真实 LLM 结果；A/B 自身判定为不可信（n=30）。
 - **W5 的工具目录 / MCP 尚未接入主 `/chat` 循环**，是并行能力；MCP 只实现 JSON-RPC 子集
   （`initialize` / `tools/list` / `tools/call`），不是完整 SDK，Java 也不是 MCP server。
-- **W8-4 Dify 对照没做**，只有计划（记在 `docs/W8_PROMPTS.md` 末尾）。
+- **W8-4 Dify 是对照不是现网**：独立编排 + 12 题打平台 API 和 `/chat`，没起来就跳过；主路径仍是自写管线（见 [`dify-comparison.md`](./dify-comparison.md)）。
 - `recall@k = 0.79` 是**页面命中**，不等于线上回答完整性；同一次现网跑的 **citation_accuracy 只有 0.155**（top-k 去重页里 gold 页占比），检索很吵时 recall 仍可能为 1。
 - 引用组装本身仍是检索侧字段透传，模型不能手写出处。
 - 没有独立的 `eval/badcases/` 目录，坏例统一记在 `docs/BUG_NOTES.md`（按编号 + 归因层）。

@@ -45,22 +45,35 @@ def mentioned_company_codes(question: str) -> set[str]:
 
 
 def mentioned_report_year(question: str) -> int | None:
+    years = mentioned_report_years(question)
+    return years[0] if years else None
+
+
+def mentioned_report_years(question: str) -> list[int]:
+    """问句里出现的全部报告期，保序去重。"""
     normalized = _normalize_year_text(question)
-    match = _LOOSE_YEAR_RE.search(normalized) or _YEAR_RE.search(normalized)
-    if not match:
-        return None
-    return int(match.group(1))
+    found: list[int] = []
+    for match in _YEAR_RE.finditer(normalized):
+        year = int(match.group(1))
+        if year not in found:
+            found.append(year)
+    return found
 
 
 def _years_needed(question: str, year: int | None) -> set[int] | None:
     """问句写了年份时默认只留该年；同比/近两年带上一年。"""
-    if year is None:
+    mentioned = mentioned_report_years(question)
+    if mentioned:
+        years = set(mentioned)
+    elif year is None:
         return None
-    years = {year}
+    else:
+        years = {year}
     if _YOY_SPAN_RE.search(question):
-        years.add(year - 1)
+        anchor = max(years)
+        years.add(anchor - 1)
         if "近三年" in question or "连续三年" in question:
-            years.add(year - 2)
+            years.add(anchor - 2)
     return years
 
 

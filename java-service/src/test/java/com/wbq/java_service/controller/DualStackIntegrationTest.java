@@ -95,6 +95,7 @@ class DualStackIntegrationTest {
                 2,
                 10.0,
                 null,
+                null,
                 null
         ));
         mvc.perform(post("/api/chat")
@@ -120,6 +121,7 @@ class DualStackIntegrationTest {
                 1,
                 2,
                 10.0,
+                null,
                 null,
                 null
         ));

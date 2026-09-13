@@ -1,6 +1,6 @@
 # W8 Prompt 资产（模板库 · 四策略对照 · A/B）
 
-> 目标：Prompt 可版本化、可 A/B。W8-1～W8-3 已齐。**W8-4 Dify 复习时再做**，不替换 W6 DAG。ReAct 只出现在评测对照。
+> 目标：Prompt 可版本化、可 A/B。W8-1～W8-4 已齐。Dify 只做对照，不替换 W6 DAG。ReAct 只出现在评测对照。
 
 ## 怎么走
 
@@ -83,4 +83,15 @@ python-ai/.venv/bin/python eval/run_w8_ab.py --write-example
 - 不把「不要编造」写进 Prompt 当数字门禁
 - 不把 fixture 准确率写成机构级模型榜
 - 不做 Langfuse（W9）
-- **W8-4 Dify 留到复习再做**：独立 `dify/` 或 `compose.dify.yaml`（不要写进根 `compose.yaml`）；导入同一批 `data/raw/*_2024_annual.pdf`；搭知识库 RAG + 最小 Workflow；同一批题打 Dify API 和 `/chat`；写成 [`dify-comparison.md`](./dify-comparison.md)（延迟 / 可控性 / 可测试性 / 成本）。不替换 `/chat`、W6 DAG、Java 工单。面试 q67。HiAgent 只口头对照，不部署。
+- 不把 Dify 嵌进 `/chat` 或根 `compose.yaml`
+
+## Dify 对照（w8-4）
+
+独立编排：[`dify/README.md`](../dify/README.md) · `./scripts/dify-up.sh`（控制台 :1380）。同一批 `data/raw/*_2024_annual.pdf` 进知识库；只搭 RAG Chatbot + 两步 Workflow。
+
+```bash
+export DIFY_APP_KEY=app-...
+python-ai/.venv/bin/python eval/run_w8_dify_compare.py --write-example
+```
+
+没起来就跳过。选型表与 q67：[`dify-comparison.md`](./dify-comparison.md)。HiAgent / 扣子只口头对照。

@@ -44,6 +44,14 @@ def test_filter_doc_ids_for_question_scopes_by_company_and_year():
     assert scoped == ["002594_2024"]
 
 
+def test_two_mentioned_years_keep_both_docs():
+    scoped = filter_doc_ids_by_question(
+        ["002594_2024", "002594_2023", "000333_2024"],
+        "比亚迪2023和2024的利润对比",
+    )
+    assert scoped == ["002594_2024", "002594_2023"]
+
+
 def test_yoy_question_keeps_prior_year_docs():
     scoped = filter_doc_ids_by_question(
         ["002594_2024", "002594_2023", "000333_2024"],

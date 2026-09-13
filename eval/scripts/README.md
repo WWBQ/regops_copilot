@@ -45,6 +45,9 @@ W8 四策略对照：`python-ai/.venv/bin/python eval/run_w8_strategy.py`
 
 W8 Prompt A/B：`python-ai/.venv/bin/python eval/run_w8_ab.py --write-example`
 
+W8-4 Dify 对照（没起来就跳过）：`python-ai/.venv/bin/python eval/run_w8_dify_compare.py`
+（独立编排 `./scripts/dify-up.sh`，口径 [`docs/dify-comparison.md`](../../docs/dify-comparison.md)）
+
 Prompt 钉扎/回滚：`python-ai/.venv/bin/python eval/run_w8_prompt_pin.py list`
 
 W9-1 双栈五条链路冒烟：`python-ai/.venv/bin/python eval/run_w9_e2e.py`

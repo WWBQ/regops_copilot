@@ -9,10 +9,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import psycopg
+from psycopg.types.json import Json
 
 logger = logging.getLogger(__name__)
 
 SESSION_TTL_HOURS = 72
+_PENDING_COLUMNS_READY = False
 
 
 @dataclass(frozen=True)
@@ -178,6 +180,90 @@ def get_document_row(
         created_at=row[7],
         updated_at=row[8],
     )
+
+
+def _ensure_pending_columns(conn: psycopg.Connection) -> bool:
+    global _PENDING_COLUMNS_READY
+    if _PENDING_COLUMNS_READY:
+        return True
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                ALTER TABLE chat_session
+                  ADD COLUMN IF NOT EXISTS pending_asknum JSONB,
+                  ADD COLUMN IF NOT EXISTS pending_asknum_expires_at TIMESTAMPTZ
+                """
+            )
+        _PENDING_COLUMNS_READY = True
+        return True
+    except Exception:
+        logger.debug("ensure pending_asknum columns skipped", exc_info=True)
+        return False
+
+
+def load_session_pending_asknum(
+    conn: psycopg.Connection,
+    session_id: str,
+) -> dict[str, Any] | None:
+    if not _ensure_pending_columns(conn):
+        return None
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT pending_asknum, pending_asknum_expires_at
+            FROM chat_session
+            WHERE session_id = %s::uuid
+            """,
+            (session_id,),
+        )
+        row = cur.fetchone()
+    if row is None or row[0] is None:
+        return None
+    expires_at = row[1]
+    if expires_at is not None:
+        aware = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
+        if aware < datetime.now(timezone.utc):
+            return None
+    payload = row[0]
+    return dict(payload) if isinstance(payload, dict) else None
+
+
+def save_session_pending_asknum(
+    conn: psycopg.Connection,
+    session_id: str,
+    payload: dict[str, Any],
+    expires_at: datetime,
+) -> None:
+    if not _ensure_pending_columns(conn):
+        return
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE chat_session
+            SET pending_asknum = %s,
+                pending_asknum_expires_at = %s,
+                updated_at = NOW()
+            WHERE session_id = %s::uuid
+            """,
+            (Json(payload), expires_at, session_id),
+        )
+
+
+def clear_session_pending_asknum(conn: psycopg.Connection, session_id: str) -> None:
+    if not _ensure_pending_columns(conn):
+        return
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE chat_session
+            SET pending_asknum = NULL,
+                pending_asknum_expires_at = NULL,
+                updated_at = NOW()
+            WHERE session_id = %s::uuid
+            """,
+            (session_id,),
+        )
 
 
 def row_to_dict(row: SessionDocumentRow) -> dict[str, Any]:

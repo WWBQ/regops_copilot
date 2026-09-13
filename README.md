@@ -171,7 +171,8 @@ python-ai/.venv/bin/python eval/run_w9_redteam.py --fail-on-regression
 [`docs/eval_rag_retrieval.md`](./docs/eval_rag_retrieval.md)、
 [`docs/eval_rag_ablation.md`](./docs/eval_rag_ablation.md)、
 [`docs/eval_rag_guard.md`](./docs/eval_rag_guard.md)、
-[`docs/W8_PROMPTS.md`](./docs/W8_PROMPTS.md)。
+[`docs/W8_PROMPTS.md`](./docs/W8_PROMPTS.md)、
+[`docs/dify-comparison.md`](./docs/dify-comparison.md)。
 
 ## 目录结构
 

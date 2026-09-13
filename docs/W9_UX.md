@@ -39,4 +39,4 @@ Compose 里 `java-service` 只等 Postgres healthy，**不等 python-ai**，便�
 
 - 不改 W6 DAG，不让 Python 写 `REVIEWED`
 - 不把 CoT / tool_trace 渲染到聊天
-- 不做 W8-4 Dify
+- Dify 对照见 [`dify-comparison.md`](./dify-comparison.md)，不进前端降级路径

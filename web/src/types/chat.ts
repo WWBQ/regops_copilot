@@ -22,6 +22,16 @@ export interface ChatRequest {
   thread_id?: string
 }
 
+export interface PendingAsknum {
+  intent?: string
+  company?: string | null
+  years?: number[]
+  metric?: string | null
+  scope?: string
+  missing?: string[]
+  hint?: string
+}
+
 export interface ChatResponse {
   reply: string
   model: string
@@ -32,6 +42,7 @@ export interface ChatResponse {
   route?: string
   thread_id?: string | null
   pending_node?: string | null
+  pending_request?: PendingAsknum | null
   prompt_tokens?: number
   completion_tokens?: number
   total_tokens?: number

@@ -53,3 +53,9 @@ k8s/secret.local.yaml
 
 # 本地开发编排脚本产物（日志 + pid）
 .dev-logs/
+
+# Dify 官方克隆与数据卷（W8-4 对照，不提交镜像/知识库）
+dify/upstream/
+
+# Dify 对照跑次（可提交 examples/）
+eval/dify/runs/

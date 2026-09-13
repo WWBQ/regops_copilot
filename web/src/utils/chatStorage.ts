@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../types/chat'
+import type { ChatMessage, PendingAsknum } from '../types/chat'
 
 const MESSAGES_KEY_PREFIX = 'regops_chat_messages:'
 const MAX_MESSAGES = 200
@@ -58,8 +58,36 @@ export function saveWorkflowThreadId(sessionId: string, threadId: string | null)
   }
 }
 
+const PENDING_KEY_PREFIX = 'regops_asknum_pending:'
+
+export function loadPendingAsknum(sessionId: string): PendingAsknum | null {
+  try {
+    const raw = localStorage.getItem(`${PENDING_KEY_PREFIX}${sessionId}`)
+    if (!raw) {
+      return null
+    }
+    return JSON.parse(raw) as PendingAsknum
+  } catch {
+    return null
+  }
+}
+
+export function savePendingAsknum(sessionId: string, pending: PendingAsknum | null): void {
+  try {
+    const key = `${PENDING_KEY_PREFIX}${sessionId}`
+    if (!pending || (pending.missing && pending.missing.length === 0)) {
+      localStorage.removeItem(key)
+      return
+    }
+    localStorage.setItem(key, JSON.stringify(pending))
+  } catch {
+    // ignore
+  }
+}
+
 export function clearChatMessages(sessionId: string): void {
   localStorage.removeItem(storageKey(sessionId))
+  localStorage.removeItem(`${PENDING_KEY_PREFIX}${sessionId}`)
 }
 
 export function createWelcomeMessage(): ChatMessage {

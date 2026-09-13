@@ -20,6 +20,8 @@ import {
   clearChatMessages,
   loadChatMessages,
   saveChatMessages,
+  loadPendingAsknum,
+  savePendingAsknum,
   loadWorkflowThreadId,
   saveWorkflowThreadId,
 } from '../../utils/chatStorage'
@@ -36,7 +38,7 @@ import { loadStoredModel, storeModel } from '../../utils/models'
 import { estimateTokens, resolveCompletionTokens } from '../../utils/tokens'
 import ChatInput from './ChatInput.vue'
 import ChatMessage from './ChatMessage.vue'
-import type { ChatMessage as ChatMessageType } from '../../types/chat'
+import type { ChatMessage as ChatMessageType, PendingAsknum } from '../../types/chat'
 
 const props = defineProps<{
   backendOk: boolean | null
@@ -68,7 +70,27 @@ const availableModels = ref<string[]>([])
 const selectedModel = ref('')
 const connectionAlert = ref<string | null>(null)
 
+const pendingRequest = ref<PendingAsknum | null>(null)
+
 const DISCLAIMER = '本回答由 AI 生成，仅供参考，不构成合规或投资建议。'
+
+const pendingHint = computed(() => {
+  const hint = pendingRequest.value?.hint?.trim()
+  if (hint) {
+    return hint
+  }
+  if (!pendingRequest.value?.missing?.length) {
+    return ''
+  }
+  return '正在补充查询'
+})
+
+function rememberPending(session: string | null, pending: PendingAsknum | null | undefined) {
+  pendingRequest.value = pending && pending.missing?.length ? pending : null
+  if (session) {
+    savePendingAsknum(session, pendingRequest.value)
+  }
+}
 
 const EXAMPLE_TOOL_LOOP = '格力2024年经营得怎么样'
 
@@ -208,6 +230,7 @@ async function initSession() {
     rebuildChatSessionsFromStorage()
     sessionId.value = await ensureSessionId()
     workflowThreadId.value = loadWorkflowThreadId(sessionId.value)
+    pendingRequest.value = loadPendingAsknum(sessionId.value)
     const restored = loadChatMessages(sessionId.value)
     if (restored) {
       messages.value = restored.map((item) => ({ ...item, streaming: false, statusText: undefined }))
@@ -244,6 +267,7 @@ async function handleNewChat() {
   try {
     sessionId.value = await startNewSession()
     rememberWorkflowThread(null)
+    rememberPending(sessionId.value, null)
     messages.value = [createWelcomeMessage()]
     sessionDocs.value = []
     touchSessionMeta({ touchUpdatedAt: true, moveToFront: true })
@@ -273,6 +297,7 @@ async function handleSwitchSession(targetSessionId: string) {
   storeSessionId(targetSessionId)
   sessionId.value = targetSessionId
   workflowThreadId.value = loadWorkflowThreadId(targetSessionId)
+  pendingRequest.value = loadPendingAsknum(targetSessionId)
   suppressSessionMeta.value = true
   messages.value = (loadChatMessages(targetSessionId) ?? [createWelcomeMessage()]).map((item) => ({
     ...item,
@@ -495,6 +520,7 @@ async function handleSend(text: string) {
         : {}),
     })
     applyWorkflowThread(response)
+    rememberPending(sessionId.value, response.pending_request)
     emit('connected', response.model)
   } catch (error) {
     const aborted = error instanceof DOMException && error.name === 'AbortError'
@@ -638,6 +664,8 @@ watch(
         </button>
       </div>
 
+      <p v-if="pendingHint" class="pending-slot-chip" role="status">{{ pendingHint }}</p>
+
       <ChatInput
         :model="selectedModel"
         :models="availableModels"
@@ -699,6 +727,18 @@ watch(
   background: #fffbeb;
   border-color: #fde68a;
   color: #92400e;
+}
+
+.pending-slot-chip {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 12px;
+  font-weight: 600;
+  width: fit-content;
 }
 
 .example-chips {

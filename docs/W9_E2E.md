@@ -84,5 +84,5 @@ Java 调 Python 的流式客户端固定 **HTTP/1.1**（uvicorn 不接 HTTP/2 �
 ## 不做什么
 
 - 不改 W6 DAG，不让 Python 写 `REVIEWED`
-- 不做 W8-4 Dify
+- Dify 对照见 [`dify-comparison.md`](./dify-comparison.md)，不进本周五条链路
 

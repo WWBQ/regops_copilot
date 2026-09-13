@@ -17,6 +17,7 @@ services:
       - ./docs/sql/w4_rag_query_log.sql:/docker-entrypoint-initdb.d/04_w4_rag_log.sql:ro
       - ./docs/sql/w4_asknum_query_log.sql:/docker-entrypoint-initdb.d/05_asknum_log.sql:ro
       - ./docs/sql/w4_asknum_alias.sql:/docker-entrypoint-initdb.d/06_asknum_alias.sql:ro
+      - ./docs/sql/w4_asknum_pending.sql:/docker-entrypoint-initdb.d/06b_asknum_pending.sql:ro
       - ./docs/sql/w6_review_draft.sql:/docker-entrypoint-initdb.d/07_review_draft.sql:ro
       - ./docs/sql/w7_identity.sql:/docker-entrypoint-initdb.d/08_w7_identity.sql:ro
     healthcheck:
