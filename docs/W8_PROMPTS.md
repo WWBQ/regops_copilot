@@ -1,6 +1,6 @@
-# W8 Prompt 资产（模板库 · 四策略对照 · A/B）
+# W8 Prompt 资产（模板库 · 三策略对照 · A/B）
 
-> 目标：Prompt 可版本化、可 A/B。W8-1～W8-4 已齐。Dify 只做对照，不替换 W6 DAG。ReAct 只出现在评测对照。
+> 目标：Prompt 可版本化、可 A/B。Dify 只做独立对照。
 
 ## 怎么走
 
@@ -20,7 +20,6 @@ System 和 User 分文件字段。用户问题只进 User 槽，不会拼进 Sys
 |---|---|---|
 | `chat.general` | `/chat` 寒暄/闭卷 | 1.0.0（与抽出前逐字相同） |
 | `rag.answer` | RAG 成稿 | 1.0.0 |
-| `tools.loop` | 点名工具自选 | 1.0.0 |
 | `strategy.*` | 只给 W8 评测 | 1.0.0；`zero_shot@1.1.0` 仅 A/B |
 
 回滚：
@@ -33,7 +32,7 @@ python-ai/.venv/bin/python eval/run_w8_prompt_pin.py rollback --name chat.genera
 
 `GET /ops/prompts`、`POST /ops/prompts/{name}/rollback` 同样只改钉扎。
 
-## 四策略对照（w8-2）
+## 三策略对照（w8-2）
 
 同一批 30 题：`eval/golden/w8_prompt_30.json`。题型有区分度（面试 q82）：闭卷概念、未入库数字、诱导手算、注入拒答、指定格式。Few-shot 示例是存款准备金率等**题外**样例，不抄黄金集原题。
 
@@ -50,11 +49,9 @@ python-ai/.venv/bin/python eval/run_w8_strategy.py
 | Zero-shot | 76.7% | 3.3% | 76 | 196 ms |
 | Few-shot | 96.7% | 0.0% | 188 | 286 ms |
 | CoT | 56.7% | 36.7% | 110 | 516 ms |
-| ReAct | 43.3% | 40.0% | 219 | 966 ms |
 
 **何时不值得用**
 
-- **ReAct**：闭卷概念、没有真实工具。Token/延迟最高，准确率最低，还爱在 Observation 里编数。生产继续走 W6 DAG。
 - **CoT**：诱导手算或库外金额。推理链补比率，数字错误率升到三成以上。数字边界仍是 `evidence.py`。
 - **Few-shot**：未入库数字题上 Zero-shot 已经会拒，再贴示例只烧 Token。留给术语/格式题。
 
@@ -79,7 +76,6 @@ python-ai/.venv/bin/python eval/run_w8_ab.py --write-example
 
 ## 不做什么
 
-- 不把 ReAct Prompt 接到 `/chat` 图上
 - 不把「不要编造」写进 Prompt 当数字门禁
 - 不把 fixture 准确率写成机构级模型榜
 - 不做 Langfuse（W9）
@@ -94,4 +90,4 @@ export DIFY_APP_KEY=app-...
 python-ai/.venv/bin/python eval/run_w8_dify_compare.py --write-example
 ```
 
-没起来就跳过。选型表与 q67：[`dify-comparison.md`](./dify-comparison.md)。HiAgent / 扣子只口头对照。
+没起来就跳过。选型表与 q67：[`dify-comparison.md`](./dify-comparison.md)。

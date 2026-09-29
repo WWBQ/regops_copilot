@@ -58,7 +58,7 @@ _CONCEPT_HINT = "、".join(
 
 @dataclass(frozen=True)
 class MetricLookup:
-    """单次指标查询结果。W6 Agent 应调 lookup_metric，不要自己拼 SQL。"""
+    """单次指标查询结果；只返回经过质量门校验的财务事实。"""
 
     company_code: str
     concept: str

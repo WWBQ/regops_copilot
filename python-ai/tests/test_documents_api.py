@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.api.deps import get_document_service, get_object_store, get_settings_dep
+from app.core.dependencies import get_document_service, get_object_store, get_settings_dep
 from app.config import Settings
 from app.documents.registry import DocumentRegistry
 from app.documents.service import DocumentService

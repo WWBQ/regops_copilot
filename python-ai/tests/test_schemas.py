@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.compliance import ComplianceConclusion
+from app.eval.schemas import ComplianceConclusion
 
 
 def test_valid_compliance_conclusion():

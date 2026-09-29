@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [vue()],
   server: {
+    host: true,
     port: 5173,
     proxy: {
       // Quality 走 Python，避免 java-service 未热加载新代理时页面一直 pending。

@@ -1,101 +1,33 @@
 # java-service
 
-RegOps Copilot 的 Java BFF / 业务网关（Spring Boot 4.1 + Java 21）。
+Spring Boot BFF，负责前端 API 聚合、登录认证、部门权限、文档预览权限与审计。LLM、RAG、问数、文档解析和评测由 `python-ai` 提供。
 
-## 职责（与 python-ai 分工）
+## 主要接口
 
-| 模块 | Owner |
-|------|--------|
-| LLM / RAG / ingest / 向量 | `python-ai` |
-| 认证 RBAC、复核流、审计、BFF 聚合 | `java-service` |
+- `GET /api/health`：Java 与 Python 状态。
+- `GET /api/models`、`POST /api/chat`、`POST /api/chat/stream`：代理模型聊天、RAG 和问数，流式响应保持 SSE。
+- `/api/sessions/**`、`/api/documents/**`、`/api/labeling/**`：会话、文档与数据标注。
+- `/api/ops/**`：检索、问数、入库、质量和评测监控。
+- `/api/auth/**`：JWT 登录；`/api/customers/**`：脱敏客户档案；`GET /api/audit/events`：审计。
 
-Agent / Python 只写 `PENDING` 草稿。提交和复核只在本服务：`PENDING → SUBMITTED → REVIEWED | REJECTED`。没有 `APPROVED`。详见 [`docs/W7_RBAC.md`](../docs/W7_RBAC.md)。
+Java 向 Python 透传 `X-Request-ID` 和部门信息，不转发用户 JWT。客户经理访问投研内部年报时，文档入口返回 404。
 
-当前已实现：
+## 本地运行
 
-- `GET /api/health` — Java + Python 健康检查（Python 探活 2.5s；挂了仍 200 + `pythonAi.down`）
-- `POST /api/chat` — 转发至 python-ai `/chat`
-- `POST /api/chat/stream` — 转发 python-ai SSE，不缓存
-- `GET /api/models` — 转发至 python-ai `/models`
-- `GET /api/documents/{docId}/viewer-url` — 客户经理访问内核年报返回 404
-- `/api/labeling/**` — 转发 python-ai 数据标注
-- `X-Request-ID` — 全链路关联 ID（响应头 + `ApiError.extra.request_id`）
-- `traceparent` — W3C Trace ID，向 Python 透传
-- 上游失败映射：`502 upstream_down` / `504 upstream_timeout`；读路径 5xx 可重试、超时不重试
-- `/api/tools/**` — 金融工具（部门隔离）；不代理 RAG；`POST /review-draft` 写 PENDING 草稿（不重试）
-- Java → Python 带服务身份（`X-Regops-Service` / Token），**不转发用户 JWT**
-- `/api/auth/**` — 登录发 JWT
-- `/api/reviews/**` — maker-checker
-- `/api/customers` — 脱敏客户档案
-- `/api/audit/events` — 审计
-
-## 本地启动
-
-先对已有库执行一次 W7 SQL（新 volume 会随 compose 自动跑）：
+先启动数据库和 `python-ai`，再运行：
 
 ```bash
-psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w7_identity.sql
-```
-
-```bash
-# 1. 数据库
-docker compose up -d db
-
-# 2. Python AI（另一个终端）
-cd python-ai && uvicorn app.main:app --reload --port 8000
-
-# 3. Java
 cd java-service
 mvn spring-boot:run
-
-# 4. 前端（可选）
-cd web && npm run dev
 ```
 
-演示账号：`analyst/analyst123`、`checker/checker123`、`rm/rm123`、`admin/admin123`。
-
-```bash
-curl -s -X POST http://localhost:8080/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"analyst","password":"analyst123"}'
-```
-
-问答和工具 capabilities 仍可不登录。复核 / 客户档案 / 审计必须带 `Authorization: Bearer`。
+已有数据库如缺少身份表，可运行 `docs/sql/w7_identity.sql`；新数据库由 Compose 初始化。演示账号：`analyst/analyst123`、`rm/rm123`、`admin/admin123`。
 
 ## 测试
 
 ```bash
-cd java-service && mvn test
+cd java-service
+mvn test
 ```
 
-工具部门隔离走 H2；W7 企业边界走 `MakerCheckerIT`（Testcontainers 真实 Postgres）。没 Docker 时该 IT 会跳过，不能当过关证据。
-
-## 配置
-
-| 变量 | 默认 |
-|------|------|
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/regops_db` |
-| `REGOPS_PYTHON_AI_BASE_URL` | `http://localhost:8000` |
-| `REGOPS_JWT_SECRET` | 开发默认（至少 32 字符） |
-
-超时预算（`application.yaml`）：建连 5s / 读 120s / 流式 180s / 探活 2.5s。详见 [`docs/W9_E2E.md`](../docs/W9_E2E.md)。
-
-## 目录结构
-
-```
-src/main/java/com/wbq/java_service/
-├── auth/            # JWT 签发与过滤器
-├── identity/        # 用户 / 角色 / 种子
-├── review/          # 工单状态机、乐观锁、事务探针
-├── audit/           # 审计
-├── customer/        # 脱敏客户档案
-├── config/          # Security、CORS、RestClient
-├── controller/      # BFF REST（含 /api/tools 与 /api/reviews）
-├── service/         # 金融工具编排（读走重试；写草稿不重试）
-├── tools/           # 部门 ACL、能力树
-├── client/          # python-ai HTTP 客户端（服务身份 + 读重试）
-├── dto/             # 请求/响应模型
-├── filter/          # X-Request-ID
-├── util/            # PII 脱敏、读重试
-└── exception/       # 统一错误格式（detail 字段，对齐 FastAPI）
-```
+超时与错误映射见 [W9_E2E.md](../docs/W9_E2E.md)，部门权限见 [W7_RBAC.md](../docs/W7_RBAC.md)。

@@ -41,7 +41,6 @@ def test_production_pins_match_extracted_text():
     assert active_version("chat.general") == "1.0.0"
     assert render_system("chat.general") == CHAT_V10
     assert render_system("rag.answer") == RAG_V10
-    assert "不得手算比率、差额或编造" in render_system("tools.loop")
 
 
 def test_changelog_requires_eval_binding():
@@ -99,7 +98,7 @@ def test_unknown_version_cannot_pin(tmp_path: Path):
 
 def test_list_templates_includes_strategy_family():
     ids = {row["id"] for row in list_templates()}
-    assert {"chat.general", "rag.answer", "tools.loop", "strategy.react"} <= ids
+    assert {"chat.general", "rag.answer", "strategy.zero_shot", "strategy.few_shot", "strategy.cot"} <= ids
 
 
 @pytest.mark.anyio

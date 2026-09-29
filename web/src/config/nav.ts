@@ -35,8 +35,6 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'compliance',
     label: '合规业务',
     items: [
-      { id: 'review', label: '合规复核', path: '/compliance/review', phase: 'W7', enabled: true },
-      { id: 'workflow', label: '审批流', path: '/compliance/workflow', phase: 'W7', enabled: true },
       { id: 'audit', label: '审计追踪', path: '/compliance/audit', phase: 'W7', enabled: true },
     ],
   },
@@ -104,18 +102,6 @@ export const PLACEHOLDER_PAGES: Record<
     backend: 'GET /api/ops/quality/facts',
     phase: 'W2-2',
   },
-  review: {
-    title: '合规复核',
-    summary: 'Java maker-checker：PENDING 草稿提交后由他人复核为 REVIEWED / REJECTED。',
-    backend: 'POST /api/reviews/tickets · /submit · /approve · /reject',
-    phase: 'W7',
-  },
-  workflow: {
-    title: '审批流',
-    summary: '与合规复核同一状态机：PENDING → SUBMITTED → REVIEWED | REJECTED，状态不能倒流。',
-    backend: 'java-service ReviewService',
-    phase: 'W7',
-  },
   audit: {
     title: '审计追踪',
     summary: '操作人、时间、前后快照、X-Request-ID。',
@@ -136,7 +122,7 @@ export const PLACEHOLDER_PAGES: Record<
   },
   eval: {
     title: '评估报告',
-    summary: '选择评测任务（W1 聊天 / RAG 检索 / 红队），一键运行并查看 Recall@k、准确率与明细。',
+    summary: '选择聊天、RAG、问数评测任务，一键运行并查看 Recall@k、准确率与明细。',
     backend: 'POST /api/ops/eval/runs',
     phase: 'W1-4',
   },
@@ -145,13 +131,6 @@ export const PLACEHOLDER_PAGES: Record<
     summary: 'Prompt 版本、Token、估算成本与 W3C Trace ID。未配 Langfuse 时使用进程内缓冲。',
     backend: 'GET /api/ops/obs/traces',
     phase: 'W9',
-  },
-  agent: {
-    title: '合规问答（多步）',
-    summary:
-      'W6 多步编排接在同一助手里：对比 + 核对口径走任务 Checkpoint，不另开对话页。工具仍是 lookup_metric / RAG。',
-    backend: 'python-ai/app/agents/（规划，入口为 /）',
-    phase: 'W6',
   },
   settings: {
     title: '设置',

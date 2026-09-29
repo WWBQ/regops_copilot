@@ -26,6 +26,13 @@ export interface GoldenSetPreview {
   items: GoldenItemPreview[]
 }
 
+export interface GoldenSetOption {
+  filename: string
+  version: string | null
+  item_count: number
+  categories: string[]
+}
+
 export interface EvalProgress {
   done: number
   total: number
@@ -47,10 +54,6 @@ export interface EvalRunSummary {
   mrr?: number
   ndcg_at_k?: number
   citation_accuracy?: number
-  param_accuracy?: number
-  avg_steps?: number
-  confirmation_rate?: number
-  fail_by_node?: Record<string, number>
   route_accuracy?: number
   leak_rate?: number
   unit_error_rate?: number
@@ -215,10 +218,8 @@ export const RUNNER_LABELS: Record<string, string> = {
   compliance_schema: '合规结论 Schema 校验（误放行率）',
   w4_asknum: 'W4 问数（受控 lookup）',
   w6_number_check: 'W6 数字校验（误放行 / 量纲）',
-  w6_workflow: 'W6 工作流轨迹（节点 / 参数 / 确认率）',
-  w8_strategy: 'W8 四策略对照（Zero-shot / Few-shot / CoT / ReAct）',
+  w8_strategy: 'W8 三策略对照（Zero-shot / Few-shot / CoT）',
   w8_ab: 'W8 Prompt A/B（Wilson / McNemar）',
-  w9_redteam: 'W9 金融红队（注入 / 越权 / SQL）',
   rag_acl: 'RAG 部门 ACL（越权不得检索）',
   rag_refuse: 'RAG 无答案拒答（寒暄 / 库外 / 缺年）',
 }

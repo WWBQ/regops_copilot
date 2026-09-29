@@ -34,7 +34,6 @@ public class DataSeeder implements ApplicationRunner {
         }
         try {
             seed("analyst", "analyst123", "投研分析师", "analyst@regops.local", Role.ANALYST, "research");
-            seed("checker", "checker123", "合规复核员", "checker@regops.local", Role.CHECKER, "compliance");
             seed("rm", "rm123", "客户经理", "rm@regops.local", Role.RM, "rm");
             seed("admin", "admin123", "系统管理员", "admin@regops.local", Role.ADMIN, "compliance");
         } catch (DataAccessException ex) {
@@ -58,6 +57,6 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     public static List<String> demoAccounts() {
-        return List.of("analyst/analyst123", "checker/checker123", "rm/rm123", "admin/admin123");
+        return List.of("analyst/analyst123", "rm/rm123", "admin/admin123");
     }
 }

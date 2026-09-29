@@ -21,7 +21,7 @@ from typing import Any, Callable
 from pydantic import ValidationError
 
 from app.eval.selection import normalize_categories, select_items
-from app.schemas.compliance import ComplianceConclusion
+from app.eval.schemas import ComplianceConclusion
 
 ProgressCallback = Callable[[int, int, str], None]
 
@@ -215,7 +215,7 @@ def run_compliance_schema_eval(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "golden_version": golden.get("version"),
         "golden_file": golden_path.name,
-        "schema_target": "app.schemas.compliance.ComplianceConclusion",
+        "schema_target": "app.eval.schemas.ComplianceConclusion",
         "params": {
             "limit": limit,
             "category": resolved_categories[0] if len(resolved_categories) == 1 else None,

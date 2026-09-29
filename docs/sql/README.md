@@ -10,12 +10,11 @@
 | `w4_rag_query_log.sql` | W3：RAG 检索 trace 日志 `rag_query_log` |
 | `w4_asknum_query_log.sql` | W4：问数 trace 日志 `asknum_query_log` |
 | `w4_asknum_alias.sql` | W4：问数/检索别名 `asknum_alias`（近义词 → 指标或证券代码） |
-| `w6_review_draft.sql` | W6-4：`review_draft`（Agent 只写 `PENDING`；`thread_id` / `idempotency_key` 部分唯一） |
-| `w7_identity.sql` | W7：工单状态扩到 `SUBMITTED/REVIEWED/REJECTED`；`app_user` / `customer_profile` / `audit_event`；用户由 Java 种子写入 |
+| `w7_identity.sql` | W7：`app_user` / `customer_profile` / `audit_event`；用户由 Java 种子写入 |
 
 ## 新库（Docker 首次启动）
 
-`compose.yaml` 已挂载 `01_init.sql` … `08_w7_identity.sql`，`docker compose up -d db` 会自动建表。
+`compose.yaml` 挂载初始化脚本，`docker compose up -d db` 会自动建表。
 
 ## 已有库（之前只跑过 init）
 
@@ -26,7 +25,6 @@ psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w2_table
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w4_rag_query_log.sql
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w4_asknum_query_log.sql
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w4_asknum_alias.sql
-psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w6_review_draft.sql
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w7_identity.sql
 ```
 
@@ -36,7 +34,7 @@ psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w7_ident
 docker compose exec db psql -U regops -d regops_db -c "\dt"
 ```
 
-应看到：`doc_chunks` `pdf_document` `web_document` `ingest_job` `fin_metric` `rag_query_log` `asknum_query_log` `asknum_alias` `review_draft` `app_user` `customer_profile` `audit_event`
+应看到：`doc_chunks` `pdf_document` `web_document` `ingest_job` `fin_metric` `rag_query_log` `asknum_query_log` `asknum_alias` `app_user` `customer_profile` `audit_event`
 
 ## 解析 JSON 回溯
 

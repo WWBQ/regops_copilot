@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python-ai"))
 
-from app.models.factory import get_llm_client, list_available_models  # noqa: E402
+from app.models.llm import get_llm_client, list_available_models, resolve_model_id  # noqa: E402
 
 OUT_PATH = ROOT / "eval" / "reports" / "model_selection_w1" / "raw.json"
 
@@ -82,7 +82,12 @@ async def run_one(model: str, question: str) -> dict:
 
 async def main() -> int:
     available = list_available_models()
-    missing = [name for name in ("deepseek", "qwen") if name not in available]
+    missing = []
+    for name in ("deepseek", "qwen"):
+        try:
+            resolve_model_id(name, available)
+        except ValueError:
+            missing.append(name)
     if missing:
         print(f"缺少模型 Key：{missing}；当前 available={available}", file=sys.stderr)
         return 1

@@ -31,13 +31,13 @@ flowchart LR
 
 | 关注点 | Owner | 说明 |
 |--------|-------|------|
-| LLM 调用与模型选路 | **python-ai** | `app/models/`：`LLMClient` 抽象 + DeepSeek / Qwen 实现 + factory |
+| LLM 调用与模型选路 | **python-ai** | `app/models/llm.py`：统一的 LangChain 模型客户端 |
 | RAG 检索、重排、引用、拒答 | **python-ai** | `app/rag/` |
 | 文档解析与入库 | **python-ai** | `app/ingest/`、`app/documents/` |
 | 评测任务与报告 | **python-ai** | `app/eval/` |
-| 问数（受控 lookup） / Agent | **python-ai** | W4：`app/asknum/` 已接 `/chat`；W5：`app/tools/`；W6：两家+结论才走 `app/agents/` Workflow（结论前 Checkpoint），不另开对话页 |
+| 问数（受控 lookup） | **python-ai** | `app/asknum/` 接入 `/chat`，只查询已核验的财务事实 |
 | 认证、RBAC、部门数据权限 | **java-service** | JWT + `@PreAuthorize`；问答/评测仍可不登录，见 [`W7_RBAC.md`](./W7_RBAC.md) |
-| maker-checker 复核、审计留痕 | **java-service** | `PENDING → SUBMITTED → REVIEWED \| REJECTED`；Python 只写 PENDING |
+| 审计留痕 | **java-service** | 记录受保护的业务操作 |
 | 对外 API 聚合与错误归一 | **java-service** | `controller/*ProxyController` + `GlobalExceptionHandler` |
 | 页面与交互 | **web** | Vue3 + vue-router |
 
@@ -81,7 +81,6 @@ BFF 侧 `GET /api/health` 会附带下游状态（下游异常时不影响本级
 | `message` | string | ✅ | 1–16000 字符 | 用户问题 |
 | `temperature` | number | | 0.0–2.0，默认 `0.1` | 采样温度 |
 | `session_id` | string \| null | | 须为合法 UUID | 会话 ID，用于关联本会话上传的临时文档 |
-| `thread_id` | string \| null | | `{dept}:{uuid}` | W6-2 审查任务检查点。暂停后前端回传，用于确认/取消 |
 | `use_rag` | boolean | | 默认 `true` | 关掉则纯 LLM 对话，不检索 |
 | `model` | string \| null | | 默认取 `DEFAULT_MODEL` | 须在 `GET /models` 返回的可用列表内 |
 
@@ -95,14 +94,12 @@ BFF 侧 `GET /api/health` 会附带下游状态（下游异常时不影响本级
 | `citations` | `Citation[]` | 引用列表：`doc_id`、`page`、`snippet`、`viewer_url`、`title`；问数另有 `href`（事实库深链）、`kind`=`facts` \| `document` |
 | `session_id` | string \| null | 回显会话 ID |
 | `rag_used` | boolean | 是否实际命中检索（有引用才为 `true`） |
-| `route` | string | `metric` / `metric_clarify` / `metric_blocked` / `agent` / `agent_blocked` / `agent_paused` / `tools` / `tools_blocked` / `rag` / `rag_blocked` / `chitchat` / `general`。数字题走问数时 `rag_used=false`；`tools` = 点名选工具或开放决策（经营概况 / 库外科目 / 待复核追问）；`agent_paused` = 审查图停在 `emit_conclusion` 前；`rag_blocked` / `tools_blocked` 在终稿数字无法回溯时也可能出现 |
-| `thread_id` | string \| null | 审查任务检查点 ID；`agent_paused` 时必带，确认/取消时原样回传 |
-| `pending_node` | string \| null | 暂停时为 `conclude` |
-| `tool_trace` | object[] | 工具自选时的调用记录（`name` / `ok` / `stop` / `value_yuan`）；末项可能是 `number_check`。RAG 被数字校验拦截时也会带这一项 |
+| `route` | string | `metric` / `metric_clarify` / `metric_blocked` / `rag` / `rag_blocked` / `chitchat` / `general`。数字题走问数时 `rag_used=false`；RAG 终稿数字无法回溯时为 `rag_blocked` |
+| `validation_trace` | object[] | RAG 数字校验记录可能包含 `number_check` |
 | `prompt_tokens` / `completion_tokens` / `total_tokens` | integer | Token 用量（问数模板答为 0） |
 | `latency_ms` | number | 模型调用耗时 |
 
-**错误码**（来源：`app/api/chat.py`）
+**错误码**（来源：`app/chat/router.py`）
 
 | 状态码 | 触发条件 |
 |--------|----------|
@@ -134,7 +131,7 @@ curl -s -X POST http://localhost:8000/chat \
 |---------|--------|------|
 | `meta` | `{model, session_id, route?}` | 路由或模型就绪 |
 | `status` | `{text}` | 工具循环 / 检索过程提示 |
-| `delta` | `{text}` | 增量正文（问数/工作流可能一次给完整段） |
+| `delta` | `{text}` | 增量正文（问数可能一次给完整段） |
 | `done` | `ChatResponse` | 最终回复、引用、用量 |
 | `error` | `{detail, status}` | 生成中失败（HTTP 仍可能是 200） |
 
@@ -154,7 +151,7 @@ BFF：`POST /api/chat/stream` 原样转发 `text/event-stream`，不缓存。
 { "available": ["deepseek"] }
 ```
 
-返回的是**实际配置了 API Key 的模型**（`app/models/factory.py:list_available_models`），
+返回的是**实际配置了 API Key 的模型**（`app/models/llm.py:list_available_models`），
 未配 Key 的模型不会出现在列表里，因此该端点也可当作「Key 是否装好」的自检。
 
 ---
@@ -243,8 +240,6 @@ GET /api/sessions      → 500（语义应为 405，该路径只接受 POST）
 | 分组 | 端点 |
 |------|------|
 | 基础 | `GET /`、`GET /health`、`GET /models`、`POST /chat`、`POST /chat/stream` |
-| 工具合同 | `GET /tools`、`GET /tools/capabilities`、`GET /tools/schema/{name}`、`POST /tools/invoke`（`backend=mock` 可回放）、`GET /tools/review-drafts`、`GET /tools/review-drafts/{draft_id}`（须 `X-Regops-Dept`） |
-| MCP | `POST /mcp`（JSON-RPC：`initialize` / `tools/list` / `tools/call`） |
 | 文档 | `GET /documents`、`POST /documents/upload`、`GET /documents/{doc_id}`、`GET /documents/{doc_id}/content`、`GET /documents/{doc_id}/viewer-url`、`POST /documents/citation/viewer-url` |
 | 会话 | `POST /sessions`、`GET|POST /sessions/{session_id}/documents`、`GET /sessions/{session_id}/documents/{doc_id}` |
 | 标注 | `GET|POST /labeling/tasks`、`GET /labeling/tasks/{task_id}`、`GET /labeling/tasks/{task_id}/export`、`GET|POST /labeling/tasks/{task_id}/items/{idx}`、`GET /labeling/template` 等 |
@@ -260,7 +255,6 @@ GET /api/sessions      → 500（语义应为 405，该路径只接受 POST）
 |-----------|------|------|
 | `HealthController` | `/api` | `GET /health` |
 | `AiProxyController` | `/api` | `GET /models`、`POST /chat`、`POST /chat/stream` |
-| `ToolController` | `/api/tools` | `GET /capabilities`、`GET /schema/{name}`、`POST /lookup`、`/compare`、`/scope`、`/verify`、`/review-draft`（PENDING 草稿，不重试）、`GET /review-drafts`、`GET /review-drafts/{draftId}`、`/invoke`（部门隔离；不代理 RAG） |
 | `DocumentProxyController` | `/api/documents` | `GET /{docId}/viewer-url`、`GET /{docId}/content` |
 | `SessionProxyController` | `/api/sessions` | `POST ""`、`GET /{sessionId}/documents`、`POST /{sessionId}/documents`（multipart）、`GET /{sessionId}/documents/{docId}` |
 | `OpsProxyController` | `/api/ops` | `GET /rag/overview`、`/rag-traces`、`/rag-traces/{traceId}`、`/asknum-traces`、`/asknum-traces/{traceId}`、`/system/overview`、`/ingest/overview`、`/ingest/jobs`、`/ingest/session-documents`、`/logs/events` |
@@ -268,11 +262,10 @@ GET /api/sessions      → 500（语义应为 405，该路径只接受 POST）
 | `LabelingProxyController` | `/api/labeling` | `GET /tasks`、`POST /tasks`（multipart）、`GET /template`、`GET /tasks/{taskId}`、`GET|POST /tasks/{taskId}/items/{idx}`、`GET /tasks/{taskId}/export`、`GET /tasks/{taskId}/pdf/{filename}`、`GET /tasks/{taskId}/html/{idx}` |
 | `AuditController` | `/api/audit` | `GET /events`（JWT；含 actor / before-after / request_id） |
 | `AuthController` | `/api/auth` | `POST /login`、`GET /me`、`GET /demo-accounts` |
-| `ReviewController` | `/api/reviews` | `GET|POST /tickets`、`POST /tickets/{id}/submit` `/approve` `/reject` |
 | `CustomerController` | `/api/customers` | `GET ""`、`GET /{id}`（客户经理只见 CLIENT，内核 404） |
 | Actuator | `/actuator` | `GET /health`、`GET /info` |
 
-登录：`analyst/analyst123`、`checker/checker123`、`rm/rm123`、`admin/admin123`。工单状态没有 `APPROVED`。详情 [`W7_RBAC.md`](./W7_RBAC.md)。
+演示登录：`analyst/analyst123`、`rm/rm123`、`admin/admin123`。详情 [`W7_RBAC.md`](./W7_RBAC.md)。
 
 > 常见误用：BFF 的运维端点都在 `/api/ops/**` 之下，直接请求 `/api/ingest/jobs` 是错的；
 > `/api/sessions` 只接受 `POST`。这两种情况当前都返回 **500** 而非 404/405，
@@ -286,8 +279,6 @@ GET /api/sessions      → 500（语义应为 405，该路径只接受 POST）
 - W1 评测基线：[`eval_w1_baseline.md`](./eval_w1_baseline.md)
 - 入库校验规则：[`INGEST_VALIDATION.md`](./INGEST_VALIDATION.md)
 - W4 问数：[`W4_ASKNUM.md`](./W4_ASKNUM.md)
-- W5 工具合同：[`W5_TOOLS.md`](./W5_TOOLS.md)
-- W6 审查对比工作流：[`W6_GRAPH.md`](./W6_GRAPH.md)
 - W7 Java 企业边界：[`W7_RBAC.md`](./W7_RBAC.md)
 - W8 Prompt 模板 / 四策略 / A/B：[`W8_PROMPTS.md`](./W8_PROMPTS.md)
 - W9-1 双栈贯通 / Correlation ID / 超时与降级：[`W9_E2E.md`](./W9_E2E.md)

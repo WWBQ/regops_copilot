@@ -18,7 +18,6 @@ services:
       - ./docs/sql/w4_asknum_query_log.sql:/docker-entrypoint-initdb.d/05_asknum_log.sql:ro
       - ./docs/sql/w4_asknum_alias.sql:/docker-entrypoint-initdb.d/06_asknum_alias.sql:ro
       - ./docs/sql/w4_asknum_pending.sql:/docker-entrypoint-initdb.d/06b_asknum_pending.sql:ro
-      - ./docs/sql/w6_review_draft.sql:/docker-entrypoint-initdb.d/07_review_draft.sql:ro
       - ./docs/sql/w7_identity.sql:/docker-entrypoint-initdb.d/08_w7_identity.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U regops -d regops_db"]
@@ -39,7 +38,6 @@ services:
       DATABASE_URL: postgresql://regops:${POSTGRES_PASSWORD:-regops123}@db:5432/regops_db
       REGOPS_SERVICE_TOKEN: ${REGOPS_SERVICE_TOKEN:-dev-service-token}
       OBJECT_STORE_ROOT: /app/data/objects
-      CHECKPOINT_SQLITE_PATH: /app/data/checkpoints/review.sqlite
       LABELING_DATA_DIR: /app/data/labeling
       HF_HOME: /app/data/hf
       API_PUBLIC_BASE_URL: http://localhost:8000

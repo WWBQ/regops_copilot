@@ -28,12 +28,12 @@ RegOps Copilot 的做法是把「能不能追溯」当作硬约束：
 
 | 服务 | 技术栈 | 负责 |
 |------|--------|------|
-| `python-ai` | FastAPI · Python 3.14 | LLM 封装、RAG 检索与引用、文档解析入库、评测任务 |
-| `java-service` | Spring Boot · JDK 21 | 对外 API 聚合、认证与 RBAC、maker-checker 复核与审计（W7） |
+| `python-ai` | FastAPI · Python 3.14 | LLM 调用、RAG 检索与引用、问数、文档解析入库、评测任务 |
+| `java-service` | Spring Boot · JDK 21 | 对外 API 聚合、认证与 RBAC、审计 |
 | `web` | Vue 3 · Vite | 合规问答、文档标注、评测与运维看板 |
 
 服务边界、端点契约、`X-Request-ID` 关联 ID 约定见 [`docs/api-spec.md`](./docs/api-spec.md)。
-W9-1 五条链路与超时/降级见 [`docs/W9_E2E.md`](./docs/W9_E2E.md)。
+W9-1 双栈链路与超时/降级见 [`docs/W9_E2E.md`](./docs/W9_E2E.md)。
 红队 / Trace / Compose / K8s / 前端降级见 [`docs/W9_SECURITY.md`](./docs/W9_SECURITY.md) · [`docs/W9_OBS.md`](./docs/W9_OBS.md) · [`docs/W9_COMPOSE.md`](./docs/W9_COMPOSE.md) · [`docs/W9_K8S.md`](./docs/W9_K8S.md) · [`docs/W9_UX.md`](./docs/W9_UX.md)。
 
 ## 快速启动
@@ -79,7 +79,7 @@ docker compose up --build
 # 或：kubectl apply --dry-run=client -k k8s/
 ```
 
-详见 [`docs/W9_K8S.md`](./docs/W9_K8S.md)。无 AI 时复核仍可用，见 [`docs/W9_UX.md`](./docs/W9_UX.md)。
+详见 [`docs/W9_K8S.md`](./docs/W9_K8S.md)。前端降级行为见 [`docs/W9_UX.md`](./docs/W9_UX.md)。
 
 ## 试一下
 
@@ -106,9 +106,6 @@ python-ai/.venv/bin/python eval/run_compliance_schema.py
 # 5b. W6-3 数字校验黄金集（抽取终稿数字并回溯，不调 LLM）
 python-ai/.venv/bin/python eval/run_w6_number_check.py
 
-# 5c. W6-6 审查工作流轨迹黄金集（节点/参数/确认率，脚本工具，不调 LLM）
-python-ai/.venv/bin/python eval/run_w6_workflow.py --fail-on-regression
-
 # 5d. W3-5 RAG 检索消融（baseline / hybrid / rerank；需入库年报）
 python-ai/.venv/bin/python eval/run_rag_ablation.py
 
@@ -116,55 +113,15 @@ python-ai/.venv/bin/python eval/run_rag_ablation.py
 python-ai/.venv/bin/python eval/run_rag_acl.py --fail-on-regression
 python-ai/.venv/bin/python eval/run_rag_refuse.py --fail-on-regression
 
-# 6. W5 工具目录 / 自省 / MCP（未接入 /chat 循环）
-curl -s http://localhost:8000/tools
-curl -s http://localhost:8000/tools/capabilities
-curl -s -X POST http://localhost:8000/mcp \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-
-# 7. Java 金融工具（必须带部门；写草稿走 PENDING，不重试）
-curl -s http://localhost:8080/api/tools/capabilities
-curl -s -X POST http://localhost:8080/api/tools/lookup \
-  -H 'Content-Type: application/json' -H 'X-Regops-Dept: research' \
-  -d '{"company_code":"002594","concept":"revenue","year":2024,"backend":"mock"}'
-
-# 8. W6 审查对比工作流（两家 + 结论/管理层才进图；结论前会暂停并预览草稿）
-curl -s -X POST http://localhost:8000/chat \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"对比比亚迪和长城2024年净利润，并结合管理层讨论给出结论","use_rag":true}'
-# 记下 thread_id 后确认续跑（不重查数；确认后写入 PENDING 工单）
-curl -s -X POST http://localhost:8000/chat \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"确认","use_rag":true,"thread_id":"<上一步的 thread_id>"}'
-curl -s http://localhost:8080/api/tools/review-drafts -H 'X-Regops-Dept: research'
-
-# 9. W7 登录（复核页也走同一套账号；详见 docs/W7_RBAC.md）
+# 6. W7 登录（详见 docs/W7_RBAC.md）
 curl -s -X POST http://localhost:8080/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"analyst","password":"analyst123"}'
 
-# 10. W9-1 五条链路冒烟（经 Java :8080；详见 docs/W9_E2E.md）
+# 7. W9-1 健康、RAG 与问数冒烟（经 Java :8080；详见 docs/W9_E2E.md）
 python-ai/.venv/bin/python eval/run_w9_e2e.py
 
-# 11. W9-2 金融红队（不调 LLM；泄露率必须为 0）
-python-ai/.venv/bin/python eval/run_w9_redteam.py --fail-on-regression
 ```
-
-## Agent 友好度自评（w5-6）
-
-量表来自公开金融数据工具的常见实践，不是本项目原创。诚实标缺项。
-
-| 维度 | 优先级 | 现状 | 说明 |
-|---|---|---|---|
-| 非交互 | P0 | 部分 | 问数 / MCP / 工具 HTTP 不暂停等人；审查对比在 `emit_conclusion` 前 Checkpoint 等人确认 |
-| 结构化输出 | P0 | 达标 | `ToolInvokeResponse` 字段稳定；结论走 JSON Schema |
-| 分级退出码 | P1 | 部分 | 用稳定 `error_code`（`missing` / `unauthorized` / `timeout` / `forbidden_write` / `budget_exceeded`），不是进程退出码。Java 鉴权是 HTTP 403，业务缺数仍是 200 |
-| 渐进帮助 | P1 | 部分 | `GET /tools` 精简目录，`/tools/schema/{name}` 给完整参数；没有 CLI `--help-full` |
-| dry-run | P1 | 部分 | 审查图暂停时给出【待写入草稿预览】；确认后才落 PENDING，取消不写 |
-| 契约自省 | P1 | 达标 | `GET /tools/capabilities` 与 `GET /api/tools/capabilities` |
-
-行业里普遍有命令清单，少有自省，输出 Schema 强制校验更少。本仓库 `emit_conclusion` 不合规直接拒绝，见 [`docs/AGENT_RULES.md`](./docs/AGENT_RULES.md)。
 
 评测报告落在 `eval/reports/<任务>/<时间戳>/`，含 `report.json` 与 `report.md`。
 基线与口径说明见 [`docs/eval_w1_baseline.md`](./docs/eval_w1_baseline.md)、
@@ -196,23 +153,29 @@ regops-copilot/
 │   ├── pom.xml                           # Maven 配置
 │   └── Dockerfile                        # Java 服务 Dockerfile
 │
-├── python-ai/                            # Python AI 服务 (FastAPI + RAG + Agent)
+├── python-ai/                            # Python AI 服务 (FastAPI + RAG + 问数)
 │   ├── app/
-│   │   ├── api/                          # FastAPI 路由
-│   │   ├── ingest/                       # 文档解析、三表提取、勾稽校验
-│   │   ├── rag/                          # 检索、RRF、Rerank、引用、拒答
-│   │   ├── text2sql/                     # Schema 检索、SQL 生成、EXPLAIN 校验
-│   │   ├── agents/                       # LangGraph 状态图、数字校验节点
-│   │   ├── prompts/                      # Prompt 模板库（含版本与变更记录）
-│   │   ├── models/                       # 模型封装（LLM、Embedding、Reranker）
-│   │   ├── services/                     # AI 服务逻辑
-│   │   └── main.py                       # FastAPI 入口
+│   │   ├── chat/                         # 统一聊天路由与 DTO
+│   │   ├── asknum/                       # 受控问数与事实库查询
+│   │   ├── rag/                          # 混合检索、精排、引用与数字校验
+│   │   ├── documents/                    # 文档上传、元数据与查看地址
+│   │   ├── ingest/                       # PDF 解析、切分、校验与入库
+│   │   ├── sessions/                     # 会话和会话级 PDF
+│   │   ├── labeling/                     # 数据标注
+│   │   ├── quality/                      # 财务事实质量门
+│   │   ├── models/                       # LangChain 模型调用与模型列表
+│   │   ├── prompts/                      # Prompt 模板与版本管理
+│   │   ├── eval/                         # 评测任务与指标
+│   │   ├── ops/ · obs/                   # 运行监控与 LLM 可观测性
+│   │   ├── db/ · storage/ · security/    # 公共基础设施
+│   │   ├── router.py                     # 全部 HTTP 路由清单
+│   │   ├── README.md                     # 模块说明与学习顺序
+│   │   └── main.py                       # FastAPI 启动入口
 │   ├── requirements.txt                  # Python 依赖
 │   └── Dockerfile                        # Python 服务 Dockerfile
 │
 ├── eval/                                  # 评测资产（可复跑、版本固定）
-│   ├── golden/                           # 8 类黄金集：RAG 100 · 对话 30 · Schema 20 · 问数 20
-│   │                                     #   · 数字回溯 20 · 工作流 20 · Prompt 30 · 红队 25
+│   ├── golden/                           # RAG、对话、问数与数字校验黄金集
 │   ├── reports/                          # 回归报告（按任务 / 时间戳归档）
 │   ├── prompt_ab/                        # Prompt A/B 实验脚本与结果
 │   └── scripts/                          # 公开基准下载脚本（不提交原数据）
@@ -237,7 +200,7 @@ regops-copilot/
 │   ├── api-spec.md                       # API 规范（Java + Python）
 │   ├── DATA_SOURCES.md                   # 公开数据源清单与使用边界声明
 │   ├── BUG_NOTES.md                      # 坏例记录与已知限制（编号 + 归因层）
-│   ├── W4_ASKNUM.md ~ W9_UX.md           # 各周专题：问数 / 工具 / 状态图 / RBAC / Prompt / 交付
+│   ├── W4_ASKNUM.md ~ W9_UX.md           # 各周专题：问数 / RBAC / Prompt / 交付
 │   ├── benchmarks/                       # 公开基准选型卡（不提交原数据）
 │   ├── security.md                       # 安全边界：SQL 只读、PII、注入红队
 │   └── deployment.md                     # 部署文档（Compose、K8s、信创适配）

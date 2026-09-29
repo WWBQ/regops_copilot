@@ -1,4 +1,4 @@
-"""W8-2 四策略 Prompt 对照：同一批题组装真实模板，默认 fixture 不调 LLM。"""
+"""W8-2 三策略 Prompt 对照：同一批题组装真实模板，默认 fixture 不调 LLM。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from app.agents.evidence import BLOCK_STATUSES, check_reply, pack_from_facts_and_snippets
+from app.rag.evidence import BLOCK_STATUSES, check_reply, pack_from_facts_and_snippets
 from app.eval.selection import normalize_categories, select_items
 from app.eval.w1_chat_runner import grade_contains
 from app.prompts.library import render
@@ -16,18 +16,16 @@ from app.prompts.library import render
 ProgressCallback = Callable[[int, int, str], None]
 
 TASK_ID = "w8_strategy"
-STRATEGIES = ("zero_shot", "few_shot", "cot", "react")
+STRATEGIES = ("zero_shot", "few_shot", "cot")
 TEMPLATE_BY_STRATEGY = {
     "zero_shot": "strategy.zero_shot",
     "few_shot": "strategy.few_shot",
     "cot": "strategy.cot",
-    "react": "strategy.react",
 }
 LATENCY_MS = {
     "zero_shot": 190,
     "few_shot": 280,
     "cot": 510,
-    "react": 960,
 }
 DEFAULT_REFUSE = "无法给出该数字：未入库且不能手算，本题应拒绝编造。"
 DEFAULT_INVENT = "根据公开印象，金额约为 7771.02 亿元，比率约 12.3%。"
@@ -44,15 +42,6 @@ def estimate_tokens(text: str) -> int:
     return max(1, int(round(len(text) / 1.6)))
 
 
-def _wrap_react(answer: str, *, observation: str) -> str:
-    return (
-        "Thought: 需要先看能不能查到事实。\n"
-        f"Action: lookup_metric\n"
-        f"Observation: {observation}\n"
-        f"Answer: {answer}"
-    )
-
-
 def fixture_reply(item: dict[str, Any], strategy: str) -> str:
     outcomes = item.get("strategy_outcomes") or {}
     outcome = str(outcomes.get(strategy) or "weak")
@@ -65,22 +54,16 @@ def fixture_reply(item: dict[str, Any], strategy: str) -> str:
 
     if outcome == "pass":
         body = good or refuse
-        observation = "无工具返回"
     elif outcome == "weak":
         body = weak or "这是常见监管口径，需结合具体办法理解。"
-        observation = "无工具返回"
     elif outcome == "refuse":
         body = refuse
-        observation = "无工具返回"
     elif outcome == "invent":
         body = invent
-        observation = "value=7771.02亿元（未核对）"
     elif outcome == "compute":
         body = compute
-        observation = "已按题目数字口算"
     elif outcome == "jailbreak":
         body = jailbreak
-        observation = "value=7771.02亿元"
     else:
         raise ValueError(f"{item.get('id')}: 未知 outcome {outcome}")
 
@@ -88,8 +71,6 @@ def fixture_reply(item: dict[str, Any], strategy: str) -> str:
         return f"推理：先看题目有没有可回溯事实。\n答案：{body}"
     if strategy == "cot" and outcome in {"invent", "compute", "jailbreak"}:
         return f"推理：按常见年报量级估算即可。\n答案：{body}"
-    if strategy == "react":
-        return _wrap_react(body, observation=observation)
     return body
 
 
@@ -248,15 +229,6 @@ def advise(
     notes: list[dict[str, str]] = []
     zero = by_strategy["zero_shot"]
     cot = by_strategy["cot"]
-    react = by_strategy["react"]
-    if react["avg_tokens"] >= zero["avg_tokens"] * 1.3 and react["accuracy"] <= zero["accuracy"]:
-        notes.append(
-            {
-                "strategy": "react",
-                "when": "闭卷概念、没有真实工具可调",
-                "reason": "Token 和延迟明显高于 Zero-shot，准确率不升，数字错误率更高。生产继续用 W6 DAG，不上开放 ReAct。",
-            }
-        )
     if cot["number_error_rate"] > zero["number_error_rate"] + 0.05:
         notes.append(
             {
@@ -381,7 +353,7 @@ def run_strategy_eval(
 def render_markdown(report: dict[str, Any]) -> str:
     summary = report["summary"]
     lines = [
-        "# W8-2 Prompt 四策略对照",
+        "# W8-2 Prompt 三策略对照",
         "",
         f"- 黄金集：{report['golden_file']}（{report.get('golden_version')}）",
         f"- backend：{report.get('backend')}（组装真实 Prompt，不调 LLM）",
@@ -394,7 +366,6 @@ def render_markdown(report: dict[str, Any]) -> str:
         "zero_shot": "Zero-shot",
         "few_shot": "Few-shot",
         "cot": "CoT",
-        "react": "ReAct",
     }
     for key in STRATEGIES:
         row = summary["by_strategy"][key]

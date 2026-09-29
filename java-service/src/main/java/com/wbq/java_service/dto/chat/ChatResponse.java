@@ -17,8 +17,6 @@ public record ChatResponse(
         @JsonProperty("completion_tokens") int completionTokens,
         @JsonProperty("total_tokens") int totalTokens,
         @JsonProperty("latency_ms") double latencyMs,
-        @JsonProperty("thread_id") String threadId,
-        @JsonProperty("pending_node") String pendingNode,
         @JsonProperty("pending_request") Map<String, Object> pendingRequest
 ) {
     public ChatResponse {

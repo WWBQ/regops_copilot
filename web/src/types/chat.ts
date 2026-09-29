@@ -19,7 +19,6 @@ export interface ChatRequest {
   session_id?: string
   use_rag?: boolean
   model?: string
-  thread_id?: string
 }
 
 export interface PendingAsknum {
@@ -40,7 +39,6 @@ export interface ChatResponse {
   session_id?: string | null
   rag_used?: boolean
   route?: string
-  thread_id?: string | null
   pending_node?: string | null
   pending_request?: PendingAsknum | null
   prompt_tokens?: number

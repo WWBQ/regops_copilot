@@ -13,6 +13,7 @@ from typing import Any, Callable
 import httpx
 
 from app.eval.selection import select_items
+from app.models.llm import resolve_model_id
 
 ProgressCallback = Callable[[int, int, str], None]
 
@@ -63,17 +64,14 @@ def resolve_eval_chat_model(
     """把评测请求里的 model 收成 /chat 能接受的值。空则用默认，不在列表里就报错。"""
     if not available:
         raise ValueError("no LLM model configured")
-    chosen = (requested or "").strip().lower()
+    chosen = (requested or "").strip()
     if chosen:
-        if chosen not in available:
-            raise ValueError(
-                f"unsupported model: {chosen}; available: {', '.join(available)}"
-            )
-        return chosen
-    fallback = (default_model or "").strip().lower()
-    if fallback in available:
-        return fallback
-    return available[0]
+        return resolve_model_id(chosen, available)
+    fallback = (default_model or "").strip()
+    try:
+        return resolve_model_id(fallback, available)
+    except ValueError:
+        return available[0]
 
 
 def run_item(

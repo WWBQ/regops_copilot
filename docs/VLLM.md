@@ -192,12 +192,12 @@ curl -s http://127.0.0.1:8000/v1/chat/completions \
 
 ## 接到 RegOps（现状）
 
-`python-ai` 的 `get_llm_client()` 只认 `deepseek` / `qwen`，地址写死在客户端里（DeepSeek → `https://api.deepseek.com`）。**现在没有「填一个 vLLM URL 就切过去」的环境变量。**
+`python-ai` 现在由 `LangChainChatClient` 调用 OpenAI 兼容接口。具体模型 ID 和地址分别由 `DEEPSEEK_MODEL_IDS` / `QWEN_MODEL_IDS`、`DEEPSEEK_BASE_URL` / `QWEN_BASE_URL` 配置；默认仍指向两家云 API。
 
 要对照时：
 
 1. 在租卡上 `curl` vLLM，和 Ollama / 云 API 比同一批粤语题（口吻、会不会乱翻译）。
-2. 真要让合规问答走 vLLM：给 `DeepSeekClient` 增加可配置 `base_url` / `model`，指向 `http://<vLLM>:8000`，`model` 填 `yue-qwen`，API Key 可填任意非空占位（vLLM 默认不校验）。这是改代码，不是手册里一条命令。
+2. 真要让合规问答走 vLLM：可把一个供应商槽位的 `*_BASE_URL` 指向 vLLM OpenAI 兼容地址，把对应 `*_MODEL_IDS` 与 `DEFAULT_MODEL` 设为服务端注册的模型 ID；API Key 是否需要有效值取决于 vLLM 部署配置。当前尚未在本项目做 vLLM 端到端验证。
 
 不要把粤语权重接到 RegOps 年报问答上充「更懂财报」——SFT 改的是怎么答，不补年报知识。数字和出处仍走问数 / RAG。
 

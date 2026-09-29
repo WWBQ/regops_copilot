@@ -99,7 +99,10 @@ RAG、Agent、评测是 **AI 侧**，迭代快、依赖 Python 生态。
 引用体只有 `doc_id`、`page`、`snippet`（前 240 字）、`viewer_url`、`title`；
 没有任何一条超过阈值的命中，链路直接标 `outcome = "low_score"`，**不进 LLM**。
 登录后检索还会按部门裁剪年报（研究岗只能碰到比亚迪/长城；未登录不裁剪），
-越权或库外公司走 `no_docs`，20+20 题脚本门禁泄露率为 0。
+越权或库外公司走 `no_docs`，20+20 题**在 Python 检索层**验证泄露为 0。
+边界说清楚：Java BFF 的部门头校验只在**已登录**时生效（登录用户不能冒用其他部门）；
+未登录的公开演示路径不强制部门约束，部门域是 demo 级 allowlist。
+红队门禁覆盖 Python 工具层，未覆盖 Java BFF 的完整认证链路。
 
 面试可以这样讲差别：
 让模型「顺便带上出处」，它会编一个看起来合理的页码；
@@ -121,43 +124,66 @@ Prompt 侧还有第二道：RAG 模板明确要求「文档中未找到相关信
 | `confidence` | 0.0–1.0 |
 | 跨字段 | **风险等级为「高」且置信度 > 0.95 → 直接拒绝**（等于 0.95 放行） |
 
-不合规就拒绝产出，而不是落库后人工修。黄金集 20 条（10 正 10 反，含 0.95 边界这种刁钻用例），
-实测 `accuracy 1.0`、`false_accept_rate 0`、`false_reject_rate 0`。
+不合规就拒绝产出，而不是落库后人工修。`ComplianceConclusion` DTO 的 **20 条正反用例单测**（纯 Pydantic，不依赖服务在线），
+误收率 / 误拒率均为 0，含 `risk_level="高"` 且 `confidence=0.95` 的边界用例。
+
+**这是校验器本身的单元测试，不是端到端准确率。**
+Agent 路径当前用模板生成结论（`risk_level` 固定「低」），所以该跨字段规则在线上未被真实触发；
+它的价值是**把不可接受的输出挡在 Schema 层**，一旦接入真实 LLM 产出即生效。
 
 这条的价值：**LLM 输出不确定，但系统边界可以是确定的。**
 把不可接受的输出在 Schema 层挡掉，比在 Prompt 里反复叮嘱有效。
 
-**(3) 受控问数（Text2SQL 的安全做法）**
+**(3) 受控问数（为什么不做开放 NL2SQL）**
 
-财务数字不走 RAG 生成，走 Text2SQL 查事实库：
-Schema 检索 → 生成 SQL → **`EXPLAIN` 校验 + 只读约束** → 执行 → 回填。
+财务数字不走 RAG 生成，也**不做开放 Text2SQL / NL2SQL**。
+年报数字最怕的不是查不出，而是**一条能跑通的 SQL 查出错误口径**——
+营业收入 vs 营业总收入、合并 vs 母公司、致辞里的约数 vs 报表行。
+EXPLAIN 只能证明语法能跑，不能证明口径对。
 
-为什么不让模型从年报文本里读数字：文本里同一指标口径不一，
-容易把「营业收入」和「营业总收入」混起来。数字类问题交给结构化表更稳，入库阶段还能做勾稽校验。
+所以数字走已过 **G1/G2/G3 门禁**的 `fin_metric` 事实表：
+公司 + 标准 concept + 期间做**参数化只读查询**，仅取 `auto_accepted` 行，
+**LLM 不写 SQL、也不手算比率**，0 token。
+叙述、条款、因果走 Hybrid RAG；只有多步任务才上 Agent，Agent 只编排这些工具。
 
-20 条黄金集实测：`accuracy 1.0`、`route_accuracy 1.0`（该走问数的都走对了）、**`leak_rate 0.0`**。
+取舍代价：灵活性下降，要预置 concept 与维护入库门禁。
+换来的是**口径可控、可审计**——这在合规场景比灵活性重要。
 
-**(4) Agent 工作流：该停下来等人**
+20 条问数黄金集实测：`accuracy 1.0`、`route_accuracy 1.0`（该走问数的都走对了）、**`leak_rate 0.0`**。
 
-多家对比、要出结论的请求才进 **LangGraph** 状态图：
+**(4) 审查工作流（固定图）+ 可选工具循环：该停下来等人**
+
+进图条件是规则路由（两家公司 + 管理层/结论类意图），**不是**模型自己决定「今天要不要走审查」。
+进图之后顺序硬编码：
 
 ```
 classify → list_scope → compare → verify → rag → (conclude | stop)
                                               interrupt_before=["conclude"]
 ```
 
-关键设计是**写入前中断**：结论落库前先出「待写入草稿预览」，
-人确认后才写 `PENDING` 工单，取消则不写。Checkpoint 存 SQLite，TTL 24 小时。
-预算也是硬的：图内 8 次工具调用 / 12 步 / 120 秒；另一条开放式工具循环最多 4 轮 / 6 个工具。
+每个节点只有「下一步或停」——这是 **Workflow（固定工作流）**，不是模型动态规划的 Agent。
+合规场景里这是有意取舍：**同一类审查必须走出同一条可复现、可审计的路径**；
+若让模型自选顺序，结论就难复盘。自主决策只开放给另一条路径——开放式工具循环
+（经营概况 / 待复核追问，或用户点名「你来选工具」），真 Function Calling，预算硬约束
+（最多 4 轮 / 6 次调用 / 120s），且**只挂 5 个只读工具**。
 
-工具共 7 个：`lookup_metric`、`list_scope`、`rag_search`、`verify_number`、
-`compare_peers`、`create_review_draft`、`emit_conclusion`。
-**`execute_sql` 故意没有注册进工具表**——不给 Agent 任意 SQL 能力。
+关键设计仍是**写入前中断**：结论落库前先出「待写入草稿预览」，
+人确认后才写 `PENDING` 工单，取消则不写。Checkpoint 存 SQLite，TTL 24 小时
+（任务快照，不是长期语义记忆）。图内预算：8 次工具 / 12 步 / 120 秒。
+
+工具合同共 7 个，分属两条机制，不要说成「一个 Agent 同时自主调 7 个」：
+
+| 路径 | 工具 |
+|---|---|
+| 固定审查图 | 上表 5 个只读 + `create_review_draft` + `emit_conclusion` |
+| 开放工具循环 | 仅 5 个只读：`list_scope` / `lookup_metric` / `compare_peers` / `verify_number` / `rag_search` |
+
+**`execute_sql` 故意没有注册进工具表**——不给任意 SQL 能力。
 
 20 条工作流黄金集实测：`accuracy 1.0`、`param_accuracy 1.0`、
 `avg_steps 4.8`、**`confirmation_rate 1.0`**（每次出结论前都确实停下来等确认了）。
 
-这本质是把 dry-run + maker-checker 搬进 Agent：**读可以自动，写要人确认。**
+这本质是把 dry-run + maker-checker 搬进审查链路：**读可以自动，写要人确认；规划权留给流程，不留给模型。**
 
 **(5) 双栈降级**
 
@@ -181,7 +207,7 @@ classify → list_scope → compare → verify → rag → (conclude | stop)
 | `rag_refuse` | 20 | accuracy, 误放行 | **1.0 / 0** |
 | `rag_support` | 20 | support_hit_rate, support_coverage | **0.55 / 0.60**（页到了不等于词在片段里） |
 | `w1_chat` | 30 | accuracy, refuse_rate, 延迟 | 0.833 / 0.10 / p50 1250 ms |
-| `compliance_schema` | 20 | accuracy, 误收/误拒率 | **1.0 / 0 / 0** |
+| `compliance_schema` | 20 | DTO 单测误收/误拒率 | **1.0 / 0 / 0**（纯 Pydantic，非端到端） |
 | `w4_asknum` | 20 | accuracy, route_accuracy, leak_rate | 1.0 / 1.0 / **0** |
 | `w6_number_check` | 20 | accuracy, 数字/单位错误率 | **1.0 / 误放行 0**（归档 [`eval_w6_number_check.md`](./eval_w6_number_check.md)） |
 | `w6_workflow` | 20 | accuracy, param, avg_steps, 确认率 | 1.0 / 1.0 / 4.8 / **1.0** |
@@ -245,7 +271,7 @@ BUG-012 同页上限现为 2（一页一条会丢掉清单细节，完全不限�
 | 决策 | 为什么 | 代价 |
 |---|---|---|
 | 引用做成检索侧字段透传 | 模型自己写出处必然会编 | 引用组装逻辑更复杂 |
-| 数字走 Text2SQL 而非 RAG | 年报文本口径不一，容易混指标 | 要维护事实库和入库勾稽 |
+| 数字走受控参数化问数而非开放 NL2SQL | 年报最怕能跑的 SQL 查出错误口径；EXPLAIN 只证语法不证口径 | 要预置 concept、维护事实库与入库勾稽 |
 | 结论不合规直接拒绝 | 脏数据进库后清理成本更高 | 会挡掉「本来能用」的结论 |
 | 不注册 `execute_sql` 工具 | 不给 Agent 任意 SQL 能力 | 灵活性下降，要预置工具 |
 | 主要评测不依赖 LLM | 稳定、可 CI、不烧钱 | 覆盖不到生成质量的主观部分 |
@@ -448,7 +474,7 @@ CiteAcc 也几乎全是精排给的。数字题 hybrid 之后 rerank 回落（0.
 要看分类，也要看是哪一档，还要看 CiteAcc。生产 rerank 整体 0.79、MRR 0.50，但 CiteAcc 只有 0.155；
 `governance` / `product_enum` Recall 1.00，`numeric_ratio` 0.80，`numeric_financial` 只有 0.524。
 消融里向量-only 的数字题 0.476，hybrid 才拉到 0.62——0.79 不是 Cross-Encoder 单独刷出来的，精排甚至把数字题召回打回去。
-这说明瓶颈在数字类检索，而这类问题我本来就分流去了 Text2SQL。
+这说明瓶颈在数字类检索，而这类问题我本来就分流去了受控问数。
 另外这个 recall 是**页面命中**，不等于线上回答完整性——我在文档里明确写了这点。
 同页上限（BUG-012）是 `rag_max_chunks_per_page=2`：一页可以留清单和详情，又不会被少数页占满 top-12。
 
@@ -457,17 +483,32 @@ CiteAcc 也几乎全是精排给的。数字题 hybrid 之后 rerank 回落（0.
 所以我选择宁可拒答，同时把拒答做成**可解释**的：告诉用户检索到了什么、为什么不足以支撑结论。
 W1 那 30 题里 refuse_rate 是 0.10，不是一味拒答。
 
-**Q：为什么财务数字不走 RAG？**
-年报文本里同一指标口径不一，「营业收入」和「营业总收入」混起来就是错。
-数字走 Text2SQL 查事实库，SQL 先 `EXPLAIN` 校验 + 只读约束再执行，入库阶段还做勾稽校验。
+**Q：为什么财务数字不走 RAG，也不做开放 NL2SQL？**
+年报最怕的不是查不出，而是**一条能跑的 SQL 查出错误口径**
+（营业收入 vs 营业总收入、合并 vs 母公司）。EXPLAIN 只能证明语法，不能证明口径。
+所以数字走已过 G1/G2/G3 的 `fin_metric`，公司 + concept + 期间**参数化只读**、仅 `auto_accepted`，
+**LLM 不写 SQL、不手算比率**；入库阶段做勾稽校验。
 20 题实测 accuracy 1.0、路由准确率 1.0、泄露率 0。
-**文本适合讲依据，表格适合出数字。**
+**文本适合讲依据，事实表适合出数字。**
 
 **Q：Agent 为什么要停下来等人确认？**
 LangGraph 图上 `interrupt_before=["conclude"]`：结论落库前先出草稿预览，
 确认后才写 `PENDING` 工单。20 题工作流黄金集里确认率 1.0，平均 4.8 步。
 本质是 dry-run + maker-checker，在合规场景比「全自动」更符合真实流程。
-我也没给 Agent 注册 `execute_sql`——**不给它任意 SQL 能力**。
+我也没给工具表注册 `execute_sql`——**不给任意 SQL 能力**。
+
+**Q：这算 Agent 吗？模型有没有自己决定下一步？**
+审查主路径**不算自主 Agent**：边是硬编码的，模型不选「下一步做什么」。
+进不进图也由规则意图决定（两家 + 结论/管理层），不是模型规划。
+我有意这样做——合规场景要**可复现、可审计**；自主规划和可审计性在这里是矛盾的，我选了后者。
+真正有工具自选的是另一条：**Function Calling 工具循环**（只读 5 工具 + 预算），
+默认还要用户点名或命中开放决策意图。对照银行 JD 的 planning / tools / memory：
+tools use 和 action 是强项；planning 在审查路径上故意不做；memory 只有 Checkpoint（任务快照）
+和问数 pending（短槽），没有长期语义记忆——被追问就直说，并说明为什么合规场景先保证可审计。
+
+**Q：简历写「7 个工具」会不会不精确？**
+合同上 7 个工具；审查图可用写路径 2 个，开放循环只挂 5 个只读。
+口述应说「工具合同 7 个，按路径挂载」，不要说「一个 Agent 随时调 7 个」。
 
 **Q：评测怎么做的？为什么不用 LLM-as-judge？**
 八类黄金集（RAG 100 / 对话 30 / Schema 20 / 问数 20 / 数字回溯 20 / 工作流 20 / Prompt 30 / 红队 25），
@@ -579,7 +620,7 @@ JDK 换龙井 / 毕昇 21 基本平替。我**不做等保或信创认证的宣�
 | 「few-shot 准确率 96.7%」 | 「那是 fixture 模拟的管线验证，不是真实 LLM 能力」 |
 | 「RAG 准确率很高」 | 「现网 recall@k 0.79、MRR 0.50、CiteAcc 0.155，且是页面命中；数字类 rerank 后只有 0.52。消融 0.69→0.70→0.76（当时同页不限），同页上限 2 再把 rerank 抬到 0.79；精排贵 8.8s」 |
 | 「Prompt 优化带来 3.3% 提升」 | 「n=30、p=1.0，判定不可信，所以没上线」 |
-| 「实现了完整 Agent 自主决策」 | 「读自动、写要人确认，`interrupt_before` 卡在结论前」 |
+| 「实现了完整 Agent 自主决策」 | 「审查是固定工作流；开放查询才有 Function Calling；写要人确认」 |
 | 「接入了 MCP」 | 「实现了 JSON-RPC 子集，未接入主 chat 循环，不是完整 SDK」 |
 | 「全面适配信创」 | 「模型侧可替；达梦不能直接替 pgvector，原因是……」 |
 | 「模型达到母语级粤语」 | 「改掉了乱翻译的行为，口吻更粤语化」 |
@@ -599,13 +640,20 @@ JDK 换龙井 / 毕昇 21 基本平替。我**不做等保或信创认证的宣�
   引用以 `doc_id`/页码/原文片段结构化透传（模型无法自拟出处），低于分数阈值即拒答且不进 LLM；
   100 题黄金集 recall@k 0.79 / MRR 0.50 / citation_accuracy 0.155，并按题型归因（治理/列举 1.00、比率 0.80、数字类 0.52）；
   三档消融：向量-only 0.69 → hybrid 0.70 → rerank 0.76（当时同页不限），同页上限 2 后再到 0.79；精排 P50 约 +8.7s，数字题 hybrid 后 rerank 回落；
-  检索层按部门裁剪年报，越权 / 无答案 20+20 题准确率 1.0、泄露 0。
+  检索层按部门裁剪年报范围（研究 / 合规可见域不同），越权与无答案各 20 题
+  **在 Python 检索层**验证泄露为 0；Java BFF 侧对 reviews/customers/audit 强制 JWT + RBAC，
+  部门头校验在已登录时生效。
 - 合规结论走 Pydantic DTO 强校验（风险等级枚举、条款编号至少一条、置信度上下界、
-  「高风险不得高置信度」跨字段规则），不合规直接拒绝产出；20 题正反用例误收率与误拒率均为 0。
-- 财务数字改走受控 Text2SQL（Schema 检索 → 生成 → `EXPLAIN` 校验 + 只读约束），
-  20 题准确率与路由准确率 1.0、泄露率 0；Agent 侧不注册 `execute_sql`，杜绝任意 SQL。
-- 用 LangGraph 实现审查工作流并在结论节点前 `interrupt_before` 中断，输出草稿预览、
-  人工确认后才落 `PENDING` 工单（maker-checker，确认率 1.0）；Java 侧承担 RBAC、
+  「高风险不得高置信度」跨字段规则），**20 条正反用例单测**误收/误拒率均为 0
+  （校验器单元测试，非端到端准确率）。
+- 财务数字改走**受控参数化问数**：经 G1/G2/G3 入库门禁的 `fin_metric` 事实表，
+  公司 + 标准 concept + 期间只读查询、仅取 `auto_accepted`，**LLM 不写 SQL、不手算比率**；
+  20 题准确率与路由准确率 1.0、泄露率 0。主动放弃开放 NL2SQL——
+  年报数字的风险是「一条能跑的 SQL 查出错误口径」，而 EXPLAIN 只能证明语法、不能证明口径；
+  Agent 侧不注册 `execute_sql`，杜绝任意 SQL。
+- 用 LangGraph 实现**固定审查工作流**（非模型自选边）并在结论节点前 `interrupt_before` 中断，输出草稿预览、
+  人工确认后才落 `PENDING` 工单（maker-checker，确认率 1.0）；另有只读 Function Calling 循环（预算硬约束）；
+  Java 侧承担 RBAC、
   四态复核流转、禁止自审与乐观锁并发控制、全量审计，`X-Request-ID` + W3C traceparent 全链路关联。
 - 自建黄金集（合计 305 题）与落盘报告，主要评测不依赖 LLM 以进 CI，
   `--fail-on-regression` 作为回归门禁；25 题金融红队 SQL/ACL 泄露率 0，五条链路端到端 5/5；

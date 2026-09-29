@@ -28,12 +28,6 @@ const routeLabel = computed(() => {
   if (route === 'metric' || route === 'metric_blocked' || route === 'metric_clarify') {
     return '问数'
   }
-  if (route === 'agent' || route === 'agent_blocked' || route === 'agent_paused') {
-    return route === 'agent_paused' ? '待确认' : '工作流'
-  }
-  if (route === 'tools' || route === 'tools_blocked') {
-    return '工具自选'
-  }
   if (route === 'rag' || route === 'rag_blocked' || props.message.ragUsed) {
     return route === 'rag_blocked' ? '数字拦截' : 'RAG'
   }
@@ -200,33 +194,12 @@ function openCitation(citation: Citation) {
   color: #c2410c;
 }
 
-.route-tag[data-route='agent_blocked'] {
-  background: #fff7ed;
-  color: #c2410c;
-}
-
-.route-tag[data-route='agent_paused'] {
-  background: #fffbeb;
-  color: #b45309;
-}
-
-.route-tag[data-route='agent'] {
-  background: #f5f3ff;
-  color: #6d28d9;
-}
-
 .route-tag[data-route='rag'] {
   background: #eef2ff;
   color: #4338ca;
 }
 
-.route-tag[data-route='rag_blocked'],
-.route-tag[data-route='tools_blocked'] {
-  background: #fff7ed;
-  color: #c2410c;
-}
-
-.route-tag[data-route='tools'] {
+.route-tag[data-route='rag_blocked'] {
   background: #fff7ed;
   color: #c2410c;
 }

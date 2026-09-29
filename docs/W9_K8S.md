@@ -20,7 +20,7 @@ Java **不** 等 python-ai Ready。`GET /api/health` 在 Python 挂掉时仍返�
 kubectl -n regops scale deploy/python-ai --replicas=0
 ```
 
-前端问答会提示不可用，合规复核和审计继续走 Java + Postgres。
+前端问答会提示不可用，登录与审计继续走 Java + Postgres。
 
 没有 Ingress。kind 用 NodePort：`web 30088→80`、`java-service 30080→8080`。`k8s/kind-config.yaml` 把它们映射到本机 **8088 / 8080**。
 
@@ -48,7 +48,7 @@ kubectl -n regops get pods,svc
 
 业务镜像 `imagePullPolicy: Never`，必须先 load。`pgvector/pgvector:pg16` 可从仓库拉。
 
-python-ai 镜像含 torch / docling，**首次构建很慢**，内存建议 ≥4Gi。小 kind 节点若 OOM，把副本打到 0 仍能演示 Java 复核（W9-6）。
+python-ai 镜像含 torch / docling，**首次构建很慢**，内存建议 ≥4Gi。小 kind 节点若 OOM，把副本打到 0 仍能演示 Java 登录与审计（W9-6）。
 
 minikube：
 

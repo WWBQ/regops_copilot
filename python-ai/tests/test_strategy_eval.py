@@ -1,4 +1,4 @@
-"""W8-2 四策略对照：30 题 fixture，不调 LLM。"""
+"""W8-2 三策略对照：30 题 fixture，不调 LLM。"""
 
 from app.eval.registry import GOLDEN_DIR, validate_golden_payload
 from app.eval.strategy_runner import (
@@ -42,17 +42,12 @@ def test_strategy_eval_comparison_story():
     zero = by_strategy["zero_shot"]
     few = by_strategy["few_shot"]
     cot = by_strategy["cot"]
-    react = by_strategy["react"]
     assert few["accuracy"] > zero["accuracy"]
-    assert react["accuracy"] < zero["accuracy"]
     assert cot["number_error_rate"] > zero["number_error_rate"]
-    assert react["number_error_rate"] > zero["number_error_rate"]
-    assert react["avg_tokens"] > zero["avg_tokens"]
-    assert react["latency_p50_ms"] > zero["latency_p50_ms"]
     concept = summary["by_category_strategy"]["concept"]
     assert concept["few_shot"]["accuracy"] > concept["zero_shot"]["accuracy"]
     notes = " ".join(item["reason"] for item in summary["when_not_worth"])
-    assert "ReAct" in notes or "react" in notes.lower() or "开放 ReAct" in notes
+    assert "CoT" in notes or "cot" in notes.lower()
     markdown = render_markdown(report)
     assert "Zero-shot" in markdown
     assert "策略取舍" in markdown

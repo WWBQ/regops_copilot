@@ -1,23 +1,9 @@
--- RegOps Copilot · W7 身份 / 客户档案 / 工单状态机 / 审计
+-- RegOps Copilot · W7 身份 / 客户档案 / 审计
 --   docker compose exec db psql -U regops -d regops_db -f /docker-entrypoint-initdb.d/08_w7_identity.sql
 --   或：psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w7_identity.sql
 -- 用户种子由 Java DataSeeder 写入（BCrypt），不在 SQL 里放明文密码哈希。
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-ALTER TABLE review_draft DROP CONSTRAINT IF EXISTS ck_review_draft_status;
-ALTER TABLE review_draft ADD CONSTRAINT ck_review_draft_status
-    CHECK (status IN ('PENDING', 'SUBMITTED', 'REVIEWED', 'REJECTED'));
-
-ALTER TABLE review_draft ADD COLUMN IF NOT EXISTS submitted_by VARCHAR(64);
-ALTER TABLE review_draft ADD COLUMN IF NOT EXISTS reviewed_by VARCHAR(64);
-ALTER TABLE review_draft ADD COLUMN IF NOT EXISTS review_reason TEXT;
-ALTER TABLE review_draft ADD COLUMN IF NOT EXISTS input_summary TEXT;
-ALTER TABLE review_draft ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE review_draft ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
-
-CREATE INDEX IF NOT EXISTS idx_review_draft_status_dept
-    ON review_draft (status, dept, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS app_user (
     id            BIGSERIAL PRIMARY KEY,

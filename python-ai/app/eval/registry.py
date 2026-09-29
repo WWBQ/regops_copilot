@@ -19,10 +19,8 @@ RUNNERS = (
     "compliance_schema",
     "w4_asknum",
     "w6_number_check",
-    "w6_workflow",
     "w8_strategy",
     "w8_ab",
-    "w9_redteam",
     "rag_acl",
     "rag_refuse",
     "rag_support",
@@ -32,10 +30,8 @@ RUNNER_DEFAULT_METRICS: dict[str, tuple[str, ...]] = {
     "compliance_schema": ("accuracy", "false_accept_rate", "false_reject_rate"),
     "w4_asknum": ("accuracy", "route_accuracy", "leak_rate"),
     "w6_number_check": ("accuracy", "false_accept_rate", "number_error_rate", "unit_error_rate"),
-    "w6_workflow": ("accuracy", "param_accuracy", "avg_steps", "confirmation_rate"),
     "w8_strategy": ("accuracy", "number_error_rate", "avg_tokens", "latency_p50_ms"),
     "w8_ab": ("accuracy", "delta", "mcnemar_p", "credible"),
-    "w9_redteam": ("accuracy", "sql_leak_rate", "acl_leak_rate", "number_error_rate"),
     "rag_retrieval": ("recall_at_k", "mrr", "ndcg_at_k", "citation_accuracy"),
     "rag_acl": ("accuracy", "false_accept_rate", "leak_rate"),
     "rag_refuse": ("accuracy", "false_accept_rate"),
@@ -109,18 +105,9 @@ def _default_tasks_payload() -> dict:
                 "builtin": True,
             },
             {
-                "id": "w6_workflow",
-                "name": "W6 工作流轨迹",
-                "description": "20 场景：节点顺序、工具参数、确认率和失败节点（不调 LLM）",
-                "golden_file": "w6_workflow_20.json",
-                "runner": "w6_workflow",
-                "metrics": list(RUNNER_DEFAULT_METRICS["w6_workflow"]),
-                "builtin": True,
-            },
-            {
                 "id": "w8_strategy",
-                "name": "W8 四策略对照",
-                "description": "30 题：Zero-shot / Few-shot / CoT / ReAct，对照准确率、数字错误率、Token、延迟（默认 fixture）",
+                "name": "W8 三策略对照",
+                "description": "30 题：Zero-shot / Few-shot / CoT，对照准确率、数字错误率、Token、延迟（默认 fixture）",
                 "golden_file": "w8_prompt_30.json",
                 "runner": "w8_strategy",
                 "metrics": list(RUNNER_DEFAULT_METRICS["w8_strategy"]),
@@ -133,15 +120,6 @@ def _default_tasks_payload() -> dict:
                 "golden_file": "w8_prompt_30.json",
                 "runner": "w8_ab",
                 "metrics": list(RUNNER_DEFAULT_METRICS["w8_ab"]),
-                "builtin": True,
-            },
-            {
-                "id": "w9_redteam",
-                "name": "W9 金融红队",
-                "description": "25 条：注入 / 越权 / SQL / PII / 诱导编造；证明边界在代码不在 Prompt（不调 LLM）",
-                "golden_file": "w9_redteam_25.json",
-                "runner": "w9_redteam",
-                "metrics": list(RUNNER_DEFAULT_METRICS["w9_redteam"]),
                 "builtin": True,
             },
             {
@@ -414,9 +392,6 @@ def validate_golden_payload(content: dict, *, runner: str | None = None) -> int:
                 raise ValueError(f"items[{index}] 缺少 reply（数字校验集必填）")
             if not isinstance(item.get("expected_ok"), bool):
                 raise ValueError(f"items[{index}] expected_ok 须为布尔值")
-        if runner == "w6_workflow":
-            if item.get("expected_entry") not in {None, "graph", "asknum", "tools"}:
-                raise ValueError(f"items[{index}] expected_entry 须为 graph / asknum / tools")
         if runner in {"w8_strategy", "w8_ab"}:
             if item.get("category") not in {
                 "concept",
@@ -437,16 +412,6 @@ def validate_golden_payload(content: dict, *, runner: str | None = None) -> int:
                 flags = item.get("ab")
                 if not isinstance(flags, dict) or "A" not in flags or "B" not in flags:
                     raise ValueError(f"items[{index}] 缺少 ab.A / ab.B")
-        if runner == "w9_redteam":
-            if not str(item.get("kind") or "").strip():
-                raise ValueError(f"items[{index}] 缺少 kind")
-            if item.get("kind") == "number_check":
-                if not str(item.get("reply") or "").strip():
-                    raise ValueError(f"items[{index}] 缺少 reply")
-                if not isinstance(item.get("expected_ok"), bool):
-                    raise ValueError(f"items[{index}] expected_ok 须为布尔值")
-            elif not isinstance(item.get("expect"), dict):
-                raise ValueError(f"items[{index}] 缺少 expect")
         if runner in {"rag_acl", "rag_refuse"}:
             if item.get("expected_outcome") not in {"no_intent", "no_docs", "retrieve"}:
                 raise ValueError(
@@ -467,9 +432,7 @@ def save_golden_set(*, filename: str, content: dict, runner: str | None = None) 
         "compliance_schema_20.json",
         "w4_asknum_20.json",
         "w6_number_check_20.json",
-        "w6_workflow_20.json",
         "w8_prompt_30.json",
-        "w9_redteam_25.json",
         "rag_acl_20.json",
         "rag_refuse_20.json",
         "rag_support_20.json",

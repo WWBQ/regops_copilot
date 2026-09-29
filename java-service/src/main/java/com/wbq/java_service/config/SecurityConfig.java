@@ -12,7 +12,6 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -60,8 +59,7 @@ public class SecurityConfig {
                         // SSE StreamingResponseBody 二次派发是 ASYNC；不放行会被当成未登录。
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/**", "/api/health", "/api/auth/login", "/api/auth/demo-accounts").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/tools/capabilities", "/api/tools/schema/**").permitAll()
-                        .requestMatchers("/api/reviews/**", "/api/customers/**", "/api/audit/**", "/api/auth/me")
+                        .requestMatchers("/api/customers/**", "/api/audit/**", "/api/auth/me")
                         .authenticated()
                         .requestMatchers("/api/**").permitAll()
                         .anyRequest().authenticated()

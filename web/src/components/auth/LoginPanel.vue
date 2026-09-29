@@ -19,7 +19,7 @@ onMounted(async () => {
   try {
     accounts.value = (await fetchDemoAccounts()).accounts
   } catch {
-    accounts.value = ['analyst/analyst123', 'checker/checker123', 'rm/rm123', 'admin/admin123']
+    accounts.value = ['analyst/analyst123', 'rm/rm123', 'admin/admin123']
   }
 })
 

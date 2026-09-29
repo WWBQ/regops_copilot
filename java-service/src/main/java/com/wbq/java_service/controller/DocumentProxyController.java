@@ -4,7 +4,7 @@ import com.wbq.java_service.auth.AuthSupport;
 import com.wbq.java_service.client.PythonAiClient;
 import com.wbq.java_service.dto.documents.ViewerUrlResponse;
 import com.wbq.java_service.exception.BusinessException;
-import com.wbq.java_service.tools.DeptAcl;
+import com.wbq.java_service.security.DeptAcl;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;

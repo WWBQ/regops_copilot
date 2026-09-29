@@ -30,21 +30,13 @@ export const PAGE_MENUS: Record<string, PageMenuItem[]> = {
     { id: 'asknum-monitor', label: '问数监控', path: '/ops/asknum', icon: 'list' },
     { id: 'eval', label: '评估报告', path: '/ops/eval', icon: 'list' },
   ],
-  '/compliance/review': [
-    { id: 'compliance-audit', label: '审计追踪', path: '/compliance/audit', icon: 'list' },
-    { id: 'users', label: '用户与权限', path: '/settings/users', icon: 'list' },
-  ],
-  '/compliance/workflow': [
-    { id: 'compliance-review', label: '合规复核', path: '/compliance/review', icon: 'list' },
-    { id: 'compliance-audit', label: '审计追踪', path: '/compliance/audit', icon: 'list' },
-  ],
   '/compliance/audit': [
-    { id: 'compliance-review', label: '合规复核', path: '/compliance/review', icon: 'list' },
+    { id: 'users', label: '用户与权限', path: '/settings/users', icon: 'list' },
   ],
 }
 
 export function pageMenuForPath(path: string): PageMenuItem[] {
-  if (path === '/' || path.startsWith('/rag') || path.startsWith('/agent')) {
+  if (path === '/' || path.startsWith('/rag')) {
     return [{ id: 'new-chat', label: '新对话', action: 'new-chat', icon: 'plus' }]
   }
   if (path.startsWith('/quality/review')) {
@@ -65,14 +57,8 @@ export function pageMenuForPath(path: string): PageMenuItem[] {
   if (path.startsWith('/ops/traces')) {
     return PAGE_MENUS['/ops/traces'] ?? []
   }
-  if (path.startsWith('/compliance/workflow')) {
-    return PAGE_MENUS['/compliance/workflow'] ?? []
-  }
   if (path.startsWith('/compliance/audit')) {
     return PAGE_MENUS['/compliance/audit'] ?? []
-  }
-  if (path.startsWith('/compliance/review')) {
-    return PAGE_MENUS['/compliance/review'] ?? []
   }
   return []
 }

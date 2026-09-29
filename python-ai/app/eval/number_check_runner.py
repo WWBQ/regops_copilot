@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from app.agents.evidence import BLOCK_STATUSES, check_reply, pack_from_facts_and_snippets
+from app.rag.evidence import BLOCK_STATUSES, check_reply, pack_from_facts_and_snippets
 from app.eval.selection import normalize_categories, select_items
 
 ProgressCallback = Callable[[int, int, str], None]

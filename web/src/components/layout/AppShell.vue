@@ -163,12 +163,10 @@ onUnmounted(() => {
     </header>
 
     <div v-if="javaDown" class="degrade-banner bad" role="status">
-      Java BFF 连不上。登录、复核、审计也会失败。
+      Java BFF 连不上。登录和审计也会失败。
     </div>
     <div v-else-if="pythonDegraded" class="degrade-banner warn" role="status">
       问答 / 问数暂不可用。
-      <router-link to="/compliance/review">合规复核</router-link>
-      ·
       <router-link to="/compliance/audit">审计追踪</router-link>
       仍可用。
     </div>

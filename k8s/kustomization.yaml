@@ -19,7 +19,6 @@ configMapGenerator:
       - 04_w4_rag_log.sql=init/04_w4_rag_log.sql
       - 05_asknum_log.sql=init/05_asknum_log.sql
       - 06_asknum_alias.sql=init/06_asknum_alias.sql
-      - 07_review_draft.sql=init/07_review_draft.sql
       - 08_w7_identity.sql=init/08_w7_identity.sql
 generatorOptions:
   disableNameSuffixHash: true

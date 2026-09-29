@@ -132,7 +132,9 @@ start_python() {
   local uvicorn="$ROOT/python-ai/.venv/bin/uvicorn"
   [ -x "$uvicorn" ] || die "缺少虚拟环境 python-ai/.venv，先执行：cd python-ai && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
 
-  start_bg python "$ROOT/python-ai" "$uvicorn" app.main:app --host 0.0.0.0 --port "$PY_PORT" --reload
+  # 开发环境不生成 __pycache__，避免功能目录被缓存文件夹淹没。
+  start_bg python "$ROOT/python-ai" env PYTHONDONTWRITEBYTECODE=1 \
+    "$uvicorn" app.main:app --host 0.0.0.0 --port "$PY_PORT" --reload
   wait_service python "http://localhost:$PY_PORT/health" 90 || die "python-ai 启动失败"
   ok "python-ai 就绪 (:$PY_PORT)"
 }

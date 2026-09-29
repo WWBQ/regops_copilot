@@ -69,23 +69,9 @@
       "builtin": true
     },
     {
-      "id": "w6_workflow",
-      "name": "W6 工作流轨迹",
-      "description": "20 场景：节点顺序、工具参数、确认率和失败节点（不调 LLM）",
-      "golden_file": "w6_workflow_20.json",
-      "runner": "w6_workflow",
-      "metrics": [
-        "accuracy",
-        "param_accuracy",
-        "avg_steps",
-        "confirmation_rate"
-      ],
-      "builtin": true
-    },
-    {
       "id": "w8_strategy",
-      "name": "W8 四策略对照",
-      "description": "30 题：Zero-shot / Few-shot / CoT / ReAct，对照准确率、数字错误率、Token、延迟（默认 fixture）",
+      "name": "W8 三策略对照",
+      "description": "30 题：Zero-shot / Few-shot / CoT，对照准确率、数字错误率、Token、延迟（默认 fixture）",
       "golden_file": "w8_prompt_30.json",
       "runner": "w8_strategy",
       "metrics": [
@@ -107,20 +93,6 @@
         "delta",
         "mcnemar_p",
         "credible"
-      ],
-      "builtin": true
-    },
-    {
-      "id": "w9_redteam",
-      "name": "W9 金融红队",
-      "description": "25 条：注入 / 越权 / SQL / PII / 诱导编造；证明边界在代码不在 Prompt（不调 LLM）",
-      "golden_file": "w9_redteam_25.json",
-      "runner": "w9_redteam",
-      "metrics": [
-        "accuracy",
-        "sql_leak_rate",
-        "acl_leak_rate",
-        "number_error_rate"
       ],
       "builtin": true
     },

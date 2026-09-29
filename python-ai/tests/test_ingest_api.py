@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.api.deps import get_document_service, get_object_store, get_settings_dep
+from app.core.dependencies import get_document_service, get_object_store, get_settings_dep
 from app.config import Settings
 from app.documents.registry import DocumentRegistry
 from app.documents.service import DocumentService
@@ -53,9 +53,9 @@ async def test_post_ingest_sync_runs_pipeline(ingest_client: AsyncClient, monkey
     def fake_conn():
         yield MagicMock()
 
-    monkeypatch.setattr("app.api.ingest.get_connection", fake_conn)
+    monkeypatch.setattr("app.ingest.router.get_connection", fake_conn)
     monkeypatch.setattr(
-        "app.api.ingest.create_job",
+        "app.ingest.router.create_job",
         lambda *_a, **_k: "11111111-1111-1111-1111-111111111111",
     )
 
@@ -72,7 +72,7 @@ async def test_post_ingest_sync_runs_pipeline(ingest_client: AsyncClient, monkey
             job_id=kwargs["job_id"],
         )
 
-    monkeypatch.setattr("app.api.ingest.ingest_pdf_to_vectors", fake_ingest)
+    monkeypatch.setattr("app.ingest.router.ingest_pdf_to_vectors", fake_ingest)
     files = {"file": ("002594_2024.pdf", b"%PDF-1.4 demo", "application/pdf")}
     response = await ingest_client.post(
         "/ingest",

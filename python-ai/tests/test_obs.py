@@ -3,7 +3,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.obs.generations import clear_generations, record_from_chat, record_generation
-from app.schemas.chat import ChatResponse
+from app.chat.schemas import ChatResponse
 
 
 @pytest.fixture

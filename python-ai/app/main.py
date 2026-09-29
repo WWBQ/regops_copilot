@@ -4,24 +4,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import (
-    chat,
-    documents,
-    eval_ops,
-    health,
-    ingest,
-    labeling,
-    models,
-    mcp,
-    ops,
-    prompts,
-    quality,
-    sessions,
-    storage,
-    tools,
-)
 from app.logging_config import setup_logging
 from app.request_id import RequestIdMiddleware
+from app.router import api_router
 
 
 @asynccontextmanager
@@ -33,7 +18,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="RegOps Copilot AI Service",
-    description="Python AI 微服务：模型调用、RAG、Agent（W1 基座）",
+    description="Python AI 微服务：模型调用、RAG、问数",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -55,20 +40,7 @@ app.add_middleware(
 )
 app.add_middleware(RequestIdMiddleware)
 
-app.include_router(health.router)
-app.include_router(chat.router)
-app.include_router(sessions.router)
-app.include_router(models.router)
-app.include_router(labeling.router)
-app.include_router(documents.router)
-app.include_router(ingest.router)
-app.include_router(storage.router)
-app.include_router(ops.router)
-app.include_router(quality.router)
-app.include_router(eval_ops.router)
-app.include_router(prompts.router)
-app.include_router(tools.router)
-app.include_router(mcp.router)
+app.include_router(api_router)
 
 
 @app.get("/")

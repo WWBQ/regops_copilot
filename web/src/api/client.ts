@@ -110,7 +110,7 @@ export function formatUserFacingError(err: unknown): string {
   if (err instanceof ApiRequestError) {
     const rid = err.requestId ? ` 关联 ID：${err.requestId}` : ''
     if (err.errorCode === 'upstream_down' || err.status === 502) {
-      return `问答服务暂时连不上。合规复核和审计还可以用。${rid}`.trim()
+      return `问答服务暂时连不上。登录和审计还可以用。${rid}`.trim()
     }
     if (err.errorCode === 'upstream_timeout' || err.status === 504) {
       return `问答超时，可点停止后重试。${rid}`.trim()

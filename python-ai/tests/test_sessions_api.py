@@ -7,10 +7,10 @@ from unittest.mock import patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.api.deps import get_document_service
+from app.core.dependencies import get_document_service
 from app.ingest.session_pipeline import SessionIngestResult
 from app.main import app
-from app.models.base import ChatResult, LLMClient
+from app.models.llm import ChatResult, LLMClient
 from app.rag.service import Citation as RagCitation
 from app.rag.service import RagAnswer
 from app.rag.trace import RagPrepareResult, RagTrace
@@ -20,7 +20,7 @@ class FakeLLMClient(LLMClient):
     async def chat(self, messages, *, temperature=0.1) -> str:
         return "基于文档的 mock 回复"
 
-    async def chat_with_usage(self, messages, *, temperature=0.1, tools=None) -> ChatResult:
+    async def chat_with_usage(self, messages, *, temperature=0.1) -> ChatResult:
         return ChatResult(content="基于文档的 mock 回复", prompt_tokens=1, completion_tokens=2)
 
 
@@ -64,8 +64,8 @@ def anyio_backend():
 
 @pytest.fixture
 async def client(monkeypatch):
-    monkeypatch.setattr("app.api.chat.get_llm_client", lambda settings, model=None: FakeLLMClient())
-    monkeypatch.setattr("app.api.chat.list_available_models", lambda settings=None: ["deepseek"])
+    monkeypatch.setattr("app.chat.router.get_llm_client", lambda settings, model=None: FakeLLMClient())
+    monkeypatch.setattr("app.chat.router.list_available_models", lambda settings=None: ["deepseek-flash"])
     app.dependency_overrides[get_document_service] = lambda: FakeDocumentService()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -89,7 +89,7 @@ async def test_upload_session_document_queues_job(client: AsyncClient):
     session_id = create.json()["session_id"]
     pdf_bytes = b"%PDF-1.4\n% minimal pdf stub\n"
 
-    with patch("app.api.sessions.ingest_session_pdf") as mock_ingest:
+    with patch("app.sessions.router.ingest_session_pdf") as mock_ingest:
         mock_ingest.return_value = SessionIngestResult(
             doc_id="sess_test",
             pages=1,
@@ -117,8 +117,8 @@ async def test_chat_with_session_pending_docs(client: AsyncClient):
     session_id = create.json()["session_id"]
     pdf_bytes = b"%PDF-1.4\n% minimal pdf stub\n"
 
-    with patch("app.api.sessions.ingest_session_pdf"), patch(
-        "app.api.chat.collect_rag_doc_ids", return_value=[]
+    with patch("app.sessions.router.ingest_session_pdf"), patch(
+        "app.chat.router.collect_rag_doc_ids", return_value=[]
     ):
         upload = await client.post(
             f"/sessions/{session_id}/documents",
@@ -149,10 +149,10 @@ async def test_chat_with_session_rag(client: AsyncClient):
         doc_ids=["sess_demo"],
     )
 
-    with patch("app.api.chat.session_exists", return_value=True), patch(
-        "app.api.chat.list_session_documents", return_value=[]
+    with patch("app.chat.router.session_exists", return_value=True), patch(
+        "app.chat.router.list_session_documents", return_value=[]
     ), patch(
-        "app.api.chat.prepare_chat_rag",
+        "app.chat.router.prepare_chat_rag",
         return_value=RagPrepareResult(
             answer=rag,
             trace=RagTrace(question="请总结这份文档的主要风险", outcome="ok", rag_used=True),

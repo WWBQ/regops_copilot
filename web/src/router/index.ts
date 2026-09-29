@@ -11,7 +11,6 @@ import AsknumMonitorView from '../views/ops/AsknumMonitorView.vue'
 import LlmTraceView from '../views/ops/LlmTraceView.vue'
 import ProfileView from '../views/account/ProfileView.vue'
 import UsersPermissionsView from '../views/account/UsersPermissionsView.vue'
-import ReviewQueueView from '../views/compliance/ReviewQueueView.vue'
 import AuditTrailView from '../views/compliance/AuditTrailView.vue'
 import PlaceholderView from '../views/PlaceholderView.vue'
 import QualityGatesView from '../views/quality/QualityGatesView.vue'
@@ -28,10 +27,6 @@ const router = createRouter({
       name: 'chat',
       component: ChatPanel,
       meta: { title: '合规问答' },
-    },
-    {
-      path: '/agent',
-      redirect: '/',
     },
     {
       path: '/rag',
@@ -108,18 +103,6 @@ const router = createRouter({
       name: 'fin-metrics',
       component: FinMetricsView,
       meta: { title: '财务事实库', pageId: 'fin-metrics', group: 'quality' },
-    },
-    {
-      path: '/compliance/review',
-      name: 'compliance-review',
-      component: ReviewQueueView,
-      meta: { title: '合规复核', pageId: 'review' },
-    },
-    {
-      path: '/compliance/workflow',
-      name: 'workflow',
-      component: ReviewQueueView,
-      meta: { title: '审批流', pageId: 'workflow' },
     },
     {
       path: '/compliance/audit',

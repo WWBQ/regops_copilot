@@ -35,29 +35,6 @@ export function saveChatMessages(sessionId: string, messages: ChatMessage[]): vo
   }
 }
 
-const THREAD_KEY_PREFIX = 'regops_workflow_thread:'
-
-export function loadWorkflowThreadId(sessionId: string): string | null {
-  try {
-    return localStorage.getItem(`${THREAD_KEY_PREFIX}${sessionId}`)
-  } catch {
-    return null
-  }
-}
-
-export function saveWorkflowThreadId(sessionId: string, threadId: string | null): void {
-  try {
-    const key = `${THREAD_KEY_PREFIX}${sessionId}`
-    if (!threadId) {
-      localStorage.removeItem(key)
-      return
-    }
-    localStorage.setItem(key, threadId)
-  } catch {
-    // ignore
-  }
-}
-
 const PENDING_KEY_PREFIX = 'regops_asknum_pending:'
 
 export function loadPendingAsknum(sessionId: string): PendingAsknum | null {
@@ -95,6 +72,6 @@ export function createWelcomeMessage(): ChatMessage {
     id: 'welcome',
     role: 'assistant',
     content:
-      '你好，我是 RegOps Copilot。营收/净利润走财务事实库；风险/制度检索年报并附页码。两家对比+结论走固定工作流，出结论前会暂停确认。经营概况、研发/毛利率/分红、待复核数字追问会让模型自选只读工具。也可 📎 上传仅本会话有效的 PDF。',
+      '你好，我是 RegOps Copilot。可查询已核验的财务数据，或检索年报并附引用页码；资料不足时会明确说明。也可 📎 上传仅本会话有效的 PDF。',
   }
 }

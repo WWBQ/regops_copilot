@@ -5,17 +5,17 @@ import pandas as pd
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.api.deps import get_label_store, get_llm_client_dep
+from app.core.dependencies import get_label_store, get_llm_client_dep
 from app.labeling.store import LabelStore
 from app.main import app
-from app.models.base import ChatResult, LLMClient
+from app.models.llm import ChatResult, LLMClient
 
 
 class FakeLLMClient(LLMClient):
     async def chat(self, messages, *, temperature=0.1) -> str:
         return "这是 mock 回复"
 
-    async def chat_with_usage(self, messages, *, temperature=0.1, tools=None) -> ChatResult:
+    async def chat_with_usage(self, messages, *, temperature=0.1) -> ChatResult:
         return ChatResult(content="这是 mock 回复", prompt_tokens=1, completion_tokens=2)
 
 
@@ -234,4 +234,3 @@ async def test_create_rejects_duplicate_id(client: AsyncClient):
     )
     assert resp.status_code == 400
     assert "重复" in resp.json()["detail"]
-

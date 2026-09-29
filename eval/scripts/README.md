@@ -50,9 +50,8 @@ W8-4 Dify 对照（没起来就跳过）：`python-ai/.venv/bin/python eval/run_
 
 Prompt 钉扎/回滚：`python-ai/.venv/bin/python eval/run_w8_prompt_pin.py list`
 
-W9-1 双栈五条链路冒烟：`python-ai/.venv/bin/python eval/run_w9_e2e.py`
+W9-1 双栈健康、RAG 与问数冒烟：`python-ai/.venv/bin/python eval/run_w9_e2e.py`
 
-W9-2 金融红队：`python-ai/.venv/bin/python eval/run_w9_redteam.py --fail-on-regression`
 
 W9-4 Compose 冒烟：`./scripts/compose-smoke.sh`
 

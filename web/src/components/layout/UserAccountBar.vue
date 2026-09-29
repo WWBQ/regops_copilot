@@ -43,11 +43,6 @@ function openPermissions() {
   void router.push('/settings/users')
 }
 
-function openSettings() {
-  closeProfile()
-  void router.push('/settings')
-}
-
 function onLogout() {
   logout()
   closeProfile()

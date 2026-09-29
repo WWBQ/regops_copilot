@@ -38,7 +38,7 @@ const initials = computed(() => userInitials(display.value.displayName))
 
     <div v-if="!loggedIn" class="profile-card">
       <h2>登录</h2>
-      <p class="hint">演示账号：analyst / checker / rm / admin，密码均为用户名 + 123。</p>
+      <p class="hint">演示账号：analyst / rm / admin，密码均为用户名 + 123。</p>
       <LoginPanel />
     </div>
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""W9-1 五条链路冒烟：经 Java BFF（:8080）打问答 / 问数 / 指标 / 草稿 / 双人复核。
+"""W9-1 双栈冒烟：经 Java BFF（:8080）验证健康、RAG 与问数。
 
 用法（项目根目录，Java 与 Postgres 需已启动；Python 可选）：
   python-ai/.venv/bin/python eval/run_w9_e2e.py
@@ -144,25 +144,6 @@ def chain_asknum(base: str, python_up: bool) -> ChainResult:
     return ChainResult("asknum", "pass", f"route={route} tokens={tokens}", rid, {"route": route})
 
 
-def chain_lookup(base: str, python_up: bool) -> ChainResult:
-    if not python_up:
-        return ChainResult("lookup", "skip", "python-ai down，指标查询跳过")
-    status, payload, rid = _call(
-        base,
-        "POST",
-        "/api/tools/lookup",
-        body={"company_code": "002594", "concept": "revenue", "year": 2024, "backend": "mock"},
-        extra_headers={"X-Regops-Dept": "research"},
-        timeout=20.0,
-        request_id="w9-lookup",
-    )
-    if status != 200 or not isinstance(payload, dict):
-        return ChainResult("lookup", "fail", f"HTTP {status} {_detail_text(payload)}", rid)
-    if payload.get("ok") is not True:
-        return ChainResult("lookup", "fail", f"ok!=true {payload.get('error_code') or payload.get('error')}", rid)
-    return ChainResult("lookup", "pass", "lookup_metric mock ok", rid)
-
-
 def chain_rag(base: str, python_up: bool) -> ChainResult:
     if not python_up:
         return ChainResult("rag", "skip", "python-ai down，问答链路跳过")
@@ -190,119 +171,12 @@ def chain_rag(base: str, python_up: bool) -> ChainResult:
     )
 
 
-def chain_draft(base: str, python_up: bool) -> ChainResult:
-    if not python_up:
-        return ChainResult("draft", "skip", "python-ai down，工单草稿跳过")
-    status, payload, rid = _call(
-        base,
-        "POST",
-        "/api/tools/review-draft",
-        body={
-            "company_code": "002594",
-            "title": f"W9-1 草稿 {uuid.uuid4().hex[:8]}",
-            "reason": "端到端冒烟：只写 PENDING",
-        },
-        extra_headers={"X-Regops-Dept": "research"},
-        timeout=20.0,
-        request_id="w9-draft",
-    )
-    if status != 200 or not isinstance(payload, dict):
-        return ChainResult("draft", "fail", f"HTTP {status} {_detail_text(payload)}", rid)
-    if payload.get("ok") is not True:
-        return ChainResult("draft", "fail", f"ok!=true {payload.get('error_code') or payload.get('error')}", rid)
-    result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
-    draft_status = result.get("status")
-    if draft_status and draft_status != "PENDING":
-        return ChainResult("draft", "fail", f"草稿状态必须是 PENDING，实际 {draft_status}", rid)
-    return ChainResult("draft", "pass", f"PENDING draft_id={result.get('draft_id')}", rid)
-
-
-def _login(base: str, username: str, password: str) -> str:
-    status, payload, _rid = _call(
-        base,
-        "POST",
-        "/api/auth/login",
-        body={"username": username, "password": password},
-        timeout=10.0,
-    )
-    if status != 200 or not isinstance(payload, dict) or not payload.get("token"):
-        raise RuntimeError(f"登录 {username} 失败 HTTP {status} {_detail_text(payload)}")
-    return str(payload["token"])
-
-
-def chain_review(base: str) -> ChainResult:
-    try:
-        analyst = _login(base, "analyst", "analyst123")
-        checker = _login(base, "checker", "checker123")
-    except RuntimeError as exc:
-        return ChainResult("review_audit", "fail", str(exc))
-    title = f"W9-1 复核 {uuid.uuid4().hex[:8]}"
-    status, created, rid = _call(
-        base,
-        "POST",
-        "/api/reviews/tickets",
-        body={"company_code": "002594", "title": title, "reason": "端到端双人复核冒烟"},
-        token=analyst,
-        timeout=10.0,
-        request_id="w9-review",
-    )
-    if status != 200 or not isinstance(created, dict) or not created.get("id"):
-        return ChainResult("review_audit", "fail", f"建单失败 HTTP {status} {_detail_text(created)}", rid)
-    ticket_id = created["id"]
-    status, submitted, rid = _call(
-        base,
-        "POST",
-        f"/api/reviews/tickets/{ticket_id}/submit",
-        token=analyst,
-        timeout=10.0,
-        request_id="w9-review-submit",
-    )
-    if status != 200 or not isinstance(submitted, dict) or submitted.get("status") != "SUBMITTED":
-        return ChainResult("review_audit", "fail", f"提交失败 HTTP {status} {_detail_text(submitted)}", rid)
-    status, decided, rid = _call(
-        base,
-        "POST",
-        f"/api/reviews/tickets/{ticket_id}/approve",
-        body={"reason": "条款引用齐全"},
-        token=checker,
-        timeout=10.0,
-        request_id="w9-review-approve",
-    )
-    if status != 200 or not isinstance(decided, dict) or decided.get("status") != "REVIEWED":
-        return ChainResult("review_audit", "fail", f"复核失败 HTTP {status} {_detail_text(decided)}", rid)
-    status, events, rid = _call(
-        base,
-        "GET",
-        "/api/audit/events",
-        token=checker,
-        timeout=10.0,
-        request_id="w9-audit",
-    )
-    if status != 200 or not isinstance(events, list):
-        return ChainResult("review_audit", "fail", f"审计失败 HTTP {status} {_detail_text(events)}", rid)
-    matched = [
-        item
-        for item in events
-        if isinstance(item, dict) and str(item.get("entityId") or "") == str(ticket_id)
-    ]
-    if not matched:
-        return ChainResult("review_audit", "fail", f"审计未找到工单 {ticket_id}", rid)
-    has_rid = any(item.get("requestId") for item in matched)
-    return ChainResult(
-        "review_audit",
-        "pass",
-        f"PENDING→SUBMITTED→REVIEWED audit={len(matched)} request_id={'yes' if has_rid else 'missing'}",
-        rid,
-        {"ticket_id": ticket_id},
-    )
-
-
 def render_markdown(results: list[ChainResult], python_up: bool) -> str:
     lines = [
-        "# W9-1 五条链路冒烟",
+        "# W9-1 健康、RAG 与问数冒烟",
         "",
         f"- 时间：{datetime.now().isoformat(timespec='seconds')}",
-        f"- python-ai：{'ok' if python_up else 'down（问答/问数/指标/草稿跳过，复核仍须过）'}",
+        f"- python-ai：{'ok' if python_up else 'down（问答与问数跳过）'}",
         "",
         "| 链路 | 结果 | 关联 ID | 说明 |",
         "|---|---|---|---|",
@@ -311,9 +185,6 @@ def render_markdown(results: list[ChainResult], python_up: bool) -> str:
         "health": "探活 + Correlation ID",
         "rag": "问答 RAG",
         "asknum": "问数",
-        "lookup": "指标查询",
-        "draft": "工单草稿 PENDING",
-        "review_audit": "双人复核 + 审计",
     }
     for item in results:
         rid = item.request_id or "—"
@@ -340,9 +211,6 @@ def main() -> int:
         health,
         chain_rag(args.base, python_up),
         chain_asknum(args.base, python_up),
-        chain_lookup(args.base, python_up),
-        chain_draft(args.base, python_up),
-        chain_review(args.base),
     ]
     markdown = render_markdown(results, python_up)
     out_dir = args.out or (ROOT / "eval" / "reports" / "w9_e2e" / datetime.now().strftime("%Y%m%d_%H%M%S"))

@@ -17,8 +17,6 @@ function normalizeChatResponse(raw: RawChatResponse): ChatResponse {
     latency_ms: raw.latency_ms ?? raw.latencyMs,
     rag_used: raw.rag_used ?? (raw as { ragUsed?: boolean }).ragUsed,
     session_id: raw.session_id ?? (raw as { sessionId?: string }).sessionId,
-    thread_id: raw.thread_id ?? (raw as { threadId?: string }).threadId,
-    pending_node: raw.pending_node ?? (raw as { pendingNode?: string }).pendingNode,
     pending_request: raw.pending_request ?? (raw as { pendingRequest?: ChatResponse['pending_request'] }).pendingRequest ?? null,
   }
 }
@@ -30,7 +28,6 @@ function chatBody(body: ChatRequest): string {
     session_id: body.session_id,
     use_rag: body.use_rag ?? true,
     model: body.model,
-    thread_id: body.thread_id,
   })
 }
 
@@ -96,7 +93,6 @@ export type ChatStreamHandlers = {
     route?: string
     model?: string
     session_id?: string | null
-    thread_id?: string | null
   }) => void | Promise<void>
   onDelta?: (text: string) => void | Promise<void>
 }

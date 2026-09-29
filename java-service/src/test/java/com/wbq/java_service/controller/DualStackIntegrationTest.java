@@ -94,8 +94,6 @@ class DualStackIntegrationTest {
                 1,
                 2,
                 10.0,
-                null,
-                null,
                 null
         ));
         mvc.perform(post("/api/chat")
@@ -121,8 +119,6 @@ class DualStackIntegrationTest {
                 1,
                 2,
                 10.0,
-                null,
-                null,
                 null
         ));
         mvc.perform(post("/api/chat")
@@ -131,20 +127,6 @@ class DualStackIntegrationTest {
                         .content("{\"message\":\"你好\",\"use_rag\":false}"))
                 .andExpect(status().isOk());
         verify(pythonAiClient).chat(any(), eq("research"));
-    }
-
-    @Test
-    void lookupTimeoutDoesNotLeakStack() throws Exception {
-        when(pythonAiClient.invokeTool(any(), any(), any(), any())).thenThrow(
-                new PythonAiException(504, "python-ai timeout", "upstream_timeout")
-        );
-        mvc.perform(post("/api/tools/lookup")
-                        .header("X-Regops-Dept", "research")
-                        .header("X-Request-ID", "e2e-lookup-timeout")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"company_code\":\"002594\",\"concept\":\"revenue\",\"year\":2024}"))
-                .andExpect(status().isGatewayTimeout())
-                .andExpect(jsonPath("$.extra.error_code").value("upstream_timeout"));
     }
 
     @Test

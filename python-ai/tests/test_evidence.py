@@ -1,6 +1,6 @@
 """W6-3 数字抽取与证据回溯。"""
 
-from app.agents.evidence import (
+from app.rag.evidence import (
     INTERCEPT_PREFIX,
     REDACT_TOKEN,
     apply_checked_reply,
@@ -111,4 +111,3 @@ def test_patent_counts_and_yuan_in_rag_snippet():
         pack,
     )
     assert result.ok
-

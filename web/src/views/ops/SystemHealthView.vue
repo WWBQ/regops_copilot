@@ -167,8 +167,6 @@ onBeforeUnmount(() => {
       class="degrade-note"
     >
       python-ai 不可用：问答 / 问数 / 标注会失败。
-      <router-link to="/compliance/review">合规复核</router-link>
-      与
       <router-link to="/compliance/audit">审计</router-link>
       仍走 Java。
     </p>

@@ -1,9 +1,7 @@
 {
   "chat.general": "1.0.0",
   "rag.answer": "1.0.0",
-  "tools.loop": "1.0.0",
   "strategy.zero_shot": "1.0.0",
   "strategy.few_shot": "1.0.0",
-  "strategy.cot": "1.0.0",
-  "strategy.react": "1.0.0"
+  "strategy.cot": "1.0.0"
 }

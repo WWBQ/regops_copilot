@@ -11,8 +11,8 @@ from uuid import uuid4
 
 from app.prompts.library import PromptLibraryError, active_version
 from app.request_id import current_request_id, current_trace_id, current_traceparent
-from app.schemas.chat import ChatResponse
-from app.tools.pii import mask_for_log
+from app.chat.schemas import ChatResponse
+from app.obs.privacy import mask_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +32,6 @@ _ROUTE_PROMPT = {
     "chitchat": "chat.general",
     "rag": "rag.answer",
     "rag_blocked": "rag.answer",
-    "tools": "tools.loop",
-    "tools_blocked": "tools.loop",
 }
 
 

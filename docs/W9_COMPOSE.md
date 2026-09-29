@@ -28,7 +28,7 @@ Java 在 Compose 网络里访问 `http://python-ai:8000`，不要写 `localhost`
 ./scripts/compose-smoke.sh
 ```
 
-会等四个 healthcheck，再跑 `eval/run_w9_e2e.py`（经 Java :8080）和红队 `--fail-on-regression`。
+会等服务健康检查，再跑 `eval/run_w9_e2e.py`（经 Java :8080 验证 RAG 与问数）。
 
 停：`docker compose down`（volume 保留）。清库：`docker compose down -v`。
 
@@ -37,7 +37,7 @@ Java 在 Compose 网络里访问 `http://python-ai:8000`，不要写 `localhost`
 - 相对路径 volume：`./docs/sql/*.sql`、命名卷 `db_data` / `python_data`
 - `REGOPS_JWT_SECRET` / `REGOPS_SERVICE_TOKEN` / LLM Key 来自 env
 - 健康检查：db `pg_isready`；python `/health`；java `/api/health`；web `/healthz`
-- `java-service` 只等 Postgres healthy，**不等 python-ai**。Python 还在构建或被停掉时，Java 探活仍是 200，复核/审计可用（W9-6）
+- `java-service` 只等 Postgres healthy，**不等 python-ai**。Python 还在构建或被停掉时，Java 探活仍是 200，登录与审计可用（W9-6）
 - K8s 最小清单见 [`W9_K8S.md`](./W9_K8S.md)
 
 课程口试对应 **q45 / q46**：Compose 适合可复现样板；上规模再 K8s，不为简历先堆集群。

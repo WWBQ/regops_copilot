@@ -12,7 +12,6 @@ data:
   DEFAULT_MODEL: "deepseek"
   API_PUBLIC_BASE_URL: "http://python-ai:8000"
   OBJECT_STORE_ROOT: "/app/data/objects"
-  CHECKPOINT_SQLITE_PATH: "/app/data/checkpoints/review.sqlite"
   LABELING_DATA_DIR: "/app/data/labeling"
   HF_HOME: "/app/data/hf"
   LANGFUSE_HOST: "https://cloud.langfuse.com"

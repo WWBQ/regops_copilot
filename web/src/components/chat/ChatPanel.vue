@@ -22,8 +22,6 @@ import {
   saveChatMessages,
   loadPendingAsknum,
   savePendingAsknum,
-  loadWorkflowThreadId,
-  saveWorkflowThreadId,
 } from '../../utils/chatStorage'
 import {
   defaultNewChatTitle,
@@ -61,7 +59,6 @@ const messages = ref<ChatMessageType[]>([createWelcomeMessage()])
 const loading = ref(false)
 const uploading = ref(false)
 const sessionId = ref<string | null>(null)
-const workflowThreadId = ref<string | null>(null)
 const sessionDocs = ref<SessionDocument[]>([])
 const listRef = ref<HTMLElement | null>(null)
 const abortRef = ref<AbortController | null>(null)
@@ -92,7 +89,6 @@ function rememberPending(session: string | null, pending: PendingAsknum | null |
   }
 }
 
-const EXAMPLE_TOOL_LOOP = '格力2024年经营得怎么样'
 
 function isVisibleStatus(text: string): boolean {
   const t = text.trim()
@@ -110,10 +106,10 @@ function isVisibleStatus(text: string): boolean {
 
 function connectionBlockedMessage(): string | null {
   if (javaOk.value === false) {
-    return 'Java BFF 不可用。登录、复核、审计也会失败，请先恢复 java-service。'
+    return 'Java BFF 不可用。登录和审计也会失败，请先恢复 java-service。'
   }
   if (pythonOk.value === false) {
-    return '问答服务暂时不可用。合规复核和审计仍可用。'
+    return '问答服务暂时不可用。审计仍可用。'
   }
   if (javaOk.value === null) {
     return '正在检测服务连接，请稍候再试。'
@@ -203,23 +199,6 @@ async function initModels() {
   }
 }
 
-function rememberWorkflowThread(threadId: string | null) {
-  workflowThreadId.value = threadId
-  if (sessionId.value) {
-    saveWorkflowThreadId(sessionId.value, threadId)
-  }
-}
-
-function applyWorkflowThread(response: { route?: string; thread_id?: string | null }) {
-  if (response.route === 'agent_paused' && response.thread_id) {
-    rememberWorkflowThread(response.thread_id)
-    return
-  }
-  if (response.route === 'agent' || response.route === 'agent_blocked') {
-    rememberWorkflowThread(null)
-  }
-}
-
 function onModelChange(model: string) {
   selectedModel.value = model
   storeModel(model)
@@ -229,7 +208,6 @@ async function initSession() {
   try {
     rebuildChatSessionsFromStorage()
     sessionId.value = await ensureSessionId()
-    workflowThreadId.value = loadWorkflowThreadId(sessionId.value)
     pendingRequest.value = loadPendingAsknum(sessionId.value)
     const restored = loadChatMessages(sessionId.value)
     if (restored) {
@@ -266,7 +244,6 @@ async function handleNewChat() {
   touchSessionMeta({ touchUpdatedAt: true })
   try {
     sessionId.value = await startNewSession()
-    rememberWorkflowThread(null)
     rememberPending(sessionId.value, null)
     messages.value = [createWelcomeMessage()]
     sessionDocs.value = []
@@ -296,7 +273,6 @@ async function handleSwitchSession(targetSessionId: string) {
   }
   storeSessionId(targetSessionId)
   sessionId.value = targetSessionId
-  workflowThreadId.value = loadWorkflowThreadId(targetSessionId)
   pendingRequest.value = loadPendingAsknum(targetSessionId)
   suppressSessionMeta.value = true
   messages.value = (loadChatMessages(targetSessionId) ?? [createWelcomeMessage()]).map((item) => ({
@@ -476,7 +452,6 @@ async function handleSend(text: string) {
       {
         message: text,
         session_id: sessionId.value ?? undefined,
-        thread_id: workflowThreadId.value ?? undefined,
         use_rag: true,
         model: selectedModel.value || undefined,
       },
@@ -519,7 +494,6 @@ async function handleSend(text: string) {
         ? { citations: response.citations, ragUsed: Boolean(response.rag_used) }
         : {}),
     })
-    applyWorkflowThread(response)
     rememberPending(sessionId.value, response.pending_request)
     emit('connected', response.model)
   } catch (error) {
@@ -612,7 +586,7 @@ watch(
       <div>
         <h1>合规问答</h1>
         <p>
-          一个助手：数字走问数，叙述走年报 RAG。两家+结论走工作流，出结论前会暂停确认。经营概况、研发/毛利率/分红、待复核数字追问会让模型自选只读工具。
+          一个助手：已核验的财务数字走问数，叙述问题走年报 RAG；缺少依据时会明确说明。
           📎 可上传仅本会话有效的 PDF。生成中点「停止」取消。引用可点开年报页，不展示思维链。
           <span v-if="sessionId" class="session-tag">会话 {{ sessionId.slice(0, 8) }}…</span>
         </p>
@@ -634,8 +608,6 @@ watch(
       <div v-if="connectionAlert" class="connection-alert" :class="{ warn: pythonDown && javaOk }" role="alert">
         <p>{{ connectionAlert }}</p>
         <p v-if="pythonDown && javaOk" class="alert-links">
-          <router-link to="/compliance/review">合规复核</router-link>
-          ·
           <router-link to="/compliance/audit">审计追踪</router-link>
         </p>
         <button type="button" class="alert-close" aria-label="关闭" @click="connectionAlert = null">×</button>
@@ -649,12 +621,12 @@ watch(
           type="button"
           class="example-chip"
           :disabled="Boolean(connectionBlockedMessage())"
-          @click="handleSend('对比比亚迪和长城2024年净利润，并结合管理层讨论给出结论')"
+          @click="handleSend('对比比亚迪和长城2024年净利润')"
         >
-          工作流
+          两家公司问数
         </button>
-        <button type="button" class="example-chip" :disabled="Boolean(connectionBlockedMessage())" @click="handleSend(EXAMPLE_TOOL_LOOP)">
-          经营概况
+        <button type="button" class="example-chip" :disabled="Boolean(connectionBlockedMessage())" @click="handleSend('比亚迪2024年年报有哪些风险因素')">
+          年报检索
         </button>
         <button type="button" class="example-chip" :disabled="Boolean(connectionBlockedMessage())" @click="handleSend('比亚迪研发投入多不多')">
           研发

@@ -25,12 +25,6 @@ public class GlobalExceptionHandler {
                 .body(new ApiError(ex.getMessage(), extra("error_code", ex.getErrorCode())));
     }
 
-    @ExceptionHandler(ToolAccessException.class)
-    public ResponseEntity<ApiError> handleToolAccess(ToolAccessException ex) {
-        return ResponseEntity.status(ex.getStatus())
-                .body(new ApiError(ex.getMessage(), extra("error_code", ex.getErrorCode())));
-    }
-
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -40,7 +34,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ResponseEntity<ApiError> handleOptimistic(ObjectOptimisticLockingFailureException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ApiError("并发复核仅允许一次成功", extra("error_code", "conflict")));
+                .body(new ApiError("并发更新冲突", extra("error_code", "conflict")));
     }
 
     @ExceptionHandler(PythonAiException.class)

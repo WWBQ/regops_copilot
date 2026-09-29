@@ -25,10 +25,8 @@ async def test_list_eval_tasks():
     assert "rag_retrieval" in ids
     assert "w4_asknum" in ids
     assert "w6_number_check" in ids
-    assert "w6_workflow" in ids
     assert "w8_strategy" in ids
     assert "w8_ab" in ids
-    assert "w9_redteam" in ids
     assert "rag_acl" in ids
     assert "rag_refuse" in ids
     assert "rag_support" in ids
@@ -37,16 +35,10 @@ async def test_list_eval_tasks():
     numbers = next(item for item in body["items"] if item["id"] == "w6_number_check")
     assert "number_error_rate" in numbers["metrics"]
     assert "unit_error_rate" in numbers["metrics"]
-    workflow = next(item for item in body["items"] if item["id"] == "w6_workflow")
-    assert "param_accuracy" in workflow["metrics"]
-    assert "confirmation_rate" in workflow["metrics"]
     strategy = next(item for item in body["items"] if item["id"] == "w8_strategy")
     assert "number_error_rate" in strategy["metrics"]
     ab = next(item for item in body["items"] if item["id"] == "w8_ab")
     assert "credible" in ab["metrics"]
-    redteam = next(item for item in body["items"] if item["id"] == "w9_redteam")
-    assert "sql_leak_rate" in redteam["metrics"]
-    assert "acl_leak_rate" in redteam["metrics"]
     retrieval = next(item for item in body["items"] if item["id"] == "rag_retrieval")
     assert "ndcg_at_k" in retrieval["metrics"]
     assert "citation_accuracy" in retrieval["metrics"]

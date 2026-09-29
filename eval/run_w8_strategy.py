@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""W8-2 四策略 Prompt 对照 CLI（默认 fixture，不调 LLM）。
+"""W8-2 三策略 Prompt 对照 CLI（默认 fixture，不调 LLM）。
 
 用法（项目根目录）：
   python-ai/.venv/bin/python eval/run_w8_strategy.py

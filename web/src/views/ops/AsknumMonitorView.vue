@@ -117,12 +117,10 @@ onMounted(refresh)
         <p>
           记录首页真实提问里走 <code>fin_metric</code> 的 trace（命中 / 拦截 / 反问 / 叙述跳过）。
           「你好」不会落库。与评估报告 20 题黄金集不是同一回事。问数结果也出现在首页引用气泡。
-          本页读 python-ai；问答挂了会空，复核和审计仍可用。
+          本页读 python-ai；问答挂了会空，审计仍可用。
         </p>
         <p v-if="pythonDown" class="head-link">
           python-ai 当前不可用。
-          <router-link to="/compliance/review">去合规复核</router-link>
-          ·
           <router-link to="/compliance/audit">审计追踪</router-link>
         </p>
         <p class="head-link">

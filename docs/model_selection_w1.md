@@ -1,7 +1,7 @@
 # W1 模型选型对照（DeepSeek vs Qwen）
 
 > 同一批 8 道金融概念题、`temperature=0.1`、各跑一轮。
-> 代码路径：`DeepSeekClient` 默认 `deepseek-chat`，`QwenClient` 默认 `qwen-plus`。
+> 这份 8 题报告运行于旧版手写 HTTP 客户端；当前模型调用统一在 `app/models/llm.py`，默认具体型号仍是 `deepseek-chat` 与 `qwen-plus`。下方延迟数据是历史基线，不能当作迁移后的实测结果。
 > 原始回复与用量：[`eval/reports/model_selection_w1/raw.json`](../eval/reports/model_selection_w1/raw.json)
 > 复跑：`python-ai/.venv/bin/python eval/scripts/run_model_selection.py`
 
@@ -64,10 +64,10 @@
 | 角色 | 选择 | 原因 |
 |------|------|------|
 | **默认（`DEFAULT_MODEL=deepseek`）** | DeepSeek `deepseek-chat` | 本批题指令遵循更好；延迟约为 Qwen 的 1/3；短题质量不差于 Qwen |
-| **备用 / 对照** | Qwen `qwen-plus` | Key 已配置，`GET /models` 返回 `["deepseek","qwen"]`；适合同一题换模型看表述差异，不适合当默认 |
+| **备用 / 对照** | Qwen `qwen-plus` | Key 已配置时，`GET /models` 返回具体型号 ID；适合同一题换模型看表述差异，不适合当默认 |
 | **不在本对照里的** | 本地开源 chat 模型 | W1 不需要；Embedding / Reranker 另走 `BAAI/bge-m3` 与 `bge-reranker-v2-m3` |
 
-换模型不改业务代码：`get_llm_client(model=...)` 走 `LLMClient` 抽象。请求体里的 `model` 字段也已接到 `/chat`。
+换模型不改业务代码：`get_llm_client(model=...)`、`LLMClient` 及 LangChain 调用均在 `app/models/llm.py`。请求体里的 `model` 字段也已接到 `/chat`。`DEEPSEEK_MODEL_IDS`、`QWEN_MODEL_IDS` 可以用逗号列出要展示的具体型号；旧请求值 `deepseek` / `qwen` 继续映射到该供应商列表首项。旧的手写 HTTP 客户端及解析器已移除。
 
 ---
 
@@ -76,4 +76,4 @@
 - 8 题全是**概念题**，没有年报数字。数字题必须走 RAG，不能用这次对照代替 `w1_chat` 基线。
 - 质量分是作者按 `look_for` 打的，换人可能差 0.5 分；**ms-02 / ms-07 的对错不依赖打分口味**。
 - 厂商改版本后数字会变，以 `raw.json` 的 `generated_at` 为准；复跑用上面的脚本。
-- 改 `.env` 不会热更新 `get_settings()` 的 `@lru_cache`。本次是重启 python-ai 之后 `/models` 才出现 `qwen`。
+- 改 `.env` 不会热更新 `get_settings()` 的 `@lru_cache`。重启 python-ai 后 `/models` 才会更新可选具体型号。
