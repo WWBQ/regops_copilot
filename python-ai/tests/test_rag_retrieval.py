@@ -10,6 +10,13 @@ from app.rag.retrieval import (
     merge_session_first,
     reciprocal_rank_fusion,
 )
+from app.eval.rag_retrieval_runner import _latency_stats
+
+
+def test_latency_p95_uses_upper_nearest_rank_for_small_samples():
+    stats = _latency_stats([{"latency_ms": 10}, {"latency_ms": 100}])
+    assert stats["latency_p50_ms"] == 55.0
+    assert stats["latency_p95_ms"] == 100.0
 
 
 def test_is_low_value_chunk_detects_annual_header():

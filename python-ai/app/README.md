@@ -102,18 +102,15 @@ Pydantic 校验，模型输出的 0～100 分不会和向量/RRF 分数混算。
 未来实现时必须保留原问题，并校验公司、年份和指标白名单，不能无条件执行模型生成的
 自然语言查询。
 
-## 待办：RAG 配置寻优
+## RAG 配置寻优
 
-状态：未开始。使用固定评测集分别测试单公司 RAG 与多公司比较，寻找质量和延迟的最佳点，
-不要根据单次问答耗时直接决定参数。
+2026-10-01 已用校验通过的 100 题黄金集完成候选数扫描。40 / 80 条在冒烟中已出现
+33～76 秒的单题延迟且质量没有改善，正式分层样本继续比较 12 / 24：两套场景 Recall
+相同，12 条的 MRR / nDCG / 引用准确率更好，P95 约为 24 条的 1/3～1/4。
 
-- 扫描 `rag_rerank_candidates` 与 `rag_compare_rerank_candidates`：12 / 24 / 40 / 80。
-- 扫描普通 `top_k`、`rag_compare_top_k_per_company`、`rag_vector_fetch_k` 和同页片段上限。
-- 对比 BGE 与 LLM 重排；API、本地部署分别记录。
-- 质量指标：Recall@k、MRR、nDCG、引用正确率、证据门控准确率和错误放行率。
-- 性能指标：冷启动/热启动、Embedding、检索、重排、模型首 Token、端到端首 Token、总耗时的 P50/P95。
-- 先满足质量与拒答安全门，再选择延迟和资源成本更低的配置。
-- 最终结果写入可复跑评测报告，并固定所选参数和模型版本。
+当前固定：`rag_rerank_candidates=12`、`rag_compare_rerank_candidates=12`。完整数据和
+复跑命令见 `docs/eval_rag_tuning.md`；后续若更换语料、Embedding 或重排模型必须重新跑，
+不能把本机样本结论永久写死。
 
 统一请求性能可通过 `GET /ops/performance-traces` 和
 `GET /ops/performance/overview` 查看。它把 AskNum、RAG、重排、回答模型、校验、

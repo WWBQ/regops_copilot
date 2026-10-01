@@ -51,13 +51,18 @@ def rag_config_snapshot() -> dict[str, Any]:
         "rag_rerank_backend": settings.rag_rerank_backend,
         "rag_rerank_model": settings.rag_rerank_model,
         "rag_rerank_candidates": settings.rag_rerank_candidates,
+        "rag_compare_rerank_candidates": settings.rag_compare_rerank_candidates,
+        "rag_compare_top_k_per_company": settings.rag_compare_top_k_per_company,
+        "rag_compare_min_hits_per_company": settings.rag_compare_min_hits_per_company,
         "rag_llm_rerank_deployment": settings.rag_llm_rerank_deployment,
         "rag_llm_rerank_model": settings.rag_llm_rerank_model,
         "rag_llm_rerank_base_url": settings.rag_llm_rerank_base_url,
         "rag_llm_rerank_candidates": settings.rag_llm_rerank_candidates,
         "rag_llm_rerank_max_chars": settings.rag_llm_rerank_max_chars,
+        "rag_llm_rerank_max_output_tokens": settings.rag_llm_rerank_max_output_tokens,
         "rag_max_chunks_per_page": settings.rag_max_chunks_per_page,
         "embedding_model": settings.embedding_model,
+        "llm_max_output_tokens": settings.llm_max_output_tokens,
     }
 
 

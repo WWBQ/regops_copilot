@@ -74,4 +74,4 @@ python-ai/.venv/bin/python eval/run_asknum.py --fail-on-regression
 - 不让 LLM 写 SQL，不做 EXPLAIN 校正循环。
 - 不手算 ROE / 毛利率 / 研发强度。
 - 不用 `human_review` 的数。
-- 问数缺槽时只把当前未完成请求记在 `session.pending_asknum`（约 30 分钟），补齐后重新查 `fin_metric`，不把旧数字当记忆，也不上 LangGraph。W6-1 只接「对比 + 管理层/结论」。
+- 问数缺槽时只把当前未完成请求记在 `session.pending_asknum`（约 30 分钟），补齐后重新查 `fin_metric`，不把旧数字当记忆。标准财务指标严格走 AskNum，不降级到 RAG 或普通模型猜数。

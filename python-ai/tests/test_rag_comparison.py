@@ -115,7 +115,7 @@ def test_prepare_multi_company_rag_retrieves_each_company_independently(monkeypa
         ["002594_2024"],
         ["601633_2024"],
     ]
-    assert [call["rerank_candidates"] for call in calls] == [24, 24]
+    assert [call["rerank_candidates"] for call in calls] == [12, 12]
     assert "比亚迪" not in calls[1]["question"]
     assert "长城汽车" not in calls[0]["question"]
     assert len(result.citations) == 2

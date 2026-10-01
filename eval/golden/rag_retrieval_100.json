@@ -1443,8 +1443,8 @@
       "company_name": "格力电器",
       "report_year": 2024,
       "gold_pages": [
-        6,
-        10
+        7,
+        13
       ],
       "probe_keywords": [
         "归属于上市公司股东的净利润",
@@ -1454,7 +1454,7 @@
       "grading": "page_hit_at_k",
       "k": 12,
       "evidence_hint": "主要会计数据",
-      "why_clean": "2024年报已入库 doc_id=000651_2024；gold page 由 doc_chunks 关键词探测"
+      "why_clean": "人工复核：p7 主要会计数据披露归母净利润，p13 管理层概述披露归母净利润及同比"
     },
     {
       "id": "rag-063",

@@ -15,6 +15,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$ROOT/.dev-logs"
 
+# 本地四个进程统一读取根目录配置；导出的环境变量也会覆盖各框架默认值。
+if [ -f "$ROOT/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$ROOT/.env"
+  set +a
+fi
+
 DB_CONTAINER="regops-db"
 PY_PORT=8000
 JAVA_PORT=8080

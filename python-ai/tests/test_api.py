@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -180,6 +180,78 @@ async def test_chat_asknum_failure_does_not_fall_through_to_rag(
     assert body["rag_used"] is False
     assert "不会降级为 RAG" in body["reply"]
     prepare_rag.assert_not_called()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("outcome", ["no_docs", "low_score"])
+async def test_chat_rag_without_evidence_never_calls_llm(
+    client: AsyncClient,
+    monkeypatch,
+    outcome: str,
+):
+    from app.rag.trace import RagPrepareResult, RagTrace
+
+    no_call = AsyncMock(side_effect=AssertionError("LLM must not be called"))
+    fake = FakeLLMClient()
+    fake.chat_with_usage = no_call
+    monkeypatch.setattr("app.chat.router.get_llm_client", lambda settings, model=None: fake)
+    monkeypatch.setattr("app.chat.router.try_answer", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        "app.chat.router.prepare_chat_rag",
+        lambda **_kwargs: RagPrepareResult(
+            answer=None,
+            trace=RagTrace(question="美的2024年经营情况", outcome=outcome),
+        ),
+    )
+
+    response = await client.post(
+        "/chat",
+        json={"message": "美的2024年经营情况", "use_rag": True},
+        headers={"X-Regops-Dept": "restricted-dept"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["route"] == "rag_blocked"
+    assert body["rag_used"] is False
+    assert body["total_tokens"] == 0
+    assert "没有检索到足够可靠的证据" in body["reply"]
+    assert "权限" not in body["reply"]
+    no_call.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_chat_stream_rag_without_evidence_never_calls_llm(
+    client: AsyncClient,
+    monkeypatch,
+):
+    from app.rag.trace import RagPrepareResult, RagTrace
+
+    no_call = MagicMock(side_effect=AssertionError("streaming LLM must not be called"))
+    fake = FakeLLMClient()
+    fake.chat_stream = no_call
+    monkeypatch.setattr("app.chat.router.get_llm_client", lambda settings, model=None: fake)
+    monkeypatch.setattr("app.chat.router.try_answer", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        "app.chat.router.prepare_chat_rag",
+        lambda **_kwargs: RagPrepareResult(
+            answer=None,
+            trace=RagTrace(question="格力2024年战略", outcome="low_score"),
+        ),
+    )
+
+    async with client.stream(
+        "POST",
+        "/chat/stream",
+        json={"message": "格力2024年战略", "use_rag": True},
+    ) as response:
+        body = "".join([chunk async for chunk in response.aiter_text()])
+
+    events = _sse_body(body)
+    done = json.loads(events["done"])
+    assert done["route"] == "rag_blocked"
+    assert done["total_tokens"] == 0
+    no_call.assert_not_called()
 
 
 @pytest.mark.anyio

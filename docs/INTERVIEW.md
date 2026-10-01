@@ -15,8 +15,8 @@
 
 > 我有两个项目。一个是 **RegOps Copilot**，在上市公司公开年报和监管文件上做合规问答，
 > 核心约束是**答案必须可追溯**：每条引用带文档号、页码和原文片段，检索分数低于阈值就拒答，不猜。
-> 前面是 Java BFF 管鉴权、复核和审计，后面是 Python 服务管 RAG、Agent 和评测，
-> 一共八类黄金集加回归门禁。
+> 前面是 Java BFF 管对外 API 和请求链路，后面是 Python 服务管 RAG、AskNum 和评测，
+> 并配套多类黄金集和回归门禁。
 >
 > 另一个是**粤语模型微调**。第一版我训出来的模型只会翻译，你问它问题它把问题译一遍就完事。
 > 我定位到是训练数据几乎全是平行翻译语料，重建了问答数据集重训，
@@ -31,10 +31,10 @@
 
 | | RegOps Copilot | 粤语微调 |
 |---|---|---|
-| 定位 | 合规 RAG + Agent 系统 | 领域 SFT（行为纠偏） |
-| 技术栈 | FastAPI · Spring Boot / JDK 21 · Vue 3 · Postgres+pgvector · LangGraph | Unsloth · TRL · PEFT · llama.cpp · Ollama |
-| 模型 | DeepSeek `deepseek-chat`（默认）/ Qwen `qwen-plus`；bge-m3 + bge-reranker-v2-m3 | Qwen2.5-7B-Instruct + LoRA |
-| 规模 | Python 约 1.9 万行 / Java 约 5.5 千行 / 前端约 1.3 万行；Python 侧 222 个测试函数 | 5.2 万条训练集，单卡 3090 |
+| 定位 | 金融年报 RAG + 受控问数系统 | 领域 SFT（行为纠偏） |
+| 技术栈 | FastAPI · Spring Boot / JDK 21 · Vue 3 · Postgres+pgvector · LangChain | Unsloth · TRL · PEFT · llama.cpp · Ollama |
+| 模型 | DeepSeek / Qwen 具体型号可配置；bge-m3 + bge-reranker-v2-m3 | Qwen2.5-7B-Instruct + LoRA |
+| 规模 | Python / Java / Vue 单仓协作；Python 侧 300+ 测试 | 5.2 万条训练集，单卡 3090 |
 | 我的角色 | 全栈独立开发 | 数据、训练、评测、导出全流程 |
 | 最能讲的 | 引用不可编造、结论强校验、双栈降级、黄金集回归门禁 | 失败归因、数据重建、三方对比评测 |
 | 边界 | 学习作品，不是生产系统；数据全部公开披露 | 不是母语级，也没有全面超过基座 |
@@ -55,7 +55,7 @@
 
 1. **答案必须带出处**：RAG 检索后作答，引用返回 `doc_id` + `page` + 原文片段 + 可跳转链接；检索分低于阈值直接拒答。
 2. **结论必须结构化可校验**：合规结论走 Pydantic DTO，含跨字段规则，不合规直接拒绝产出。
-3. **评测必须可复跑**：八类黄金集 + 报告落盘，`--fail-on-regression` 当门禁。
+3. **评测必须可复跑**：多类黄金集 + 报告落盘，`--fail-on-regression` 当门禁。
 
 ### 2.2 架构
 
@@ -66,14 +66,14 @@
 
 | 服务 | 技术栈 | 负责 |
 |---|---|---|
-| `python-ai` | FastAPI · Python 3.14 | LLM 封装、RAG 检索与引用、文档解析入库、受控问数、LangGraph 工作流、评测 |
-| `java-service` | Spring Boot · JDK 21 | API 聚合、认证与 RBAC、maker-checker 复核与审计、部门隔离 |
+| `python-ai` | FastAPI · Python 3.14 | LangChain 模型调用、RAG 检索与引用、文档解析入库、受控问数、评测 |
+| `java-service` | Spring Boot · JDK 21 | API 聚合、JWT 认证、部门范围、审计日志与 Python 服务代理 |
 | `web` | Vue 3 · Vite | 合规问答、文档标注、评测与运维看板 |
 
 **为什么要分两个后端服务**（这题一定会被问）：
 
-不是为了炫技，是职责不同。鉴权、审计、复核工单是**企业边界**，要稳定事务、RBAC、可审计；
-RAG、Agent、评测是 **AI 侧**，迭代快、依赖 Python 生态。
+不是为了炫技，是职责不同。对外 API、鉴权、部门范围和审计日志是**企业边界**，要稳定、可追踪；
+RAG、AskNum、模型调用和评测是 **AI 侧**，迭代快、依赖 Python 生态。
 两边用 `X-Request-ID` 加 W3C `traceparent` 串同一次请求，出问题能在两个服务日志里对上同一条链路。
 
 代价我清楚：多一跳网络和一份 DTO 映射。所以我硬性要求 **Java 侧不写 AI 逻辑**，
@@ -91,7 +91,7 @@ RAG、Agent、评测是 **AI 侧**，迭代快、依赖 Python 生态。
 | 向量 | `BAAI/bge-m3`，1024 维，取 top 80 |
 | 关键词 | Okapi BM25，问题短语 TF，取 top 30（k1=1.2, b=0.75） |
 | 融合 | RRF `k=60`，向量权重 2.0 / 关键词 1.0 |
-| 精排 | `BAAI/bge-reranker-v2-m3`，候选 80 |
+| 精排 | `BAAI/bge-reranker-v2-m3`，普通/多公司候选当前默认 24 |
 | 最终 | `top_k=12`，同页最多 2 条 `max_chunks_per_page=2` |
 | 拒答阈值 | `min_score=0.42` |
 
@@ -102,7 +102,7 @@ RAG、Agent、评测是 **AI 侧**，迭代快、依赖 Python 生态。
 越权或库外公司走 `no_docs`，20+20 题**在 Python 检索层**验证泄露为 0。
 边界说清楚：Java BFF 的部门头校验只在**已登录**时生效（登录用户不能冒用其他部门）；
 未登录的公开演示路径不强制部门约束，部门域是 demo 级 allowlist。
-红队门禁覆盖 Python 工具层，未覆盖 Java BFF 的完整认证链路。
+红队门禁覆盖 Python RAG / AskNum 链路，未覆盖 Java BFF 的完整认证链路。
 
 面试可以这样讲差别：
 让模型「顺便带上出处」，它会编一个看起来合理的页码；
@@ -128,8 +128,8 @@ Prompt 侧还有第二道：RAG 模板明确要求「文档中未找到相关信
 误收率 / 误拒率均为 0，含 `risk_level="高"` 且 `confidence=0.95` 的边界用例。
 
 **这是校验器本身的单元测试，不是端到端准确率。**
-Agent 路径当前用模板生成结论（`risk_level` 固定「低」），所以该跨字段规则在线上未被真实触发；
-它的价值是**把不可接受的输出挡在 Schema 层**，一旦接入真实 LLM 产出即生效。
+当前在线聊天不产生并写入「合规结论」，所以不把这个 DTO 说成现网主路径。
+它的价值是展示**如何把不可接受的结构化输出挡在 Schema 层**。
 
 这条的价值：**LLM 输出不确定，但系统边界可以是确定的。**
 把不可接受的输出在 Schema 层挡掉，比在 Prompt 里反复叮嘱有效。
@@ -144,52 +144,26 @@ EXPLAIN 只能证明语法能跑，不能证明口径对。
 所以数字走已过 **G1/G2/G3 门禁**的 `fin_metric` 事实表：
 公司 + 标准 concept + 期间做**参数化只读查询**，仅取 `auto_accepted` 行，
 **LLM 不写 SQL、也不手算比率**，0 token。
-叙述、条款、因果走 Hybrid RAG；只有多步任务才上 Agent，Agent 只编排这些工具。
+叙述、条款、因果走 Hybrid RAG；多公司叙述比较按公司独立检索，再经证据门控后综合。
 
 取舍代价：灵活性下降，要预置 concept 与维护入库门禁。
 换来的是**口径可控、可审计**——这在合规场景比灵活性重要。
 
 20 条问数黄金集实测：`accuracy 1.0`、`route_accuracy 1.0`（该走问数的都走对了）、**`leak_rate 0.0`**。
 
-**(4) 审查工作流（固定图）+ 可选工具循环：该停下来等人**
+**(4) 多公司独立 RAG + 证据门控**
 
-进图条件是规则路由（两家公司 + 管理层/结论类意图），**不是**模型自己决定「今天要不要走审查」。
-进图之后顺序硬编码：
+叙述性的多公司比较不把整句问题只检索一次。程序先解析公司和年份，然后为每家公司分别收窄 `doc_ids`，
+分别执行混合检索和重排，最后才把各公司证据交给模型综合。任一公司缺少同期报告、检索失败或证据低于门槛，
+就走 `rag_compare_blocked`，说明哪家公司缺什么，不直接比较。
 
-```
-classify → list_scope → compare → verify → rag → (conclude | stop)
-                                              interrupt_before=["conclude"]
-```
-
-每个节点只有「下一步或停」——这是 **Workflow（固定工作流）**，不是模型动态规划的 Agent。
-合规场景里这是有意取舍：**同一类审查必须走出同一条可复现、可审计的路径**；
-若让模型自选顺序，结论就难复盘。自主决策只开放给另一条路径——开放式工具循环
-（经营概况 / 待复核追问，或用户点名「你来选工具」），真 Function Calling，预算硬约束
-（最多 4 轮 / 6 次调用 / 120s），且**只挂 5 个只读工具**。
-
-关键设计仍是**写入前中断**：结论落库前先出「待写入草稿预览」，
-人确认后才写 `PENDING` 工单，取消则不写。Checkpoint 存 SQLite，TTL 24 小时
-（任务快照，不是长期语义记忆）。图内预算：8 次工具 / 12 步 / 120 秒。
-
-工具合同共 7 个，分属两条机制，不要说成「一个 Agent 同时自主调 7 个」：
-
-| 路径 | 工具 |
-|---|---|
-| 固定审查图 | 上表 5 个只读 + `create_review_draft` + `emit_conclusion` |
-| 开放工具循环 | 仅 5 个只读：`list_scope` / `lookup_metric` / `compare_peers` / `verify_number` / `rag_search` |
-
-**`execute_sql` 故意没有注册进工具表**——不给任意 SQL 能力。
-
-20 条工作流黄金集实测：`accuracy 1.0`、`param_accuracy 1.0`、
-`avg_steps 4.8`、**`confirmation_rate 1.0`**（每次出结论前都确实停下来等确认了）。
-
-这本质是把 dry-run + maker-checker 搬进审查链路：**读可以自动，写要人确认；规划权留给流程，不留给模型。**
+这条链路是确定性路由和检索管线，不是 Agent；当前项目也没有 LangGraph、Function Calling 工具循环、MCP、Checkpoint 或 HITL 写入链路。
 
 **(5) 双栈降级**
 
 - `GET /api/health` **永远返回 HTTP 200**，用 body 里的 `pythonAi.status=down` 表达降级，
   这样监控和前端不会把「AI 挂了」误判成「整个系统挂了」。
-- Python 挂时，登录 / 复核 / 审计照常可用（只依赖 Java + Postgres）；
+- Python 挂时，登录、审计查询和 Java 健康接口照常可用（只依赖 Java + Postgres）；
   AI 链路返回 **502 `upstream_down`** 或 **504 `upstream_timeout`**，前端顶栏出降级横幅。
 - Compose 里 **Java 只 `depends_on` 数据库**，不等 python-ai——不让一个依赖把系统拖住。
 
@@ -210,20 +184,18 @@ classify → list_scope → compare → verify → rag → (conclude | stop)
 | `compliance_schema` | 20 | DTO 单测误收/误拒率 | **1.0 / 0 / 0**（纯 Pydantic，非端到端） |
 | `w4_asknum` | 20 | accuracy, route_accuracy, leak_rate | 1.0 / 1.0 / **0** |
 | `w6_number_check` | 20 | accuracy, 数字/单位错误率 | **1.0 / 误放行 0**（归档 [`eval_w6_number_check.md`](./eval_w6_number_check.md)） |
-| `w6_workflow` | 20 | accuracy, param, avg_steps, 确认率 | 1.0 / 1.0 / 4.8 / **1.0** |
 | `w8_prompt` | 30 | 四策略对比 + A/B | **fixture 模拟，见下** |
 | `w9_redteam` | 25 | SQL / ACL 泄露率 | **全部 0** |
 
 外加 W9 端到端冒烟：五条链路 **5/5 通过**。
 
-**主要评测刻意不依赖 LLM**（Schema 校验、数字回溯、工作流轨迹、红队、检索 ACL / 拒答都是脚本判定）：
+**主要评测刻意不依赖 LLM**（Schema 校验、数字回溯、红队、检索 ACL / 拒答都是脚本判定）：
 稳定、可进 CI、不烧钱。`--fail-on-regression` 是重点——
 **评测不是跑个分，是回归门禁**，改 Prompt、换检索参数、调模型之后掉了就该拦住。
 
 ```bash
 python-ai/.venv/bin/python eval/run_compliance_schema.py
 python-ai/.venv/bin/python eval/run_w6_number_check.py
-python-ai/.venv/bin/python eval/run_w6_workflow.py  --fail-on-regression
 python-ai/.venv/bin/python eval/run_w9_redteam.py   --fail-on-regression
 python-ai/.venv/bin/python eval/run_w9_e2e.py
 ```
@@ -273,7 +245,7 @@ BUG-012 同页上限现为 2（一页一条会丢掉清单细节，完全不限�
 | 引用做成检索侧字段透传 | 模型自己写出处必然会编 | 引用组装逻辑更复杂 |
 | 数字走受控参数化问数而非开放 NL2SQL | 年报最怕能跑的 SQL 查出错误口径；EXPLAIN 只证语法不证口径 | 要预置 concept、维护事实库与入库勾稽 |
 | 结论不合规直接拒绝 | 脏数据进库后清理成本更高 | 会挡掉「本来能用」的结论 |
-| 不注册 `execute_sql` 工具 | 不给 Agent 任意 SQL 能力 | 灵活性下降，要预置工具 |
+| 不提供开放 `execute_sql` 路径 | 不让模型用能跑的 SQL 猜财务口径 | 灵活性下降，要预置 concept 和维护事实表 |
 | 主要评测不依赖 LLM | 稳定、可 CI、不烧钱 | 覆盖不到生成质量的主观部分 |
 | 健康检查永远 200 | 区分「AI 降级」与「系统故障」 | 需要调用方读 body，不能只看状态码 |
 | Java 不写 AI 逻辑 | 避免业务规则双写 | 多一跳网络与 DTO 映射 |
@@ -282,14 +254,13 @@ BUG-012 同页上限现为 2（一页一条会丢掉清单细节，完全不限�
 
 - **学习作品，不是生产系统**；数据全部来自公开年报与监管文件，不含客户数据；输出带免责声明。
 - **W8 四策略与 A/B 是 fixture 模拟**，不是真实 LLM 结果；A/B 自身判定为不可信（n=30）。
-- **W5 的工具目录 / MCP 尚未接入主 `/chat` 循环**，是并行能力；MCP 只实现 JSON-RPC 子集
-  （`initialize` / `tools/list` / `tools/call`），不是完整 SDK，Java 也不是 MCP server。
+- **当前项目不包含 Agent 实现**：没有 LangGraph、Function Calling 工具循环、MCP、Checkpoint 或 HITL；简历和演示只讲已实现的 AskNum、单/多公司 RAG 和证据门控。
 - **W8-4 Dify 是对照不是现网**：独立编排 + 12 题打平台 API 和 `/chat`，没起来就跳过；主路径仍是自写管线（见 [`dify-comparison.md`](./dify-comparison.md)）。
 - `recall@k = 0.79` 是**页面命中**，不等于线上回答完整性；同一次现网跑的 **citation_accuracy 只有 0.155**（top-k 去重页里 gold 页占比），检索很吵时 recall 仍可能为 1。
 - 引用组装本身仍是检索侧字段透传，模型不能手写出处。
 - 没有独立的 `eval/badcases/` 目录，坏例统一记在 `docs/BUG_NOTES.md`（按编号 + 归因层）。
 - 前端没有自动化测试；K8s 只到「最小可跑」，没有 HPA / Ingress 灰度。
-- 分级退出码用的是稳定 `error_code`（`missing` / `unauthorized` / `timeout` / `forbidden_write` / `budget_exceeded`），不是进程退出码。
+- 运维中的失败类型是 API/Trace 字段，不是进程退出码。
 
 ---
 
@@ -463,7 +434,7 @@ PEFT / bitsandbytes 经常直接报错或留下残留 `quantization_config`；
 **Q：为什么混合检索 + RRF + rerank，不直接向量检索？**
 纯向量对条款编号、专有名词这类精确匹配不友好（「第十二条」容易被语义近邻淹没）；
 纯关键词抓不到同义表述。所以向量 top 80 + **BM25 关键词** top 30，RRF（k=60，权重 2:1）融合，
-再用 bge-reranker-v2-m3 精排到 top 12。
+再把当前最多 24 条候选交给 bge-reranker-v2-m3 精排，最终保留 top 12。
 100 题消融（Okapi BM25 + 节标题提名，当时 `max_chunks_per_page=0`）把贡献拆开了：
 向量-only Recall 0.69 / MRR 0.28 / CiteAcc 0.12；加上 hybrid 到 0.70 / 0.39 / 0.12（+25ms）；
 再精排到 0.76 / 0.50 / 0.157，但 P50 从 82ms 跳到约 8.8s。这一轮召回增益几乎全在精排（hybrid 只 +1pp、rerank +6pp）；
@@ -491,27 +462,18 @@ W1 那 30 题里 refuse_rate 是 0.10，不是一味拒答。
 20 题实测 accuracy 1.0、路由准确率 1.0、泄露率 0。
 **文本适合讲依据，事实表适合出数字。**
 
-**Q：Agent 为什么要停下来等人确认？**
-LangGraph 图上 `interrupt_before=["conclude"]`：结论落库前先出草稿预览，
-确认后才写 `PENDING` 工单。20 题工作流黄金集里确认率 1.0，平均 4.8 步。
-本质是 dry-run + maker-checker，在合规场景比「全自动」更符合真实流程。
-我也没给工具表注册 `execute_sql`——**不给任意 SQL 能力**。
+**Q：这个项目为什么不使用 Agent / LangGraph？**
+当前问题能被确定性路由清楚地分为三类：标准财务指标走 AskNum，单公司叙述走 RAG，
+多公司叙述比较走「分公司检索 + 证据门控 + 综合」。这些分支的步骤、失败语义和禁止降级规则都已知，
+用普通程序更容易测试、定位和审计。引入 Agent 会增加动态规划、工具选择和状态恢复的复杂度，
+但当前没有一个必须靠自主规划解决的明确业务主题，所以不为了技术标签强加。
 
-**Q：这算 Agent 吗？模型有没有自己决定下一步？**
-审查主路径**不算自主 Agent**：边是硬编码的，模型不选「下一步做什么」。
-进不进图也由规则意图决定（两家 + 结论/管理层），不是模型规划。
-我有意这样做——合规场景要**可复现、可审计**；自主规划和可审计性在这里是矛盾的，我选了后者。
-真正有工具自选的是另一条：**Function Calling 工具循环**（只读 5 工具 + 预算），
-默认还要用户点名或命中开放决策意图。对照银行 JD 的 planning / tools / memory：
-tools use 和 action 是强项；planning 在审查路径上故意不做；memory 只有 Checkpoint（任务快照）
-和问数 pending（短槽），没有长期语义记忆——被追问就直说，并说明为什么合规场景先保证可审计。
-
-**Q：简历写「7 个工具」会不会不精确？**
-合同上 7 个工具；审查图可用写路径 2 个，开放循环只挂 5 个只读。
-口述应说「工具合同 7 个，按路径挂载」，不要说「一个 Agent 随时调 7 个」。
+**Q：多公司比较不是很像 Agent 吗？**
+不是。它没有模型自主选工具、动态改变步骤或循环规划；只是程序把公司拆开后独立检索，
+然后在证据齐全时调用一次模型综合。技术上应该准确地叫「确定性多路 RAG 管线」。
 
 **Q：评测怎么做的？为什么不用 LLM-as-judge？**
-八类黄金集（RAG 100 / 对话 30 / Schema 20 / 问数 20 / 数字回溯 20 / 工作流 20 / Prompt 30 / 红队 25），
+多类黄金集（RAG 检索、对话、Schema、问数、数字回溯、Prompt 和红队），
 报告落盘可复跑，`--fail-on-regression` 当门禁。
 主要评测**刻意不依赖 LLM**：稳定、可进 CI、不烧钱。
 LLM-as-judge 适合评生成质量的主观维度，但它自己有方差，不适合当回归门禁。
@@ -522,15 +484,9 @@ LLM-as-judge 适合评生成质量的主观维度，但它自己有方差，不�
 我给的门槛是 n≥100、Δ≥8pp、p<0.05。**能测出「这个提升不该上线」比测出好看的提升更有价值。**
 
 **Q：为什么 Java + Python 双栈？不是复杂化吗？**
-职责不同：鉴权、审计、复核工单要稳定事务和 RBAC；RAG / Agent / 评测迭代快、依赖 Python 生态。
+职责不同：Java 作为对外 BFF 和稳定业务边界；RAG / AskNum / 模型调用 / 评测迭代快、依赖 Python 生态。
 两边用 `X-Request-ID` + `traceparent` 串同一次请求。
 代价我清楚——多一跳网络和 DTO 映射，所以硬性要求 Java 侧不写 AI 逻辑，避免规则双写。
-
-**Q：复核流程具体怎么走？**
-角色 `ANALYST` / `CHECKER` / `RM` / `ADMIN`；状态 `PENDING → SUBMITTED → REVIEWED | REJECTED`。
-Python 只能写 `PENDING` 草稿，提交和审批只在 Java 侧；
-禁止自审（`self_review`），并发审批用乐观锁返回 409，重复提交用 `Idempotency-Key` 去重。
-审计记录里带 actor / 角色 / 部门 / 动作 / 实体 / `request_id` / 变更前后 JSON。
 
 ### 微调类
 
@@ -583,7 +539,7 @@ packing 把多条短样本拼成一条定长序列（这里 2048），减少 pad
 **Q：模型服务挂了系统怎么办？**
 `GET /api/health` 永远 200，用 body 里 `pythonAi.status=down` 表达降级，
 避免监控把「AI 降级」误判成「系统故障」。
-Python 挂时登录 / 复核 / 审计照常可用，AI 链路给 502 `upstream_down` 或 504 `upstream_timeout`，
+Python 挂时登录、审计查询和 Java 健康接口照常可用，AI 链路给 502 `upstream_down` 或 504 `upstream_timeout`，
 前端出降级横幅；Compose 里 Java 只 `depends_on` 数据库。
 **AI 是增强能力，不该是单点依赖。**
 
@@ -608,7 +564,7 @@ JDK 换龙井 / 毕昇 21 基本平替。我**不做等保或信创认证的宣�
 - 你们检索质量的瓶颈目前在召回还是排序？有按层归因的坏例记录吗？
 - 线上怎么判断一次 Prompt 或模型变更是不是回归？有门禁吗？还是靠人肉抽查？
 - 领域能力靠微调还是检索在做？两者边界怎么划？
-- Agent 的写操作是全自动还是有人确认？出问题怎么追溯到具体一次调用？
+- 你们怎么判断一个业务问题应该用确定性工作流还是 Agent？哪些步骤必须由程序控制？
 
 ---
 
@@ -620,8 +576,8 @@ JDK 换龙井 / 毕昇 21 基本平替。我**不做等保或信创认证的宣�
 | 「few-shot 准确率 96.7%」 | 「那是 fixture 模拟的管线验证，不是真实 LLM 能力」 |
 | 「RAG 准确率很高」 | 「现网 recall@k 0.79、MRR 0.50、CiteAcc 0.155，且是页面命中；数字类 rerank 后只有 0.52。消融 0.69→0.70→0.76（当时同页不限），同页上限 2 再把 rerank 抬到 0.79；精排贵 8.8s」 |
 | 「Prompt 优化带来 3.3% 提升」 | 「n=30、p=1.0，判定不可信，所以没上线」 |
-| 「实现了完整 Agent 自主决策」 | 「审查是固定工作流；开放查询才有 Function Calling；写要人确认」 |
-| 「接入了 MCP」 | 「实现了 JSON-RPC 子集，未接入主 chat 循环，不是完整 SDK」 |
+| 「项目实现了 Agent / LangGraph」 | 「当前用确定性路由组合 AskNum、单公司 RAG 和多公司 RAG，没有 Agent 实现」 |
+| 「项目接入了 MCP / Function Calling」 | 「当前项目不包含工具循环或 MCP，这些只是通用学习内容」 |
 | 「全面适配信创」 | 「模型侧可替；达梦不能直接替 pgvector，原因是……」 |
 | 「模型达到母语级粤语」 | 「改掉了乱翻译的行为，口吻更粤语化」 |
 | 「微调后全面超过 Qwen2.5」 | 「和基座能力接近，相对旧版是纠偏；差异主要在口吻和拒答」 |
@@ -634,7 +590,7 @@ JDK 换龙井 / 毕昇 21 基本平替。我**不做等保或信创认证的宣�
 
 ## 6. 简历条目（可直接粘贴）
 
-**RegOps Copilot · 合规问答与审查系统**（FastAPI · Spring Boot/JDK 21 · Vue 3 · Postgres+pgvector · LangGraph）
+**RegOps Copilot · 金融年报问答与分析系统**（FastAPI · LangChain · Spring Boot/JDK 21 · Vue 3 · Postgres+pgvector）
 
 - 构建可追溯 RAG 问答：bge-m3 向量检索 + Okapi BM25 经 RRF 融合、bge-reranker-v2-m3 精排至 top-12，
   引用以 `doc_id`/页码/原文片段结构化透传（模型无法自拟出处），低于分数阈值即拒答且不进 LLM；
@@ -650,16 +606,15 @@ JDK 换龙井 / 毕昇 21 基本平替。我**不做等保或信创认证的宣�
   公司 + 标准 concept + 期间只读查询、仅取 `auto_accepted`，**LLM 不写 SQL、不手算比率**；
   20 题准确率与路由准确率 1.0、泄露率 0。主动放弃开放 NL2SQL——
   年报数字的风险是「一条能跑的 SQL 查出错误口径」，而 EXPLAIN 只能证明语法、不能证明口径；
-  Agent 侧不注册 `execute_sql`，杜绝任意 SQL。
-- 用 LangGraph 实现**固定审查工作流**（非模型自选边）并在结论节点前 `interrupt_before` 中断，输出草稿预览、
-  人工确认后才落 `PENDING` 工单（maker-checker，确认率 1.0）；另有只读 Function Calling 循环（预算硬约束）；
-  Java 侧承担 RBAC、
-  四态复核流转、禁止自审与乐观锁并发控制、全量审计，`X-Request-ID` + W3C traceparent 全链路关联。
-- 自建黄金集（合计 305 题）与落盘报告，主要评测不依赖 LLM 以进 CI，
+  不提供开放 `execute_sql` 路径，杜绝模型猜 SQL 口径。
+- 实现单公司 RAG 和**多公司独立 RAG + 证据门控**：按公司/年份收窄文档，各自检索和重排，
+  任一公司缺报告或证据不足即拒绝直接比较；该链路是确定性管线，不宣称 Agent / LangGraph / MCP。
+  Java 与 Python 通过 `X-Request-ID` + W3C traceparent 关联请求。
+- 自建多类黄金集与落盘报告，主要门禁评测不依赖 LLM 以进 CI，
   `--fail-on-regression` 作为回归门禁；25 题金融红队 SQL/ACL 泄露率 0，五条链路端到端 5/5；
   Prompt A/B 依 Wilson CI + McNemar 判定 Δ3.3%（n=30）不可信而未上线。
 - 交付 Compose 四容器编排与 Kustomize 最小 K8s 清单（含 readiness/liveness 探针），
-  健康检查恒返 200 并以字段表达降级，AI 服务不可用时复核与审计仍可用（前端降级横幅 + 502/504 区分）。
+  健康检查恒返 200 并以字段表达降级，AI 服务不可用时登录与审计查询仍可用（前端降级横幅 + 502/504 区分）。
 
 **粤语大模型微调 · Qwen2.5-7B LoRA**（Unsloth · TRL · PEFT · llama.cpp · Ollama）
 

@@ -7,12 +7,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.logging_config import setup_logging
 from app.request_id import RequestIdMiddleware
 from app.router import api_router
+from app.config import get_settings
+from app.core.warmup import warmup_models
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     setup_logging()
     logging.getLogger(__name__).info("RegOps python-ai starting")
+    settings = get_settings()
+    if settings.startup_warmup_enabled:
+        result = warmup_models(settings)
+        logging.getLogger(__name__).info(
+            "model warmup complete llm_clients=%s embedding=%s reranker=%s errors=%s",
+            result.llm_clients,
+            result.embedding_ready,
+            result.reranker_ready,
+            result.errors,
+        )
     yield
 
 

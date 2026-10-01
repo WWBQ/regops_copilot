@@ -92,15 +92,18 @@ docker compose up --build
 curl -s http://localhost:8080/api/health
 
 # 2. 查看已配置可用的模型（只返回配了 Key 的）
-curl -s http://localhost:8000/models
+curl -s http://localhost:8000/models \
+  -H 'X-Regops-Service-Token: dev-service-token'
 
 # 3. 纯 LLM 对话（不检索）
 curl -s -X POST http://localhost:8000/chat \
+  -H 'X-Regops-Service-Token: dev-service-token' \
   -H 'Content-Type: application/json' \
   -d '{"message":"什么是审慎监管？一句话说明","use_rag":false}'
 
 # 4. 年报问答（走 RAG，返回带页码的引用）
 curl -s -X POST http://localhost:8000/chat \
+  -H 'X-Regops-Service-Token: dev-service-token' \
   -H 'Content-Type: application/json' \
   -d '{"message":"比亚迪2024年营业收入是多少","use_rag":true}'
 
@@ -112,6 +115,10 @@ python-ai/.venv/bin/python eval/run_w6_number_check.py
 
 # 5d. W3-5 RAG 检索消融（baseline / hybrid / rerank；需入库年报）
 python-ai/.venv/bin/python eval/run_rag_ablation.py
+
+# 5d-1. 黄金集校验与重排候选数寻优
+python-ai/.venv/bin/python eval/validate_rag_golden.py
+python-ai/.venv/bin/python eval/run_rag_tuning.py
 
 # 5e. W3-4 检索层部门 ACL / 无答案拒答（不调 LLM）
 python-ai/.venv/bin/python eval/run_rag_acl.py --fail-on-regression
@@ -131,6 +138,7 @@ python-ai/.venv/bin/python eval/run_w9_e2e.py
 基线与口径说明见 [`docs/eval_w1_baseline.md`](./docs/eval_w1_baseline.md)、
 [`docs/eval_rag_retrieval.md`](./docs/eval_rag_retrieval.md)、
 [`docs/eval_rag_ablation.md`](./docs/eval_rag_ablation.md)、
+[`docs/eval_rag_tuning.md`](./docs/eval_rag_tuning.md)、
 [`docs/eval_rag_guard.md`](./docs/eval_rag_guard.md)、
 [`docs/W8_PROMPTS.md`](./docs/W8_PROMPTS.md)、
 [`docs/dify-comparison.md`](./docs/dify-comparison.md)。
@@ -231,5 +239,6 @@ regops-copilot/
 
 - 前端 `/api/*` 经 Vite 代理打到 Java BFF，Java 再转发 python-ai，因此三者需同时在线。
 - 三个应用进程均为热重载模式（uvicorn `--reload`、Vite HMR、Spring DevTools），改代码无需重启。
+- `scripts/dev.sh` 会把根目录 `.env` 统一注入 Python 与 Java；修改环境变量后需用 `./scripts/dev.sh restart` 重启进程。
 - `java-service` 用系统 `mvn` 的离线模式启动（`./mvnw` 需联网下载 Maven 发行包）。若依赖有变动需联网拉取，用 `MVN_OFFLINE=0 ./scripts/dev.sh up java`。
 - 表结构由 `compose.yaml` 挂载的 `docs/sql/*.sql` 在容器首次初始化时建立；`ddl-auto: none`，Hibernate 不改表。

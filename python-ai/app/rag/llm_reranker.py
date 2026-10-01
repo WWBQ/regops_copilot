@@ -42,12 +42,14 @@ def _client_for_config(
     base_url: str,
     api_key: str,
     timeout: float,
+    max_output_tokens: int,
 ) -> LLMClient:
     return LLMClient(
         api_key=api_key,
         base_url=base_url,
         model_id=model,
         timeout=timeout,
+        max_output_tokens=max_output_tokens,
     )
 
 
@@ -72,6 +74,7 @@ def _configured_client(settings: Settings) -> tuple[LLMClient, Literal["api", "l
             base_url,
             api_key,
             settings.llm_timeout_seconds,
+            settings.rag_llm_rerank_max_output_tokens,
         ),
         deployment,
     )

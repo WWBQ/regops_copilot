@@ -58,11 +58,14 @@ def fetch_system_overview() -> dict[str, Any]:
         },
         "config": {
             "default_model": settings.default_model,
+            "llm_max_output_tokens": settings.llm_max_output_tokens,
+            "startup_warmup_enabled": settings.startup_warmup_enabled,
             "embedding_model": settings.embedding_model,
             "rag_top_k": settings.rag_top_k,
             "rag_compare_rerank_candidates": settings.rag_compare_rerank_candidates,
             "rag_compare_top_k_per_company": settings.rag_compare_top_k_per_company,
             "rag_rerank_enabled": settings.rag_rerank_enabled,
+            "rag_rerank_candidates": settings.rag_rerank_candidates,
             "rag_rerank_backend": settings.rag_rerank_backend,
             "rag_rerank_model": (
                 settings.rag_llm_rerank_model

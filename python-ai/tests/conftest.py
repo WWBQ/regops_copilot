@@ -6,7 +6,17 @@ from datetime import UTC, datetime
 
 import pytest
 
+from app.main import app
+from app.security.service_auth import require_service_token
 from app.db.pdf_document_repository import DocumentRecord
+
+
+@pytest.fixture(autouse=True)
+def service_auth_bypass():
+    """普通 API 单测绕过服务身份；身份边界由 test_service_auth.py 单独覆盖。"""
+    app.dependency_overrides[require_service_token] = lambda: None
+    yield
+    app.dependency_overrides.pop(require_service_token, None)
 
 
 @pytest.fixture

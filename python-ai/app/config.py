@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     qwen_model_ids: str = "qwen3.8-max,qwen3.8-flash,qwen3.7-plus"
     database_url: str = "postgresql://regops:regops123@localhost:5432/regops_db"
     llm_timeout_seconds: float = 120.0
+    llm_max_output_tokens: int = Field(default=1400, ge=64, le=32768)
+    startup_warmup_enabled: bool = True
     labeling_data_dir: str = str(ROOT_DIR / "data" / "labeling")
     object_store_root: str = str(ROOT_DIR / "data" / "objects")
     object_store_bucket: str = "regops-docs"
@@ -49,17 +51,18 @@ class Settings(BaseSettings):
     rag_rerank_enabled: bool = True
     rag_rerank_backend: Literal["bge", "llm"] = "bge"
     rag_rerank_model: str = "BAAI/bge-reranker-v2-m3"
-    rag_rerank_candidates: int = 24
+    rag_rerank_candidates: int = 12
     rag_llm_rerank_deployment: Literal["api", "local"] = "local"
     rag_llm_rerank_model: str | None = None
     rag_llm_rerank_base_url: str | None = None
     rag_llm_rerank_api_key: str | None = None
     rag_llm_rerank_candidates: int = 12
     rag_llm_rerank_max_chars: int = 800
+    rag_llm_rerank_max_output_tokens: int = Field(default=800, ge=64, le=4096)
     # 同页最多留几条；0 = 不截断。2 是召回与同页细节的折中（见 docs/eval_rag_ablation.md §6.2）
     rag_max_chunks_per_page: int = 2
     # 多公司比较已按公司和年份缩小文档范围，无需沿用普通 RAG 的 80 条候选。
-    rag_compare_rerank_candidates: int = 24
+    rag_compare_rerank_candidates: int = 12
     rag_compare_top_k_per_company: int = 6
     rag_compare_min_hits_per_company: int = 1
     rag_trace_enabled: bool = True

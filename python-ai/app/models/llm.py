@@ -3,6 +3,7 @@
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from functools import lru_cache
 from time import perf_counter
 from typing import Any
 
@@ -97,10 +98,12 @@ class LLMClient:
         base_url: str,
         model_id: str,
         timeout: float,
+        max_output_tokens: int,
     ) -> None:
         if not api_key:
             raise ValueError("model API key is required")
         self.model_id = model_id
+        self.max_output_tokens = max_output_tokens
         self._model = init_chat_model(
             model=model_id,
             model_provider="openai",
@@ -108,6 +111,7 @@ class LLMClient:
             base_url=base_url,
             timeout=timeout,
             max_retries=1,
+            max_tokens=max_output_tokens,
             stream_usage=True,
         )
 
@@ -220,6 +224,23 @@ def resolve_model_id(requested: str, available: list[str]) -> str:
     raise ValueError(f"unsupported model: {choice}; available: {', '.join(available)}")
 
 
+@lru_cache(maxsize=32)
+def _client_for_config(
+    api_key: str,
+    base_url: str,
+    model_id: str,
+    timeout: float,
+    max_output_tokens: int,
+) -> LLMClient:
+    return LLMClient(
+        api_key=api_key,
+        base_url=base_url,
+        model_id=model_id,
+        timeout=timeout,
+        max_output_tokens=max_output_tokens,
+    )
+
+
 def get_llm_client(settings: Settings | None = None, *, model: str | None = None) -> LLMClient:
     settings = settings or get_settings()
     configured = _configured_models(settings)
@@ -228,13 +249,24 @@ def get_llm_client(settings: Settings | None = None, *, model: str | None = None
         raise ValueError("no LLM model configured")
     model_id = resolve_model_id(model or settings.default_model, list(configured))
     api_key, base_url = configured[model_id]
-    return LLMClient(
-        api_key=api_key,
-        base_url=base_url,
-        model_id=model_id,
-        timeout=settings.llm_timeout_seconds,
+    return _client_for_config(
+        api_key,
+        base_url,
+        model_id,
+        settings.llm_timeout_seconds,
+        settings.llm_max_output_tokens,
     )
 
 
 def list_available_models(settings: Settings | None = None) -> list[str]:
     return list(_configured_models(settings or get_settings()))
+
+
+def warmup_llm_clients(settings: Settings | None = None) -> list[str]:
+    """创建并缓存全部已配置聊天客户端；不发送外部模型请求。"""
+    settings = settings or get_settings()
+    warmed: list[str] = []
+    for model_id in list_available_models(settings):
+        get_llm_client(settings, model=model_id)
+        warmed.append(model_id)
+    return warmed

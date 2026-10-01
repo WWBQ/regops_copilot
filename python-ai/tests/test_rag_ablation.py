@@ -8,6 +8,7 @@ from app.eval.rag_retrieval_runner import (
     ndcg_at_k,
     page_hit_at_k,
     reciprocal_rank,
+    run_item,
     summarize,
 )
 from app.rag.modes import parse_retrieval_mode, resolve_retrieval_flags
@@ -100,6 +101,25 @@ def test_summarize_includes_latency():
     assert summary["by_category"]["numeric_financial"]["ndcg_at_k"] == 0.5
     assert summary["latency_p50_ms"] == 20.0
     assert summary["by_category"]["numeric_financial"]["count"] == 2
+
+
+def test_run_item_uses_resolved_top_k_override(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        "app.rag.service.retrieve_hits_with_trace",
+        lambda **kwargs: (captured.update(kwargs) or [], {}),
+    )
+    item = {
+        "id": "rag-001",
+        "category": "strategy_outlook",
+        "question": "战略是什么",
+        "doc_id": "000333_2024",
+        "gold_pages": [10],
+        "k": 12,
+    }
+    result = run_item(item, top_k=6, mode="rerank", rerank_candidates=12)
+    assert captured["top_k"] == 6
+    assert result["top_k"] == 6
 
 
 def _fake_report(mode: str, hits: dict[str, bool], *, recall: float, mrr: float, p50: float) -> dict:

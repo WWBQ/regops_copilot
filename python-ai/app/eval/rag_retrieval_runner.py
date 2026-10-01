@@ -92,7 +92,7 @@ def _latency_stats(results: list[dict[str, Any]]) -> dict[str, float]:
     if not latencies:
         return {"latency_p50_ms": 0.0, "latency_p95_ms": 0.0, "latency_mean_ms": 0.0}
     ordered = sorted(latencies)
-    p95_idx = max(0, int(len(ordered) * 0.95) - 1)
+    p95_idx = min(len(ordered) - 1, max(0, math.ceil(len(ordered) * 0.95) - 1))
     return {
         "latency_p50_ms": round(statistics.median(latencies), 1),
         "latency_p95_ms": round(ordered[p95_idx], 1),
@@ -105,17 +105,24 @@ def run_item(
     *,
     top_k: int,
     mode: RetrievalMode | None = None,
+    rerank_candidates: int | None = None,
 ) -> dict[str, Any]:
     from app.rag.service import retrieve_hits_with_trace
 
     doc_id = item["doc_id"]
     question = item["question"]
-    k = int(item.get("k", top_k))
+    # run_rag_retrieval_eval 已把命令行覆盖值或黄金集默认值解析为 top_k。
+    # 这里不能再次用 item.k 覆盖，否则 --top-k 与参数寻优不会真正生效。
+    k = int(top_k)
     gold_pages = item.get("gold_pages") or []
 
     started = time.perf_counter()
     hits, pipeline = retrieve_hits_with_trace(
-        question=question, doc_ids=[doc_id], top_k=k, mode=mode
+        question=question,
+        doc_ids=[doc_id],
+        top_k=k,
+        mode=mode,
+        rerank_candidates=rerank_candidates,
     )
     latency_ms = round((time.perf_counter() - started) * 1000, 1)
     retrieved_pages = [int(h.metadata.get("page") or 0) for h in hits if h.metadata.get("page")]
@@ -142,6 +149,7 @@ def run_item(
         "latency_ms": latency_ms,
         "timing_ms": timing,
         "rerank_fallback": bool(pipeline.get("rerank_fallback")),
+        "rerank_candidates": rerank_candidates,
     }
 
 
@@ -209,6 +217,7 @@ def run_rag_retrieval_eval(
     label: str = "",
     mode: RetrievalMode | None = None,
     warmup: bool = False,
+    rerank_candidates: int | None = None,
     on_progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     golden = load_golden(golden_path)
@@ -224,14 +233,26 @@ def run_rag_retrieval_eval(
     resolved_top_k = top_k or int(golden.get("default_params", {}).get("top_k", 12))
 
     if warmup:
-        run_item(items[0], top_k=resolved_top_k, mode=mode)
+        run_item(
+            items[0],
+            top_k=resolved_top_k,
+            mode=mode,
+            rerank_candidates=rerank_candidates,
+        )
 
     results: list[dict[str, Any]] = []
     total = len(items)
     for index, item in enumerate(items, start=1):
         if on_progress:
             on_progress(index, total, item["id"])
-        results.append(run_item(item, top_k=resolved_top_k, mode=mode))
+        results.append(
+            run_item(
+                item,
+                top_k=resolved_top_k,
+                mode=mode,
+                rerank_candidates=rerank_candidates,
+            )
+        )
 
     summary = summarize(results)
     from app.eval.provenance import build_provenance
@@ -249,11 +270,12 @@ def run_rag_retrieval_eval(
             "top_k": resolved_top_k,
             "mode": mode,
             "warmup": warmup,
+            "rerank_candidates": rerank_candidates,
         },
         "provenance": build_provenance(
             golden_path=golden_path,
             label=label,
-            extra={"retrieval_mode": mode},
+            extra={"retrieval_mode": mode, "rerank_candidates_override": rerank_candidates},
         ),
         "summary": summary,
         "results": results,

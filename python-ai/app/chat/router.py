@@ -276,10 +276,12 @@ def _prepare_llm_turn(
     body: ChatRequest,
     *,
     session_id: str | None,
+    model_name: str,
     document_service: DocumentService,
     request_id: str | None,
     dept: str | None = None,
-) -> LlmTurn:
+    performance: dict[str, Any] | None = None,
+) -> ChatResponse | LlmTurn:
     if not body.use_rag:
         return LlmTurn(
             messages=[
@@ -297,6 +299,8 @@ def _prepare_llm_turn(
     )
     rag = rag_result.answer
     rag_metrics = _rag_performance(rag_result.trace)
+    if performance is not None:
+        performance["rag"] = rag_metrics
     if rag is not None:
         citations = [
             Citation(
@@ -315,6 +319,17 @@ def _prepare_llm_turn(
             rag_used=rag_used,
             route="rag" if rag_used else "general",
             rag_performance=rag_metrics,
+        )
+    if rag_result.trace.outcome in {"no_docs", "low_score"}:
+        return ChatResponse(
+            reply=(
+                "当前可访问的知识库中没有检索到足够可靠的证据，本次不生成推测性答案。"
+                "请确认公司、年份和相关文档已入库后重试。"
+            ),
+            model=model_name,
+            session_id=session_id,
+            rag_used=False,
+            route="rag_blocked",
         )
     route = "chitchat" if rag_result.trace.outcome == "no_intent" else "general"
     return LlmTurn(
@@ -475,15 +490,17 @@ def _route_request(
     turn = _prepare_llm_turn(
         body,
         session_id=session_id,
+        model_name=model_name,
         document_service=document_service,
         request_id=request_id,
         dept=dept,
+        performance=performance,
     )
     performance["timing_ms"]["rag" if body.use_rag else "prepare_turn"] = _elapsed_ms(
         rag_started
     )
     performance["route"] = turn.route
-    if turn.rag_performance is not None:
+    if isinstance(turn, LlmTurn) and turn.rag_performance is not None:
         performance["rag"] = turn.rag_performance
     return turn
 

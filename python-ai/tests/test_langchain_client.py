@@ -4,6 +4,14 @@ from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, Sys
 
 from app.config import Settings
 from app.models.llm import ModelTimeoutError, get_llm_client, list_available_models, resolve_model_id
+from app.models import llm as llm_module
+
+
+@pytest.fixture(autouse=True)
+def clear_llm_client_cache():
+    llm_module._client_for_config.cache_clear()
+    yield
+    llm_module._client_for_config.cache_clear()
 
 
 class FakeChatModel:
@@ -68,6 +76,7 @@ def test_factory_lists_concrete_models_and_accepts_provider_aliases(monkeypatch)
     assert [item["model"] for item in created] == ["deepseek-v4-pro", "qwen3.8-max"]
     assert created[0]["model_provider"] == "openai"
     assert created[0]["stream_usage"] is True
+    assert created[0]["max_tokens"] == settings.llm_max_output_tokens
     assert created[1]["base_url"] == settings.qwen_base_url
 
 

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 @lru_cache
-def _get_cross_encoder(model_name: str):
+def get_cross_encoder(model_name: str):
     from sentence_transformers import CrossEncoder
 
     logger.info("loading cross-encoder reranker model=%s", model_name)
@@ -28,7 +28,7 @@ def rerank_with_cross_encoder(
     if not hits:
         return hits
 
-    model = _get_cross_encoder(model_name)
+    model = get_cross_encoder(model_name)
     pairs = [[question, hit.content[:2000]] for hit in hits]
     scores = model.predict(pairs)
 

@@ -10,7 +10,13 @@ def test_chat_result_total_tokens():
 
 def test_llm_client_requires_api_key():
     with pytest.raises(ValueError, match="API key"):
-        LLMClient(api_key="", base_url="https://example.com", model_id="demo", timeout=1)
+        LLMClient(
+            api_key="",
+            base_url="https://example.com",
+            model_id="demo",
+            timeout=1,
+            max_output_tokens=100,
+        )
 
 
 def test_model_errors_inherit():

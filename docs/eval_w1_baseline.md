@@ -57,7 +57,7 @@ python-ai/.venv/bin/python eval/run_w1_chat.py --limit 3 --model deepseek
 |------|--------|
 | W3 | RAG 检索 `rag_retrieval_100.json`（带 evidence 页码） |
 | W4 | 受控问数（`eval/golden/w4_asknum_20.json`，`lookup_metric`） |
-| W6 | 审查对比轨迹 `eval/golden/w6_workflow_20.json`（节点/工具/确认率）；数字校验 `w6_number_check_20.json` |
+| W6 | 数字证据回溯 `w6_number_check_20.json`；多公司 RAG 按公司证据状态评测门控准确性 |
 
 ## 6. 你可以改什么
 
