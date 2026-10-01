@@ -116,6 +116,11 @@ def test_unauthenticated_dept_does_not_filter():
     assert apply_retrieval_scope(docs, "美的集团2024年营业收入是多少", None) == ["000333_2024"]
 
 
+def test_company_operating_question_scopes_bare_year():
+    docs = ["000333_2024", "000333_2023", "000651_2024"]
+    assert apply_retrieval_scope(docs, "美的2024经营的怎么样", None) == ["000333_2024"]
+
+
 def test_research_asking_midea_is_empty():
     scoped = apply_retrieval_scope(
         ["002594_2024", "601633_2024", "000333_2024"],

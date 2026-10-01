@@ -5,14 +5,24 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app.storage.base import ObjectMeta
 from app.storage.exceptions import ObjectNotFoundError, ObjectStoreError
 from app.storage.presign import build_presigned_url
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ObjectMeta:
+    bucket: str
+    key: str
+    size: int
+    content_type: str
+    etag: str
+    last_modified: datetime
 
 
 class LocalObjectStore:

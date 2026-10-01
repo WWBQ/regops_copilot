@@ -70,7 +70,7 @@ const initials = computed(() => userInitials(display.value.displayName))
           <dd><code>{{ display.id }}</code></dd>
         </div>
       </dl>
-      <p class="hint">JWT 存在浏览器本地。问答 / 评测仍可不登录；复核、客户档案、审计必须带 Token。</p>
+      <p class="hint">JWT 存在浏览器本地。受保护的年报数据域和审计接口会校验角色与部门。</p>
     </div>
 
     <div class="profile-actions">

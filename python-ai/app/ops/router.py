@@ -211,3 +211,22 @@ def obs_traces_api(
     payload = list_generations(limit=limit, offset=offset)
     payload["summary"] = overview()
     return payload
+
+
+@router.get("/performance/overview")
+def performance_overview_api() -> dict[str, Any]:
+    from app.obs.performance import performance_overview
+
+    return performance_overview()
+
+
+@router.get("/performance-traces")
+def performance_traces_api(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
+    from app.obs.performance import list_performance_traces, performance_overview
+
+    payload = list_performance_traces(limit=limit, offset=offset)
+    payload["summary"] = performance_overview()
+    return payload

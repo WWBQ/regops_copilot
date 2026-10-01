@@ -115,7 +115,7 @@ flowchart LR
 
 **W3 附加已完成**：
 
-- 会话级 PDF：文件和切块放会话目录，**不写入** `doc_chunks`；检索先搜上传、再搜年报
+- 会话级 PDF：正文仍放临时对象路径，元数据统一写 `pdf_document`，切块统一写 `doc_chunks`；检索分池排序后仍先上传、再年报
 - RAG trace：`rag_query_log` + `/ops/rag` 监控（向量/关键词/RRF/精排链路）
 - 系统健康：`/ops/health`（DB/pgvector/语料/配置概览）
 - 公司 scope 过滤：问题含「比亚迪/002594/2024」时收窄 doc_id（BUG-008 已修）

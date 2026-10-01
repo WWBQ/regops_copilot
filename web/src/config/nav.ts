@@ -139,8 +139,8 @@ export const PLACEHOLDER_PAGES: Record<
   },
   users: {
     title: '用户与权限',
-    summary: 'JWT 登录、角色与客户档案数据域。客户经理看不到投研内核。',
-    backend: 'POST /api/auth/login · GET /api/customers',
+    summary: 'JWT 登录、角色与年报数据域。不同部门只能检索和预览授权公司文档。',
+    backend: 'POST /api/auth/login · GET /api/auth/me',
     phase: 'W7',
   },
 }

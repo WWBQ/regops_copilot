@@ -30,6 +30,7 @@ async def test_list_eval_tasks():
     assert "rag_acl" in ids
     assert "rag_refuse" in ids
     assert "rag_support" in ids
+    assert "rag_compare" in ids
     asknum = next(item for item in body["items"] if item["id"] == "w4_asknum")
     assert "leak_rate" in asknum["metrics"]
     numbers = next(item for item in body["items"] if item["id"] == "w6_number_check")
@@ -48,6 +49,9 @@ async def test_list_eval_tasks():
     assert "false_accept_rate" in refuse["metrics"]
     support = next(item for item in body["items"] if item["id"] == "rag_support")
     assert "support_hit_rate" in support["metrics"]
+    comparison = next(item for item in body["items"] if item["id"] == "rag_compare")
+    assert "company_scope_accuracy" in comparison["metrics"]
+    assert "false_compare_rate" in comparison["metrics"]
     w1 = next(item for item in body["items"] if item["id"] == "w1_chat")
     assert "refuse_rate" in w1["metrics"]
     assert "number_error_rate" not in w1["metrics"]

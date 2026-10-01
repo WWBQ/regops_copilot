@@ -59,7 +59,7 @@ public class SecurityConfig {
                         // SSE StreamingResponseBody 二次派发是 ASYNC；不放行会被当成未登录。
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/**", "/api/health", "/api/auth/login", "/api/auth/demo-accounts").permitAll()
-                        .requestMatchers("/api/customers/**", "/api/audit/**", "/api/auth/me")
+                        .requestMatchers("/api/audit/**", "/api/auth/me")
                         .authenticated()
                         .requestMatchers("/api/**").permitAll()
                         .anyRequest().authenticated()

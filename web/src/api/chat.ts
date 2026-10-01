@@ -4,6 +4,7 @@ import type { ChatRequest, ChatResponse } from '../types/chat'
 type RawChatResponse = ChatResponse & {
   totalTokens?: number
   latencyMs?: number
+  totalLatencyMs?: number
   promptTokens?: number
   completionTokens?: number
 }
@@ -15,6 +16,7 @@ function normalizeChatResponse(raw: RawChatResponse): ChatResponse {
     completion_tokens: raw.completion_tokens ?? raw.completionTokens,
     total_tokens: raw.total_tokens ?? raw.totalTokens,
     latency_ms: raw.latency_ms ?? raw.latencyMs,
+    total_latency_ms: raw.total_latency_ms ?? raw.totalLatencyMs,
     rag_used: raw.rag_used ?? (raw as { ragUsed?: boolean }).ragUsed,
     session_id: raw.session_id ?? (raw as { sessionId?: string }).sessionId,
     pending_request: raw.pending_request ?? (raw as { pendingRequest?: ChatResponse['pending_request'] }).pendingRequest ?? null,

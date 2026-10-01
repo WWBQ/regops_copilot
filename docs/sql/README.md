@@ -10,7 +10,8 @@
 | `w4_rag_query_log.sql` | W3：RAG 检索 trace 日志 `rag_query_log` |
 | `w4_asknum_query_log.sql` | W4：问数 trace 日志 `asknum_query_log` |
 | `w4_asknum_alias.sql` | W4：问数/检索别名 `asknum_alias`（近义词 → 指标或证券代码） |
-| `w7_identity.sql` | W7：`app_user` / `customer_profile` / `audit_event`；用户由 Java 种子写入 |
+| `w7_identity.sql` | W7：`app_user` / `audit_event`；用户由 Java 种子写入 |
+| `w10_storage_unification.sql` | 已有库升级：同内容会话文档可分别登记，哈希改为普通索引 |
 
 ## 新库（Docker 首次启动）
 
@@ -26,6 +27,7 @@ psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w4_rag_q
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w4_asknum_query_log.sql
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w4_asknum_alias.sql
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w7_identity.sql
+psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w10_storage_unification.sql
 ```
 
 ## 验证
@@ -34,7 +36,7 @@ psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w7_ident
 docker compose exec db psql -U regops -d regops_db -c "\dt"
 ```
 
-应看到：`doc_chunks` `pdf_document` `web_document` `ingest_job` `fin_metric` `rag_query_log` `asknum_query_log` `asknum_alias` `app_user` `customer_profile` `audit_event`
+应看到：`doc_chunks` `pdf_document` `web_document` `ingest_job` `fin_metric` `rag_query_log` `asknum_query_log` `asknum_alias` `app_user` `audit_event`
 
 ## 解析 JSON 回溯
 

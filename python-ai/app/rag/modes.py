@@ -9,9 +9,9 @@ RetrievalMode = Literal["baseline", "hybrid", "rerank"]
 ABLATION_MODES: tuple[RetrievalMode, ...] = ("baseline", "hybrid", "rerank")
 
 MODE_DESCRIPTIONS: dict[RetrievalMode, str] = {
-    "baseline": "向量检索 only：无关键词、无 RRF、无 Cross-Encoder",
-    "hybrid": "向量 + BM25 + RRF，关闭 Cross-Encoder",
-    "rerank": "hybrid 候选 + bge-reranker-v2-m3，当前生产路径",
+    "baseline": "向量检索 only：无关键词、无 RRF、无重排",
+    "hybrid": "向量 + BM25 + RRF，关闭重排",
+    "rerank": "hybrid 候选 + 配置的 BGE/LLM 重排器",
 }
 
 

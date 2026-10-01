@@ -22,3 +22,5 @@ async def test_system_overview():
     assert "services" in body
     assert "corpus" in body
     assert body["services"]["python_ai"]["status"] == "ok"
+    assert body["config"]["rag_rerank_backend"] in {"bge", "llm"}
+    assert "rag_llm_rerank_api_key" not in body["config"]

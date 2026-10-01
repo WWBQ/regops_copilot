@@ -12,7 +12,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from app.config import get_settings
-from app.documents.registry import DocumentRegistry
 from app.documents.service import DocumentService
 from app.storage.local import LocalObjectStore
 
@@ -30,8 +29,7 @@ def main() -> int:
         public_base_url=settings.api_public_base_url,
         presign_secret=settings.object_store_presign_secret,
     )
-    registry = DocumentRegistry(Path(settings.object_store_root) / "_registry" / "documents.json")
-    service = DocumentService(store, registry, default_bucket=settings.object_store_bucket)
+    service = DocumentService(store, default_bucket=settings.object_store_bucket)
 
     raw_dir = ROOT.parent / "data" / "raw"
     paths = [Path(p) for p in args.paths] if args.paths else sorted(raw_dir.glob("*.pdf"))

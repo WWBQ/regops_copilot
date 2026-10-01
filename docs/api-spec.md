@@ -262,7 +262,6 @@ GET /api/sessions      → 500（语义应为 405，该路径只接受 POST）
 | `LabelingProxyController` | `/api/labeling` | `GET /tasks`、`POST /tasks`（multipart）、`GET /template`、`GET /tasks/{taskId}`、`GET|POST /tasks/{taskId}/items/{idx}`、`GET /tasks/{taskId}/export`、`GET /tasks/{taskId}/pdf/{filename}`、`GET /tasks/{taskId}/html/{idx}` |
 | `AuditController` | `/api/audit` | `GET /events`（JWT；含 actor / before-after / request_id） |
 | `AuthController` | `/api/auth` | `POST /login`、`GET /me`、`GET /demo-accounts` |
-| `CustomerController` | `/api/customers` | `GET ""`、`GET /{id}`（客户经理只见 CLIENT，内核 404） |
 | Actuator | `/actuator` | `GET /health`、`GET /info` |
 
 演示登录：`analyst/analyst123`、`rm/rm123`、`admin/admin123`。详情 [`W7_RBAC.md`](./W7_RBAC.md)。

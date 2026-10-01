@@ -1,10 +1,10 @@
 import type { Citation } from '../types/chat'
 import { renderMarkdown } from './markdown'
 
-const CITE_FOOTER_RE = /\n*出处：(?:\[\d{1,2}\])+\s*$/u
+const CITE_FOOTER_RE = /\n*出处：(?:\[(?:片段)?\d{1,2}\])+\s*$/u
 
 function citeMarkerRe(): RegExp {
-  return /\[(\d{1,2})\]/g
+  return /\[(?:片段)?(\d{1,2})\]/g
 }
 
 function escapeAttr(text: string): string {
@@ -80,7 +80,7 @@ function citeNeedles(cite: Citation): string[] {
 }
 
 function alreadyMarked(text: string, at: number): boolean {
-  return /^\s*\[\d{1,2}\]/u.test(text.slice(at, at + 8))
+  return /^\s*\[(?:片段)?\d{1,2}\]/u.test(text.slice(at, at + 12))
 }
 
 function insertAfter(text: string, needle: string, mark: string): string | null {

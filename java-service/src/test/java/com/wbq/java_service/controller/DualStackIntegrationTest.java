@@ -102,7 +102,8 @@ class DualStackIntegrationTest {
                         .content("{\"message\":\"你好\",\"use_rag\":false}"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("X-Request-ID", "e2e-chat-ok"))
-                .andExpect(jsonPath("$.reply").value("hi"));
+                .andExpect(jsonPath("$.reply").value("hi"))
+                .andExpect(jsonPath("$.total_latency_ms").value(10.0));
     }
 
     @Test

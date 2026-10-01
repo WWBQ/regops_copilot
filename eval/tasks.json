@@ -132,6 +132,21 @@
         "support_coverage"
       ],
       "builtin": true
+    },
+    {
+      "id": "rag_compare",
+      "name": "多公司 RAG 证据门",
+      "description": "16 题：公司隔离、共同期间、部门 ACL 与任一方低证据拒绝（不调 LLM）",
+      "golden_file": "rag_compare_16.json",
+      "runner": "rag_compare",
+      "metrics": [
+        "accuracy",
+        "route_accuracy",
+        "company_scope_accuracy",
+        "period_accuracy",
+        "false_compare_rate"
+      ],
+      "builtin": true
     }
   ]
 }

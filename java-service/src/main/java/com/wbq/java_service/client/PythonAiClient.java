@@ -438,6 +438,25 @@ public class PythonAiClient {
                 .body(MAP_TYPE));
     }
 
+    public Map<String, Object> getPerformanceOverview() {
+        return exchange(() -> restClient.get()
+                .uri("/ops/performance/overview")
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
+    public Map<String, Object> listPerformanceTraces(int limit, int offset) {
+        return exchange(() -> restClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/ops/performance-traces")
+                        .queryParam("limit", limit)
+                        .queryParam("offset", offset)
+                        .build())
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
     public Map<String, Object> getIngestOverview() {
         return exchange(() -> restClient.get()
                 .uri("/ops/ingest/overview")

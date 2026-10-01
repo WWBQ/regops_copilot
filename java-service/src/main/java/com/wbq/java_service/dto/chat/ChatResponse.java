@@ -17,7 +17,9 @@ public record ChatResponse(
         @JsonProperty("completion_tokens") int completionTokens,
         @JsonProperty("total_tokens") int totalTokens,
         @JsonProperty("latency_ms") double latencyMs,
-        @JsonProperty("pending_request") Map<String, Object> pendingRequest
+        @JsonProperty("total_latency_ms") double totalLatencyMs,
+        @JsonProperty("pending_request") Map<String, Object> pendingRequest,
+        Map<String, Object> comparison
 ) {
     public ChatResponse {
         if (citations == null) {
@@ -26,5 +28,37 @@ public record ChatResponse(
         if (route == null || route.isBlank()) {
             route = "general";
         }
+    }
+
+    public ChatResponse(
+            String reply,
+            String model,
+            String disclaimer,
+            List<Citation> citations,
+            String sessionId,
+            boolean ragUsed,
+            String route,
+            int promptTokens,
+            int completionTokens,
+            int totalTokens,
+            double latencyMs,
+            Map<String, Object> pendingRequest
+    ) {
+        this(
+                reply,
+                model,
+                disclaimer,
+                citations,
+                sessionId,
+                ragUsed,
+                route,
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                latencyMs,
+                latencyMs,
+                pendingRequest,
+                null
+        );
     }
 }

@@ -10,18 +10,22 @@ from httpx import ASGITransport, AsyncClient
 from app.core.dependencies import get_document_service
 from app.ingest.session_pipeline import SessionIngestResult
 from app.main import app
-from app.models.llm import ChatResult, LLMClient
+from app.models.llm import ChatResult, StreamDelta
 from app.rag.service import Citation as RagCitation
 from app.rag.service import RagAnswer
 from app.rag.trace import RagPrepareResult, RagTrace
 
 
-class FakeLLMClient(LLMClient):
-    async def chat(self, messages, *, temperature=0.1) -> str:
-        return "基于文档的 mock 回复"
+class FakeLLMClient:
+    model_id = "deepseek-flash"
 
     async def chat_with_usage(self, messages, *, temperature=0.1) -> ChatResult:
         return ChatResult(content="基于文档的 mock 回复", prompt_tokens=1, completion_tokens=2)
+
+    async def chat_stream(self, messages, *, temperature=0.1):
+        result = await self.chat_with_usage(messages, temperature=temperature)
+        yield StreamDelta(text=result.content)
+        yield StreamDelta(done=True, result=result)
 
 
 class FakeUploadResult:
@@ -65,7 +69,6 @@ def anyio_backend():
 @pytest.fixture
 async def client(monkeypatch):
     monkeypatch.setattr("app.chat.router.get_llm_client", lambda settings, model=None: FakeLLMClient())
-    monkeypatch.setattr("app.chat.router.list_available_models", lambda settings=None: ["deepseek-flash"])
     app.dependency_overrides[get_document_service] = lambda: FakeDocumentService()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

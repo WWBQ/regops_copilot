@@ -8,6 +8,6 @@
 | 问数监控 | `/ops/asknum` | Java → Python |
 | 审计追踪 | `/compliance/audit` | Java + PostgreSQL |
 
-`GET /api/health` 在 Python 不可用时仍返回 Java 自身状态，并在响应体标识 `pythonAi.status=down`。前端据此显示降级横幅：Python 挂时聊天/问数不可用，登录、客户档案和审计仍可用；Java 挂时 BFF 相关页面不可用。
+`GET /api/health` 在 Python 不可用时仍返回 Java 自身状态，并在响应体标识 `pythonAi.status=down`。前端据此显示降级横幅：Python 挂时聊天/问数不可用，登录和审计仍可用；Java 挂时 BFF 相关页面不可用。
 
 SSE 适合单向逐段输出；若需要双向实时协作才考虑 WebSocket。

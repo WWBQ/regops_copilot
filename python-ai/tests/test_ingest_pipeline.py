@@ -69,7 +69,7 @@ def test_ingest_pdf_to_vectors_writes_job_stages(tmp_path: Path, monkeypatch):
         lambda *_a, **kwargs: statuses.append(kwargs["status"]),
     )
     monkeypatch.setattr("app.ingest.pipeline.get_connection", fake_conn)
-    monkeypatch.setattr("app.ingest.pipeline.parse_pdf", lambda _p: [block])
+    monkeypatch.setattr("app.ingest.pipeline.parse_pdf", lambda _p, **_k: [block])
     monkeypatch.setattr("app.ingest.pipeline.clean_page_blocks", lambda blocks: (blocks, None))
     monkeypatch.setattr(
         "app.ingest.pipeline.chunk_page_blocks",
@@ -88,6 +88,7 @@ def test_ingest_pdf_to_vectors_writes_job_stages(tmp_path: Path, monkeypatch):
     assert isinstance(result, IngestResult)
     assert result.job_id == "job-1"
     assert result.chunks == 1
+    assert result.parser_backend == "docling"
     assert statuses == ["PARSING", "CLEANING", "CHUNKING", "EMBEDDING", "DONE"]
 
 

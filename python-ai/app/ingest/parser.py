@@ -1,4 +1,4 @@
-"""PDF → PageBlock（Docling 主路径）。"""
+"""PDF → PageBlock：在 Docling 和 MinerU 之间选择解析器。"""
 
 from __future__ import annotations
 
@@ -12,9 +12,12 @@ from docling_core.types.doc.base import BoundingBox
 from docling_core.types.doc.items.table.table import TableItem
 from docling_core.types.doc.items.text import ListItem, SectionHeaderItem, TextItem, TitleItem
 
+from app.config import get_settings
 from app.ingest.models import BBox, PageBlock, TableBlock, TableCellBlock
 
 logger = logging.getLogger(__name__)
+
+SUPPORTED_PARSER_BACKENDS = ("docling", "mineru")
 
 TEXT_LABELS = frozenset(
     {
@@ -31,6 +34,15 @@ TEXT_LABELS = frozenset(
 
 class ParseError(Exception):
     """解析失败；调用方应写入 ingest_job 错误队列，不静默跳过。"""
+
+
+def normalize_parser_backend(value: str | None) -> str:
+    """解析并校验后端名，未传时读取环境配置。"""
+    selected = (value or get_settings().document_parser_backend).strip().lower()
+    if selected not in SUPPORTED_PARSER_BACKENDS:
+        known = ", ".join(SUPPORTED_PARSER_BACKENDS)
+        raise ParseError(f"unsupported document parser backend: {selected}; choose {known}")
+    return selected
 
 
 def content_hash(path: Path) -> str:
@@ -89,6 +101,17 @@ def _table_block(item: TableItem, doc, page_no: int) -> TableBlock:
             markdown_lines.append(" | ".join(row))
     markdown = "\n".join(markdown_lines)
 
+    try:
+        table_html = item.export_to_html(doc=doc).strip()
+    except Exception:  # noqa: BLE001 - 表格文本仍可入库，HTML 失败单独降级
+        logger.warning("docling table html export failed page=%d", page_no, exc_info=True)
+        table_html = ""
+    try:
+        title = item.caption_text(doc).strip()
+    except Exception:  # noqa: BLE001 - caption 是增强字段，不应中断整份 PDF 解析
+        logger.warning("docling table caption export failed page=%d", page_no, exc_info=True)
+        title = ""
+
     table_bbox = _bbox_tuple(item.prov[0].bbox) if item.prov else None
     return TableBlock(
         page_no=page_no,
@@ -96,6 +119,8 @@ def _table_block(item: TableItem, doc, page_no: int) -> TableBlock:
         cells=cells,
         bbox=table_bbox,
         markdown=markdown,
+        html=table_html,
+        title=title,
     )
 
 
@@ -133,20 +158,15 @@ def _docling_to_pages(doc, source_file: str, file_hash: str) -> list[PageBlock]:
     return blocks
 
 
-def parse_pdf(path: str | Path, *, converter: DocumentConverter | None = None) -> list[PageBlock]:
-    """解析 PDF，返回按页排序的 PageBlock 列表。"""
-    pdf_path = Path(path).expanduser().resolve()
-    if not pdf_path.is_file():
-        logger.error("parse_pdf file not found: %s", pdf_path)
-        raise ParseError(f"PDF not found: {pdf_path}")
-    if pdf_path.suffix.lower() != ".pdf":
-        logger.error("parse_pdf not a PDF: %s", pdf_path)
-        raise ParseError(f"not a PDF file: {pdf_path}")
-
-    file_hash = content_hash(pdf_path)
+def _parse_pdf_with_docling(
+    pdf_path: Path,
+    *,
+    file_hash: str,
+    converter: DocumentConverter | None,
+) -> list[PageBlock]:
     source_file = pdf_path.name
     doc_converter = converter or DocumentConverter()
-    logger.info("parse_pdf start file=%s", source_file)
+    logger.info("parse_pdf start backend=docling file=%s", source_file)
 
     try:
         result = doc_converter.convert(str(pdf_path))
@@ -156,16 +176,58 @@ def parse_pdf(path: str | Path, *, converter: DocumentConverter | None = None) -
 
     doc = result.document
     if doc.num_pages() == 0:
-        logger.error("parse_pdf zero pages file=%s", source_file)
+        logger.error("parse_pdf zero pages backend=docling file=%s", source_file)
         raise ParseError(f"docling returned zero pages: {pdf_path.name}")
 
     blocks = _docling_to_pages(doc, source_file, file_hash)
     table_count = sum(len(b.tables) for b in blocks)
     logger.info(
-        "parse_pdf ok file=%s pages=%d tables=%d hash=%s",
+        "parse_pdf ok backend=docling file=%s pages=%d tables=%d hash=%s",
         source_file,
         len(blocks),
         table_count,
         file_hash[:16],
     )
     return blocks
+
+
+def parse_pdf(
+    path: str | Path,
+    *,
+    backend: str | None = None,
+    converter: DocumentConverter | None = None,
+) -> list[PageBlock]:
+    """用指定解析器转换 PDF，返回统一的 PageBlock 列表。"""
+    pdf_path = Path(path).expanduser().resolve()
+    if not pdf_path.is_file():
+        logger.error("parse_pdf file not found: %s", pdf_path)
+        raise ParseError(f"PDF not found: {pdf_path}")
+    if pdf_path.suffix.lower() != ".pdf":
+        logger.error("parse_pdf not a PDF: %s", pdf_path)
+        raise ParseError(f"not a PDF file: {pdf_path}")
+
+    selected_backend = normalize_parser_backend(backend)
+    file_hash = content_hash(pdf_path)
+    if selected_backend == "docling":
+        return _parse_pdf_with_docling(
+            pdf_path,
+            file_hash=file_hash,
+            converter=converter,
+        )
+
+    if converter is not None:
+        raise ParseError("converter is only supported by the docling backend")
+
+    from app.ingest.mineru_parser import parse_pdf_with_mineru
+
+    settings = get_settings()
+    try:
+        return parse_pdf_with_mineru(
+            pdf_path,
+            file_hash=file_hash,
+            tier=settings.mineru_tier,
+            ocr_mode=settings.mineru_ocr_mode,
+        )
+    except Exception as exc:  # noqa: BLE001 - 对外保持统一 ParseError
+        logger.exception("parse_pdf mineru convert failed file=%s", pdf_path.name)
+        raise ParseError(f"mineru convert failed for {pdf_path.name}: {exc}") from exc

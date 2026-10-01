@@ -423,6 +423,6 @@ def apply_checked_reply(
     if result.ok:
         return reply, route, result
     mapped = route
-    if route == "rag":
-        mapped = "rag_blocked"
+    if route in {"rag", "rag_compare"}:
+        mapped = f"{route}_blocked"
     return result.reply, mapped, result

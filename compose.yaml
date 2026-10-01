@@ -19,6 +19,7 @@ services:
       - ./docs/sql/w4_asknum_alias.sql:/docker-entrypoint-initdb.d/06_asknum_alias.sql:ro
       - ./docs/sql/w4_asknum_pending.sql:/docker-entrypoint-initdb.d/06b_asknum_pending.sql:ro
       - ./docs/sql/w7_identity.sql:/docker-entrypoint-initdb.d/08_w7_identity.sql:ro
+      - ./docs/sql/w10_storage_unification.sql:/docker-entrypoint-initdb.d/09_storage_unification.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U regops -d regops_db"]
       interval: 5s

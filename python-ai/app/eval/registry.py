@@ -24,6 +24,7 @@ RUNNERS = (
     "rag_acl",
     "rag_refuse",
     "rag_support",
+    "rag_compare",
 )
 RUNNER_DEFAULT_METRICS: dict[str, tuple[str, ...]] = {
     "w1_chat": ("accuracy", "refuse_rate", "latency_p50_ms"),
@@ -36,6 +37,13 @@ RUNNER_DEFAULT_METRICS: dict[str, tuple[str, ...]] = {
     "rag_acl": ("accuracy", "false_accept_rate", "leak_rate"),
     "rag_refuse": ("accuracy", "false_accept_rate"),
     "rag_support": ("support_hit_rate", "support_coverage"),
+    "rag_compare": (
+        "accuracy",
+        "route_accuracy",
+        "company_scope_accuracy",
+        "period_accuracy",
+        "false_compare_rate",
+    ),
 }
 _TASK_ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,48}$")
 
@@ -147,6 +155,15 @@ def _default_tasks_payload() -> dict:
                 "golden_file": "rag_support_20.json",
                 "runner": "rag_support",
                 "metrics": list(RUNNER_DEFAULT_METRICS["rag_support"]),
+                "builtin": True,
+            },
+            {
+                "id": "rag_compare",
+                "name": "多公司 RAG 证据门",
+                "description": "16 题：公司隔离、共同期间、部门 ACL 与任一方低证据拒绝（不调 LLM）",
+                "golden_file": "rag_compare_16.json",
+                "runner": "rag_compare",
+                "metrics": list(RUNNER_DEFAULT_METRICS["rag_compare"]),
                 "builtin": True,
             },
         ],
@@ -419,6 +436,21 @@ def validate_golden_payload(content: dict, *, runner: str | None = None) -> int:
                 )
             if runner == "rag_acl" and "dept" not in item:
                 raise ValueError(f"items[{index}] 缺少 dept（ACL 集可为空字符串/null）")
+        if runner == "rag_compare":
+            if item.get("expected_outcome") not in {
+                "rag_compare",
+                "rag_compare_blocked",
+            }:
+                raise ValueError(
+                    f"items[{index}] expected_outcome 须为 rag_compare / rag_compare_blocked"
+                )
+            if not isinstance(item.get("expected_companies"), list):
+                raise ValueError(f"items[{index}] 缺少 expected_companies")
+            if not isinstance(item.get("expected_years"), list):
+                raise ValueError(f"items[{index}] 缺少 expected_years")
+            counts = item.get("evidence_counts")
+            if counts is not None and not isinstance(counts, dict):
+                raise ValueError(f"items[{index}] evidence_counts 须为对象")
     return len(items)
 
 
@@ -436,6 +468,7 @@ def save_golden_set(*, filename: str, content: dict, runner: str | None = None) 
         "rag_acl_20.json",
         "rag_refuse_20.json",
         "rag_support_20.json",
+        "rag_compare_16.json",
     }:
         raise ValueError("内置黄金集不可覆盖，请使用新文件名")
     item_count = validate_golden_payload(content, runner=runner)

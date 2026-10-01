@@ -11,9 +11,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from app.config import get_settings
-from app.documents.registry import DocumentRegistry
 from app.documents.service import DocumentService
-from app.ingest.parser import parse_pdf
+from app.ingest.parser import SUPPORTED_PARSER_BACKENDS, normalize_parser_backend, parse_pdf
 from app.storage.local import LocalObjectStore
 
 
@@ -21,6 +20,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Parse PDF and save full parse JSON artifact")
     parser.add_argument("pdf", nargs="?", help="PDF path; default: uploaded doc via --doc-id")
     parser.add_argument("--doc-id", help="Use uploaded document from ObjectStore")
+    parser.add_argument(
+        "--parser",
+        choices=SUPPORTED_PARSER_BACKENDS,
+        help="PDF parser; default reads DOCUMENT_PARSER_BACKEND",
+    )
     args = parser.parse_args()
 
     settings = get_settings()
@@ -30,8 +34,7 @@ def main() -> int:
         public_base_url=settings.api_public_base_url,
         presign_secret=settings.object_store_presign_secret,
     )
-    registry = DocumentRegistry(Path(settings.object_store_root) / "_registry" / "documents.json")
-    service = DocumentService(store, registry, default_bucket=settings.object_store_bucket)
+    service = DocumentService(store, default_bucket=settings.object_store_bucket)
 
     if args.doc_id:
         pdf_path = service.local_pdf_path(args.doc_id)
@@ -45,9 +48,17 @@ def main() -> int:
         doc_id = service.infer_doc_id(pdf_path.name)
         service.upload_pdf(body, pdf_path.name, doc_id=doc_id)
 
-    blocks = parse_pdf(pdf_path)
-    key = service.save_parse_artifact(doc_id, blocks)
-    print(f"doc_id={doc_id} pages={len(blocks)} parse_object_key={key}")
+    parser_backend = normalize_parser_backend(args.parser)
+    blocks = parse_pdf(pdf_path, backend=parser_backend)
+    key = service.save_parse_artifact(
+        doc_id,
+        blocks,
+        parser_backend=parser_backend,
+    )
+    print(
+        f"doc_id={doc_id} parser={parser_backend} "
+        f"pages={len(blocks)} parse_object_key={key}"
+    )
     return 0
 
 

@@ -70,4 +70,18 @@ class OpsProxyControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("DONE"));
     }
+
+    @Test
+    void performanceTracesForwardPagination() throws Exception {
+        when(pythonAiClient.listPerformanceTraces(20, 5))
+                .thenReturn(Map.of("total", 1, "items", java.util.List.of()));
+
+        mvc.perform(get("/api/ops/performance-traces")
+                        .param("limit", "20")
+                        .param("offset", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1));
+
+        verify(pythonAiClient).listPerformanceTraces(20, 5);
+    }
 }

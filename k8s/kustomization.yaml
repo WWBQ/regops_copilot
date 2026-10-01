@@ -20,5 +20,6 @@ configMapGenerator:
       - 05_asknum_log.sql=init/05_asknum_log.sql
       - 06_asknum_alias.sql=init/06_asknum_alias.sql
       - 08_w7_identity.sql=init/08_w7_identity.sql
+      - 09_storage_unification.sql=init/09_storage_unification.sql
 generatorOptions:
   disableNameSuffixHash: true

@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS pdf_document (
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     CONSTRAINT uk_pdf_document_doc_id_version UNIQUE (doc_id, version),
-    CONSTRAINT uk_pdf_document_content_hash UNIQUE (content_hash),
     CONSTRAINT ck_pdf_document_ingest_status CHECK (
         ingest_status IN ('uploaded', 'processing', 'ready', 'failed', 'archived')
     )
@@ -43,6 +42,9 @@ CREATE INDEX IF NOT EXISTS idx_pdf_document_company_year
 CREATE INDEX IF NOT EXISTS idx_pdf_document_active
     ON pdf_document (doc_id)
     WHERE is_active = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_pdf_document_content_hash
+    ON pdf_document (content_hash);
 
 -- ---------------------------------------------------------------------------
 -- web_document · 网页 / HTML / 纯文本快照元数据

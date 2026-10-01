@@ -11,6 +11,7 @@ from app.eval.rag_retrieval_runner import (
     summarize,
 )
 from app.rag.modes import parse_retrieval_mode, resolve_retrieval_flags
+from app.rag.llm_reranker import LLMRerankResult
 from app.rag.service import retrieve_hits_with_trace
 
 
@@ -292,3 +293,171 @@ def test_rerank_mode_forces_cross_encoder_even_if_setting_off(monkeypatch):
     assert pipeline["use_rerank"] is True
     assert hits[0].chunk_index == 9
     assert "rerank" in pipeline["timing_ms"]
+
+
+def test_rerank_candidates_can_be_limited_for_comparison(monkeypatch):
+    vector_hits = [
+        _hit(index, index, f"{SUBSTANTIVE} 候选片段 {index}")
+        for index in range(1, 41)
+    ]
+    rerank_input_sizes: list[int] = []
+
+    class _Settings:
+        rag_vector_fetch_k = 80
+        rag_keyword_top_k = 30
+        rag_bm25_k1 = 1.2
+        rag_bm25_b = 0.75
+        rag_rrf_k = 60
+        rag_vector_rrf_weight = 2.0
+        rag_keyword_rrf_weight = 1.0
+        rag_rerank_enabled = True
+        rag_rerank_backend = "bge"
+        rag_rerank_model = "BAAI/bge-reranker-v2-m3"
+        rag_rerank_candidates = 80
+        rag_llm_rerank_candidates = 12
+        rag_max_chunks_per_page = 0
+        rag_enum_keyword_rrf_weight = 0.0
+        rag_section_title_boost = 3
+
+    @contextmanager
+    def fake_conn():
+        yield MagicMock()
+
+    def fake_rerank(_question, hits, **_kwargs):
+        rerank_input_sizes.append(len(hits))
+        return hits
+
+    monkeypatch.setattr("app.rag.service.get_settings", lambda: _Settings())
+    monkeypatch.setattr("app.rag.service.embed_text", lambda _q: [0.1] * 8)
+    monkeypatch.setattr("app.rag.service.get_connection", fake_conn)
+    monkeypatch.setattr(
+        "app.rag.service.search_similar_chunks",
+        lambda *_a, **_k: vector_hits,
+    )
+    monkeypatch.setattr("app.rag.service.search_keyword_chunks", lambda *_a, **_k: [])
+    monkeypatch.setattr("app.rag.service.rerank_with_cross_encoder", fake_rerank)
+
+    hits, pipeline = retrieve_hits_with_trace(
+        question="比较两家公司的战略重点",
+        doc_ids=["002594_2024"],
+        top_k=6,
+        rerank_candidates=24,
+    )
+
+    assert rerank_input_sizes == [24]
+    assert len(hits) == 6
+    assert pipeline["rerank_candidate_limit"] == 24
+
+
+def test_llm_backend_is_selected_and_recorded(monkeypatch):
+    vector_hits = [
+        _hit(1, 10, SUBSTANTIVE),
+        _hit(2, 11, SUBSTANTIVE + " 战略重点"),
+    ]
+    llm_calls: list[list[int]] = []
+
+    class _Settings:
+        rag_vector_fetch_k = 80
+        rag_keyword_top_k = 30
+        rag_bm25_k1 = 1.2
+        rag_bm25_b = 0.75
+        rag_rrf_k = 60
+        rag_vector_rrf_weight = 2.0
+        rag_keyword_rrf_weight = 1.0
+        rag_rerank_enabled = True
+        rag_rerank_backend = "llm"
+        rag_rerank_model = "BAAI/bge-reranker-v2-m3"
+        rag_rerank_candidates = 80
+        rag_llm_rerank_deployment = "local"
+        rag_llm_rerank_model = "qwen3:8b"
+        rag_llm_rerank_candidates = 12
+        rag_max_chunks_per_page = 2
+        rag_enum_keyword_rrf_weight = 0.0
+        rag_section_title_boost = 3
+
+    @contextmanager
+    def fake_conn():
+        yield MagicMock()
+
+    def fake_llm(_question, hits, *, settings):
+        llm_calls.append([hit.chunk_index for hit in hits])
+        return LLMRerankResult(
+            hits=list(reversed(hits)),
+            supports_answer=True,
+            ranking=[{"id": "c2", "score": 96}],
+            latency_ms=30.0,
+        )
+
+    monkeypatch.setattr("app.rag.service.get_settings", lambda: _Settings())
+    monkeypatch.setattr("app.rag.service.embed_text", lambda _q: [0.1] * 8)
+    monkeypatch.setattr("app.rag.service.get_connection", fake_conn)
+    monkeypatch.setattr("app.rag.service.search_similar_chunks", lambda *_a, **_k: vector_hits)
+    monkeypatch.setattr("app.rag.service.search_keyword_chunks", lambda *_a, **_k: [])
+    monkeypatch.setattr("app.rag.service.rerank_with_llm", fake_llm)
+
+    hits, pipeline = retrieve_hits_with_trace(
+        question="2024年战略重点是什么",
+        doc_ids=["002594_2024"],
+        top_k=2,
+    )
+
+    assert llm_calls == [[1, 2]]
+    assert [hit.chunk_index for hit in hits] == [2, 1]
+    assert pipeline["rerank_backend"] == "llm"
+    assert pipeline["rerank_deployment"] == "local"
+    assert pipeline["corpus_rerank_backend"] == "llm"
+    assert pipeline["corpus_llm_latency_ms"] == 30.0
+
+
+def test_llm_failure_falls_back_to_bge(monkeypatch):
+    vector_hits = [_hit(1, 10, SUBSTANTIVE)]
+    bge_calls: list[int] = []
+
+    class _Settings:
+        rag_vector_fetch_k = 80
+        rag_keyword_top_k = 30
+        rag_bm25_k1 = 1.2
+        rag_bm25_b = 0.75
+        rag_rrf_k = 60
+        rag_vector_rrf_weight = 2.0
+        rag_keyword_rrf_weight = 1.0
+        rag_rerank_enabled = True
+        rag_rerank_backend = "llm"
+        rag_rerank_model = "BAAI/bge-reranker-v2-m3"
+        rag_rerank_candidates = 80
+        rag_llm_rerank_deployment = "api"
+        rag_llm_rerank_model = "deepseek-chat"
+        rag_llm_rerank_candidates = 12
+        rag_max_chunks_per_page = 2
+        rag_enum_keyword_rrf_weight = 0.0
+        rag_section_title_boost = 3
+
+    @contextmanager
+    def fake_conn():
+        yield MagicMock()
+
+    monkeypatch.setattr("app.rag.service.get_settings", lambda: _Settings())
+    monkeypatch.setattr("app.rag.service.embed_text", lambda _q: [0.1] * 8)
+    monkeypatch.setattr("app.rag.service.get_connection", fake_conn)
+    monkeypatch.setattr("app.rag.service.search_similar_chunks", lambda *_a, **_k: vector_hits)
+    monkeypatch.setattr("app.rag.service.search_keyword_chunks", lambda *_a, **_k: [])
+    monkeypatch.setattr(
+        "app.rag.service.rerank_with_llm",
+        lambda *_a, **_k: (_ for _ in ()).throw(ValueError("bad JSON")),
+    )
+    monkeypatch.setattr(
+        "app.rag.service.rerank_with_cross_encoder",
+        lambda _question, hits, **_kwargs: bge_calls.append(1) or hits,
+    )
+
+    hits, pipeline = retrieve_hits_with_trace(
+        question="2024年战略重点是什么",
+        doc_ids=["002594_2024"],
+        top_k=1,
+    )
+
+    assert hits
+    assert bge_calls == [1]
+    assert pipeline["rerank_fallback"] is True
+    assert pipeline["corpus_rerank_backend"] == "bge_fallback"
+    assert pipeline["corpus_rerank_error"] == "ValueError"

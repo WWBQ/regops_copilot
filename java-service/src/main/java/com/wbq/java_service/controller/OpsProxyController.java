@@ -75,6 +75,19 @@ public class OpsProxyController {
         return pythonAiClient.listObsTraces(limit, offset);
     }
 
+    @GetMapping("/performance/overview")
+    public Map<String, Object> performanceOverview() {
+        return pythonAiClient.getPerformanceOverview();
+    }
+
+    @GetMapping("/performance-traces")
+    public Map<String, Object> listPerformanceTraces(
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "0") int offset
+    ) {
+        return pythonAiClient.listPerformanceTraces(limit, offset);
+    }
+
     @GetMapping("/ingest/overview")
     public Map<String, Object> ingestOverview() {
         return pythonAiClient.getIngestOverview();

@@ -62,7 +62,7 @@ kubectl apply -k k8s/
 minikube service web -n regops
 ```
 
-改表结构先改 `docs/sql/`，再复制到 `k8s/init/`（文件名 `01_`–`08_` 与 Compose 挂载顺序一致）。Kustomize 不能引用 overlay 目录外的文件，所以 SQL 在清单里留一份。
+改表结构先改 `docs/sql/`，再复制到 `k8s/init/`（文件名 `01_`–`09_` 与 Compose 挂载顺序一致）。Kustomize 不能引用 overlay 目录外的文件，所以 SQL 在清单里留一份。
 
 只检查清单、不启集群：
 

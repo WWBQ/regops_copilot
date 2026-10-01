@@ -7,7 +7,6 @@ from httpx import ASGITransport, AsyncClient
 
 from app.core.dependencies import get_document_service, get_object_store, get_settings_dep
 from app.config import Settings
-from app.documents.registry import DocumentRegistry
 from app.documents.service import DocumentService
 from app.main import app
 from app.storage.local import LocalObjectStore
@@ -19,7 +18,7 @@ def anyio_backend():
 
 
 @pytest.fixture
-def document_env(tmp_path: Path):
+def document_env(tmp_path: Path, document_repository_stub):
     root = tmp_path / "objects"
     store = LocalObjectStore(
         root,
@@ -27,8 +26,7 @@ def document_env(tmp_path: Path):
         public_base_url="http://test",
         presign_secret="test-secret",
     )
-    registry = DocumentRegistry(root / "_registry" / "documents.json")
-    service = DocumentService(store, registry, default_bucket="regops-docs")
+    service = DocumentService(store, default_bucket="regops-docs")
     settings = Settings(
         object_store_root=str(root),
         object_store_bucket="regops-docs",

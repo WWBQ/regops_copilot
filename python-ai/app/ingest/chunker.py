@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html as html_lib
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -31,6 +32,7 @@ _EFFECTIVE_DATE_RE = re.compile(
     r"(?:自)?\s*(20\d{2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日"
 )
 _NOT_HEADING_RE = re.compile(r"(以上|详见|注：|单位：|未经审计)")
+_ANNUAL_REPORT_DOC_ID_RE = re.compile(r"^(?P<company_code>\d{6})_(?P<year>20\d{2})")
 
 
 def _is_header_only_chunk(text: str) -> bool:
@@ -52,15 +54,45 @@ def _table_text(table: TableBlock) -> str:
 
 
 def _page_indexable_text(block: PageBlock) -> str:
-    parts: list[str] = []
-    body = block.text.strip()
-    if body:
-        parts.append(body)
-    for table in block.tables:
-        table_body = _table_text(table)
-        if table_body:
-            parts.append(table_body)
-    return "\n\n".join(parts)
+    # 表格单独生成 chunk，避免正文 chunk 与表格 chunk 重复入库。
+    return block.text.strip()
+
+
+def _document_scope_metadata(doc_id: str) -> dict[str, Any]:
+    match = _ANNUAL_REPORT_DOC_ID_RE.match(doc_id)
+    if not match:
+        return {}
+    return {
+        "company_code": match.group("company_code"),
+        "year": int(match.group("year")),
+    }
+
+
+def _fallback_table_html(table: TableBlock) -> str:
+    """测试数据或旧调用未提供 Docling HTML 时，生成最小可用表格。"""
+    if table.html.strip():
+        return table.html.strip()
+    rows: list[str] = []
+    for row_index, row in enumerate(table.rows):
+        tag = "th" if row_index == 0 else "td"
+        cells = "".join(f"<{tag}>{html_lib.escape(cell)}</{tag}>" for cell in row)
+        rows.append(f"<tr>{cells}</tr>")
+    return "<table>" + "".join(rows) + "</table>" if rows else ""
+
+
+def _table_title(
+    table: TableBlock,
+    sections: list[tuple[str | None, str]],
+    *,
+    page_no: int,
+    table_index: int,
+) -> str:
+    if table.title.strip():
+        return table.title.strip()
+    for heading, _body in reversed(sections):
+        if heading:
+            return heading
+    return f"第{page_no}页表格{table_index}"
 
 
 @dataclass(frozen=True)
@@ -220,6 +252,7 @@ def chunk_page_blocks(
     doc_id: str,
     source_file: str,
     content_hash: str,
+    parser_backend: str = "docling",
     chunk_size: int = DEFAULT_CHUNK_SIZE,
     chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
     max_chunk_size: int = MAX_CHUNK_SIZE,
@@ -228,6 +261,7 @@ def chunk_page_blocks(
     chunks: list[TextChunk] = []
     index = 0
     carry_heading: str | None = None
+    scope_metadata = _document_scope_metadata(doc_id)
     for block in blocks:
         page_text = _page_indexable_text(block)
         sections, carry_heading = _page_sections(page_text, carry_heading)
@@ -256,7 +290,10 @@ def chunk_page_blocks(
                     "page_end": block.page_no,
                     "source_file": source_file,
                     "content_hash": content_hash,
+                    "parser_backend": parser_backend,
                     "has_table": bool(block.tables),
+                    "content_type": "text",
+                    **scope_metadata,
                 }
                 if heading:
                     metadata["section_title"] = heading
@@ -273,4 +310,43 @@ def chunk_page_blocks(
                     )
                 )
                 index += 1
+
+        for table_index, table in enumerate(block.tables, start=1):
+            raw_table_text = _table_text(table)
+            if not raw_table_text:
+                continue
+            title = _table_title(
+                table,
+                sections,
+                page_no=block.page_no,
+                table_index=table_index,
+            )
+            table_text = f"{title}\n{raw_table_text}" if title else raw_table_text
+            table_html = _fallback_table_html(table)
+            metadata = {
+                "source_type": "pdf",
+                "doc_id": doc_id,
+                "page": block.page_no,
+                "page_end": block.page_no,
+                "source_file": source_file,
+                "content_hash": content_hash,
+                "parser_backend": parser_backend,
+                "has_table": True,
+                "content_type": "table",
+                "table_id": f"{doc_id}:p{block.page_no}:t{table_index}",
+                "table_index": table_index,
+                "table_title": title,
+                "table_text": table_text,
+                "table_html": table_html,
+                **scope_metadata,
+            }
+            chunks.append(
+                TextChunk(
+                    doc_id=doc_id,
+                    chunk_index=index,
+                    content=table_text,
+                    metadata=metadata,
+                )
+            )
+            index += 1
     return chunks

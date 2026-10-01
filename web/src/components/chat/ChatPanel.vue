@@ -480,14 +480,20 @@ async function handleSend(text: string) {
     const clientLatencyMs = performance.now() - startedAt
     const tokenCount = resolveCompletionTokens(response)
     const promptTokenCount = response.prompt_tokens ?? 0
-    const latencyMs = response.latency_ms && response.latency_ms > 0 ? response.latency_ms : clientLatencyMs
+    const latencyMs = response.latency_ms && response.latency_ms > 0 ? response.latency_ms : undefined
+    const totalLatencyMs =
+      response.total_latency_ms && response.total_latency_ms > 0
+        ? response.total_latency_ms
+        : clientLatencyMs
     patchAssistant({
       content: response.reply,
       model: response.model,
       tokenCount: tokenCount > 0 ? tokenCount : undefined,
       promptTokenCount: promptTokenCount > 0 ? promptTokenCount : undefined,
       latencyMs,
+      totalLatencyMs,
       route: response.route,
+      comparison: response.comparison,
       streaming: false,
       statusText: undefined,
       ...(response.citations?.length

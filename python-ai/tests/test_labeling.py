@@ -5,18 +5,9 @@ import pandas as pd
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.core.dependencies import get_label_store, get_llm_client_dep
+from app.core.dependencies import get_label_store
 from app.labeling.store import LabelStore
 from app.main import app
-from app.models.llm import ChatResult, LLMClient
-
-
-class FakeLLMClient(LLMClient):
-    async def chat(self, messages, *, temperature=0.1) -> str:
-        return "这是 mock 回复"
-
-    async def chat_with_usage(self, messages, *, temperature=0.1) -> ChatResult:
-        return ChatResult(content="这是 mock 回复", prompt_tokens=1, completion_tokens=2)
 
 
 @pytest.fixture
@@ -28,7 +19,6 @@ def anyio_backend():
 async def client(tmp_path: Path):
     store = LabelStore(tmp_path)
     app.dependency_overrides[get_label_store] = lambda: store
-    app.dependency_overrides[get_llm_client_dep] = lambda: FakeLLMClient()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

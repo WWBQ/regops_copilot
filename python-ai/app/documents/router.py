@@ -68,7 +68,7 @@ async def upload_document(
 
 @router.get("", response_model=DocumentListResponse)
 def list_documents(service: DocSvcDep) -> DocumentListResponse:
-    items = [_info(record) for record in service.registry.list_all()]
+    items = [_info(record) for record in service.list_records()]
     return DocumentListResponse(items=items)
 
 

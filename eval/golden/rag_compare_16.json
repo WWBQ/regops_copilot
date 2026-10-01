@@ -1,0 +1,173 @@
+{
+  "version": "rag-compare-v1",
+  "description": "多公司叙述性比较范围与证据门：公司隔离、共同期间、部门 ACL、任一方低证据即拒绝。使用固定证据计数，不调 LLM、不连向量库。",
+  "default_params": {
+    "corpus_doc_ids": [
+      "002594_2024",
+      "002594_2023",
+      "601633_2024",
+      "601633_2023",
+      "000333_2024",
+      "000333_2023",
+      "000651_2024",
+      "000651_2023",
+      "600031_2024",
+      "600031_2023",
+      "300750_2024",
+      "600519_2024"
+    ],
+    "min_hits_per_company": 1
+  },
+  "items": [
+    {
+      "id": "cmp-001",
+      "category": "compare_ready",
+      "question": "比亚迪和长城汽车2024年的供应链风险有哪些差异",
+      "dept": "research",
+      "expected_outcome": "rag_compare",
+      "expected_companies": ["002594", "601633"],
+      "expected_years": [2024]
+    },
+    {
+      "id": "cmp-002",
+      "category": "compare_ready",
+      "question": "美的集团与格力电器2024年的战略重点有什么不同",
+      "dept": "rm",
+      "expected_outcome": "rag_compare",
+      "expected_companies": ["000333", "000651"],
+      "expected_years": [2024]
+    },
+    {
+      "id": "cmp-003",
+      "category": "compare_ready",
+      "question": "三一重工和宁德时代2024年的内控风险分别是什么",
+      "dept": "compliance",
+      "expected_outcome": "rag_compare",
+      "expected_companies": ["300750", "600031"],
+      "expected_years": [2024]
+    },
+    {
+      "id": "cmp-004",
+      "category": "common_period",
+      "question": "比亚迪和长城汽车的未来展望有什么差异",
+      "dept": "research",
+      "expected_outcome": "rag_compare",
+      "expected_companies": ["002594", "601633"],
+      "expected_years": [2024]
+    },
+    {
+      "id": "cmp-005",
+      "category": "common_period",
+      "question": "比亚迪和长城汽车2023年的风险因素有何不同",
+      "dept": "research",
+      "expected_outcome": "rag_compare",
+      "expected_companies": ["002594", "601633"],
+      "expected_years": [2023]
+    },
+    {
+      "id": "cmp-006",
+      "category": "common_period",
+      "question": "美的集团与格力电器2023年的战略重点有什么不同",
+      "dept": "rm",
+      "expected_outcome": "rag_compare",
+      "expected_companies": ["000333", "000651"],
+      "expected_years": [2023]
+    },
+    {
+      "id": "cmp-007",
+      "category": "common_period",
+      "question": "比亚迪和长城汽车2023年的车型战略有什么差异",
+      "dept": "research",
+      "expected_outcome": "rag_compare",
+      "expected_companies": ["002594", "601633"],
+      "expected_years": [2023]
+    },
+    {
+      "id": "cmp-008",
+      "category": "period_blocked",
+      "question": "比亚迪和长城汽车的风险因素有何不同",
+      "dept": "research",
+      "corpus_doc_ids": ["002594_2024", "601633_2023"],
+      "expected_outcome": "rag_compare_blocked",
+      "expected_companies": ["002594", "601633"],
+      "expected_years": []
+    },
+    {
+      "id": "cmp-009",
+      "category": "period_blocked",
+      "question": "比亚迪和长城汽车2024年的风险因素有何不同",
+      "dept": "research",
+      "corpus_doc_ids": ["002594_2024", "601633_2023"],
+      "expected_outcome": "rag_compare_blocked",
+      "expected_companies": ["002594", "601633"],
+      "expected_years": [2024]
+    },
+    {
+      "id": "cmp-010",
+      "category": "period_blocked",
+      "question": "美的集团与格力电器2023年的战略重点有什么不同",
+      "dept": "rm",
+      "corpus_doc_ids": ["000333_2024", "000651_2023"],
+      "expected_outcome": "rag_compare_blocked",
+      "expected_companies": ["000333", "000651"],
+      "expected_years": [2023]
+    },
+    {
+      "id": "cmp-011",
+      "category": "acl_blocked",
+      "question": "比亚迪和美的集团2024年的供应链风险有什么差异",
+      "dept": "research",
+      "expected_outcome": "rag_compare_blocked",
+      "expected_companies": ["000333", "002594"],
+      "expected_years": [2024]
+    },
+    {
+      "id": "cmp-012",
+      "category": "acl_blocked",
+      "question": "比亚迪和长城汽车2024年的风险因素有什么差异",
+      "dept": "rm",
+      "expected_outcome": "rag_compare_blocked",
+      "expected_companies": ["002594", "601633"],
+      "expected_years": [2024]
+    },
+    {
+      "id": "cmp-013",
+      "category": "acl_blocked",
+      "question": "美的集团和格力电器2024年的战略重点有什么差异",
+      "dept": "research",
+      "expected_outcome": "rag_compare_blocked",
+      "expected_companies": ["000333", "000651"],
+      "expected_years": [2024]
+    },
+    {
+      "id": "cmp-014",
+      "category": "evidence_blocked",
+      "question": "比亚迪和长城汽车2024年的供应链风险有什么差异",
+      "dept": "research",
+      "evidence_counts": {"002594": 2, "601633": 0},
+      "expected_outcome": "rag_compare_blocked",
+      "expected_companies": ["002594", "601633"],
+      "expected_years": [2024]
+    },
+    {
+      "id": "cmp-015",
+      "category": "evidence_blocked",
+      "question": "美的集团和格力电器2024年的内控风险有什么差异",
+      "dept": "rm",
+      "evidence_counts": {"000333": 0, "000651": 0},
+      "expected_outcome": "rag_compare_blocked",
+      "expected_companies": ["000333", "000651"],
+      "expected_years": [2024]
+    },
+    {
+      "id": "cmp-016",
+      "category": "evidence_blocked",
+      "question": "美的集团与格力电器2023年的未来展望有什么差异",
+      "dept": "rm",
+      "evidence_counts": {"000333": 0, "000651": 3},
+      "expected_outcome": "rag_compare_blocked",
+      "expected_companies": ["000333", "000651"],
+      "expected_years": [2023]
+    }
+  ]
+}

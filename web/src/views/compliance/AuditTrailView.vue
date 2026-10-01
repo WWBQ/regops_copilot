@@ -50,7 +50,7 @@ onMounted(refresh)
     </header>
 
     <nav class="quick-links">
-      <router-link to="/settings/users" class="quick-link">登录 / 客户档案</router-link>
+      <router-link to="/settings/users" class="quick-link">登录 / 数据权限</router-link>
     </nav>
 
     <section v-if="!loggedIn" class="panel">

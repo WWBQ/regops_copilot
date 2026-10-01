@@ -40,6 +40,86 @@ main.py
 | `config.py` | 环境变量与全局配置 |
 | `logging_config.py` / `request_id.py` | 日志、Request ID 与 Trace 上下文 |
 
+## PDF 解析器切换
+
+默认用 Docling；MinerU 4.x 是可选的高精度解析模块。两者都会转换为统一的
+`PageBlock / TableBlock`，所以清洗、切块、Embedding 和 RAG 不需要分两套实现。
+
+```bash
+# 只有要用 MinerU 时才安装（默认 requirements.txt 不强制安装大型依赖）
+cd python-ai
+.venv/bin/pip install -r requirements-mineru.txt
+
+# 全局切换：写入项目根目录 .env
+DOCUMENT_PARSER_BACKEND=mineru
+MINERU_TIER=standard
+MINERU_OCR_MODE=auto
+
+# 单次批量入库覆盖全局配置
+.venv/bin/python scripts/ingest_pdf_to_vectors.py --parser mineru --no-parse-cache ../data/raw/demo.pdf
+```
+
+`POST /ingest` 也提供 `parser_backend=docling|mineru` 表单字段。两种解析器的
+parse artifact 缓存路径相互隔离，chunk 元数据会记录 `parser_backend`。MinerU
+未安装或解析失败时会让 ingest 明确失败，不会静默回退到 Docling，避免掩盖数据质量问题。
+
+## RAG 重排器切换
+
+默认使用本地 BGE Cross-Encoder。也可以把候选片段交给 OpenAI 兼容的本地
+Ollama/vLLM 或远程模型 API 做结构化相关性判断：
+
+```bash
+# BGE（默认）
+RAG_RERANK_ENABLED=true
+RAG_RERANK_BACKEND=bge
+
+# 本地 LLM
+RAG_RERANK_BACKEND=llm
+RAG_LLM_RERANK_DEPLOYMENT=local
+RAG_LLM_RERANK_MODEL=qwen3:8b
+RAG_LLM_RERANK_BASE_URL=http://127.0.0.1:11434/v1
+RAG_LLM_RERANK_API_KEY=local
+
+# 远程 API：填写供应商的 OpenAI 兼容地址、模型 ID 和独立 Key
+RAG_LLM_RERANK_DEPLOYMENT=api
+```
+
+Python 服务直接在宿主机运行时，本地地址可写 `127.0.0.1`；如果 Python 服务运行在
+Compose 容器内，macOS/Windows 应改用 `host.docker.internal`，或使用同一 Compose
+网络中的模型服务名。
+
+LLM 重排只接收 RRF 后的少量候选，默认 12 条、每条最多 800 字。返回结果用
+Pydantic 校验，模型输出的 0～100 分不会和向量/RRF 分数混算。调用或结构校验失败时
+会明确记录 trace 并回退到 BGE；模型明确判断“没有直接证据”时不会回退。
+
+`GET /ops/system/overview` 可查看脱敏后的当前后端、部署位置、模型和地址；API Key
+不会返回。每次请求的 `/ops/rag-traces` 还会记录实际后端、耗时、排序和降级情况。
+
+## 暂缓：模型问题改写
+
+后续可以增加一次结构化 Query Planner：由 LLM 把“某公司某年经营得怎么样”改写成
+受约束的查询计划，再由程序执行事实库与 RAG。当前暂不实现，仍使用确定性意图规则；
+未来实现时必须保留原问题，并校验公司、年份和指标白名单，不能无条件执行模型生成的
+自然语言查询。
+
+## 待办：RAG 配置寻优
+
+状态：未开始。使用固定评测集分别测试单公司 RAG 与多公司比较，寻找质量和延迟的最佳点，
+不要根据单次问答耗时直接决定参数。
+
+- 扫描 `rag_rerank_candidates` 与 `rag_compare_rerank_candidates`：12 / 24 / 40 / 80。
+- 扫描普通 `top_k`、`rag_compare_top_k_per_company`、`rag_vector_fetch_k` 和同页片段上限。
+- 对比 BGE 与 LLM 重排；API、本地部署分别记录。
+- 质量指标：Recall@k、MRR、nDCG、引用正确率、证据门控准确率和错误放行率。
+- 性能指标：冷启动/热启动、Embedding、检索、重排、模型首 Token、端到端首 Token、总耗时的 P50/P95。
+- 先满足质量与拒答安全门，再选择延迟和资源成本更低的配置。
+- 最终结果写入可复跑评测报告，并固定所选参数和模型版本。
+
+统一请求性能可通过 `GET /ops/performance-traces` 和
+`GET /ops/performance/overview` 查看。它把 AskNum、RAG、重排、回答模型、校验、
+流式首 Token 和端到端总耗时关联到同一个 Request ID；标准日志也会输出
+`performance_trace` JSON，但不会记录问题正文或文档片段。
+
 ## 阅读顺序
 
 建议按一条真实请求学习：

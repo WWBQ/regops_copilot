@@ -16,13 +16,12 @@ from app.db.chunk_repository import delete_chunks, insert_chunks
 from app.db.connection import get_connection
 from app.db.ingest_job_repository import create_job, update_job_status
 from app.db.pdf_document_repository import infer_doc_id, upsert_pdf_document
-from app.documents.registry import DocumentRegistry
 from app.documents.service import DocumentService
 from app.ingest.chunker import TextChunk, chunk_page_blocks
 from app.ingest.cleaner import clean_page_blocks
 from app.ingest.embeddings import embed_texts, get_embedding_model
 from app.ingest.models import PageBlock
-from app.ingest.parser import content_hash, parse_pdf
+from app.ingest.parser import content_hash, normalize_parser_backend, parse_pdf
 from app.ingest.parse_store import ParseArtifactStore
 from app.storage.local import LocalObjectStore
 
@@ -37,6 +36,7 @@ class IngestResult:
     deleted_chunks: int
     parse_cached: bool
     job_id: str | None = None
+    parser_backend: str = "docling"
 
 
 def _build_document_service() -> DocumentService:
@@ -47,8 +47,7 @@ def _build_document_service() -> DocumentService:
         public_base_url=settings.api_public_base_url,
         presign_secret=settings.object_store_presign_secret,
     )
-    registry = DocumentRegistry(Path(settings.object_store_root) / "_registry" / "documents.json")
-    return DocumentService(store, registry, default_bucket=settings.object_store_bucket)
+    return DocumentService(store, default_bucket=settings.object_store_bucket)
 
 
 def _set_job_status(job_id: str | None, status: str, error_message: str | None = None) -> None:
@@ -74,15 +73,37 @@ def _parse_or_load(
     *,
     use_parse_cache: bool,
     parse_store: ParseArtifactStore,
+    parser_backend: str,
 ) -> tuple[list[PageBlock], bool]:
     file_hash = content_hash(pdf_path)
-    if use_parse_cache and parse_store.exists(doc_id, file_hash, source_type="pdf"):
-        logger.info("load parse cache doc_id=%s", doc_id)
-        return parse_store.load_blocks(doc_id, file_hash, source_type="pdf"), True
+    if use_parse_cache and parse_store.exists(
+        doc_id,
+        file_hash,
+        source_type="pdf",
+        parser_backend=parser_backend,
+    ):
+        logger.info("load parse cache doc_id=%s backend=%s", doc_id, parser_backend)
+        try:
+            return (
+                parse_store.load_blocks(
+                    doc_id,
+                    file_hash,
+                    source_type="pdf",
+                    parser_backend=parser_backend,
+                ),
+                True,
+            )
+        except ValueError as exc:
+            logger.info("ignore stale parse cache doc_id=%s reason=%s", doc_id, exc)
 
-    logger.info("parse pdf doc_id=%s path=%s", doc_id, pdf_path.name)
-    blocks = parse_pdf(pdf_path)
-    parse_store.save_blocks(doc_id, blocks, source_type="pdf")
+    logger.info("parse pdf doc_id=%s path=%s backend=%s", doc_id, pdf_path.name, parser_backend)
+    blocks = parse_pdf(pdf_path, backend=parser_backend)
+    parse_store.save_blocks(
+        doc_id,
+        blocks,
+        source_type="pdf",
+        parser_backend=parser_backend,
+    )
     return blocks, False
 
 
@@ -94,6 +115,7 @@ def ingest_pdf_to_vectors(
     chunk_size: int = 512,
     chunk_overlap: int = 128,
     job_id: str | None = None,
+    parser_backend: str | None = None,
 ) -> IngestResult:
     pdf_path = pdf_path.resolve()
     if not pdf_path.is_file():
@@ -102,6 +124,7 @@ def ingest_pdf_to_vectors(
     resolved_doc_id = doc_id or infer_doc_id(pdf_path)
     job_id = _ensure_job(job_id, resolved_doc_id)
     settings = get_settings()
+    selected_parser = normalize_parser_backend(parser_backend)
     store = LocalObjectStore(
         Path(settings.object_store_root),
         default_bucket=settings.object_store_bucket,
@@ -121,9 +144,13 @@ def ingest_pdf_to_vectors(
             resolved_doc_id,
             use_parse_cache=use_parse_cache,
             parse_store=parse_store,
+            parser_backend=selected_parser,
         )
         parse_object_key = parse_store.object_key_for(
-            resolved_doc_id, upload.content_hash, source_type="pdf"
+            resolved_doc_id,
+            upload.content_hash,
+            source_type="pdf",
+            parser_backend=selected_parser,
         )
 
         _set_job_status(job_id, "CLEANING")
@@ -135,6 +162,7 @@ def ingest_pdf_to_vectors(
             doc_id=resolved_doc_id,
             source_file=pdf_path.name,
             content_hash=upload.content_hash,
+            parser_backend=selected_parser,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
         )
@@ -161,14 +189,14 @@ def ingest_pdf_to_vectors(
                 parse_object_key=parse_object_key,
                 ingest_status="ready",
             )
-            doc_service.save_parse_artifact(resolved_doc_id, blocks)
             update_job_status(conn, job_id=job_id, status="DONE")
             conn.commit()
 
         logger.info(
-            "ingest done doc_id=%s job_id=%s pages=%d chunks=%d deleted=%d cached=%s",
+            "ingest done doc_id=%s job_id=%s backend=%s pages=%d chunks=%d deleted=%d cached=%s",
             resolved_doc_id,
             job_id,
+            selected_parser,
             len(blocks),
             inserted,
             deleted,
@@ -181,6 +209,7 @@ def ingest_pdf_to_vectors(
             deleted_chunks=deleted,
             parse_cached=parse_cached,
             job_id=job_id,
+            parser_backend=selected_parser,
         )
     except Exception as exc:
         logger.exception("ingest failed doc_id=%s job_id=%s", resolved_doc_id, job_id)

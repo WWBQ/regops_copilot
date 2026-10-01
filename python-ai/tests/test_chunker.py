@@ -33,9 +33,51 @@ def test_chunk_page_blocks_includes_table_markdown():
     assert "531.9亿元" in chunks[0].content
     assert chunks[0].content.startswith("4、研发投入")
     assert chunks[0].metadata["has_table"] is True
-    assert chunks[0].metadata["section_title"] == "4、研发投入"
+    assert chunks[0].metadata["content_type"] == "table"
+    assert chunks[0].metadata["table_title"] == "4、研发投入"
+    assert chunks[0].metadata["table_text"] == chunks[0].content
+    assert chunks[0].metadata["table_html"].startswith("<table>")
+    assert chunks[0].metadata["company_code"] == "002594"
+    assert chunks[0].metadata["year"] == 2024
     assert "dept_acl" not in chunks[0].metadata
     assert "effective_date" not in chunks[0].metadata
+
+
+def test_chunk_page_blocks_separates_text_and_table_content():
+    blocks = [
+        PageBlock(
+            page_no=8,
+            text="经营情况\n公司持续推进海外渠道建设并提升核心产品竞争力。",
+            tables=[
+                TableBlock(
+                    page_no=8,
+                    rows=[["地区", "收入"], ["海外", "100亿元"]],
+                    markdown="地区 | 收入\n海外 | 100亿元",
+                    html="<table><tr><th>地区</th><th>收入</th></tr><tr><td>海外</td><td>100亿元</td></tr></table>",
+                    title="分地区收入",
+                )
+            ],
+            source_file="000333_2024.pdf",
+            content_hash="sha256:demo",
+        )
+    ]
+    chunks = chunk_page_blocks(
+        blocks,
+        doc_id="000333_2024",
+        source_file="000333_2024.pdf",
+        content_hash="sha256:demo",
+        parser_backend="mineru",
+    )
+
+    text_chunks = [chunk for chunk in chunks if chunk.metadata["content_type"] == "text"]
+    table_chunks = [chunk for chunk in chunks if chunk.metadata["content_type"] == "table"]
+    assert len(text_chunks) == 1
+    assert len(table_chunks) == 1
+    assert "100亿元" not in text_chunks[0].content
+    assert table_chunks[0].content == "分地区收入\n地区 | 收入\n海外 | 100亿元"
+    assert table_chunks[0].metadata["table_id"] == "000333_2024:p8:t1"
+    assert text_chunks[0].metadata["parser_backend"] == "mineru"
+    assert table_chunks[0].metadata["parser_backend"] == "mineru"
 
 
 def test_chunk_page_blocks_splits_long_page():

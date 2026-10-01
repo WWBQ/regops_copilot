@@ -1,7 +1,6 @@
 """RegOps 模型调用：LangChain 客户端、模型配置与业务返回类型。"""
 
 import logging
-from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from time import perf_counter
@@ -52,39 +51,6 @@ class StreamDelta:
     result: ChatResult | None = None
 
 
-class LLMClient(ABC):
-    """普通聊天与流式聊天共用的接口。"""
-
-    @abstractmethod
-    async def chat(
-        self,
-        messages: list[dict[str, Any]],
-        *,
-        temperature: float = 0.1,
-    ) -> str:
-        """返回模型文本回复。"""
-
-    @abstractmethod
-    async def chat_with_usage(
-        self,
-        messages: list[dict[str, Any]],
-        *,
-        temperature: float = 0.1,
-    ) -> ChatResult:
-        """返回文本与用量。"""
-
-    async def chat_stream(
-        self,
-        messages: list[dict[str, Any]],
-        *,
-        temperature: float = 0.1,
-    ) -> AsyncIterator[StreamDelta]:
-        result = await self.chat_with_usage(messages, temperature=temperature)
-        if result.content:
-            yield StreamDelta(text=result.content)
-        yield StreamDelta(done=True, result=result)
-
-
 def _model_error(exc: Exception) -> ModelError:
     if isinstance(exc, ModelError):
         return exc
@@ -121,7 +87,9 @@ def _chat_result(
     )
 
 
-class LangChainChatClient(LLMClient):
+class LLMClient:
+    """用 LangChain 调用模型，并转换成项目统一的结果与异常。"""
+
     def __init__(
         self,
         *,
@@ -132,6 +100,7 @@ class LangChainChatClient(LLMClient):
     ) -> None:
         if not api_key:
             raise ValueError("model API key is required")
+        self.model_id = model_id
         self._model = init_chat_model(
             model=model_id,
             model_provider="openai",
@@ -142,14 +111,26 @@ class LangChainChatClient(LLMClient):
             stream_usage=True,
         )
 
-    async def chat(
+    def chat_with_usage_sync(
         self,
         messages: list[dict[str, Any]],
         *,
         temperature: float = 0.1,
-    ) -> str:
-        result = await self.chat_with_usage(messages, temperature=temperature)
-        return result.content
+    ) -> ChatResult:
+        """同步调用供当前同步 RAG 检索链路使用。"""
+        started_at = perf_counter()
+        try:
+            response = self._model.invoke(
+                convert_to_messages(messages),
+                temperature=temperature,
+            )
+            return _chat_result(response, (perf_counter() - started_at) * 1000)
+        except Exception as exc:
+            logger.exception("LangChain model request failed")
+            mapped = _model_error(exc)
+            if mapped is exc:
+                raise
+            raise mapped from exc
 
     async def chat_with_usage(
         self,
@@ -206,20 +187,20 @@ def _model_ids(raw: str) -> list[str]:
     return list(dict.fromkeys(item.strip() for item in raw.split(",") if item.strip()))
 
 
-def _configured_models(settings: Settings) -> dict[str, tuple[str, str, str]]:
-    """模型 ID -> (供应商, API Key, OpenAI 兼容地址)。"""
-    models: dict[str, tuple[str, str, str]] = {}
+def _configured_models(settings: Settings) -> dict[str, tuple[str, str]]:
+    """模型 ID -> (API Key, OpenAI 兼容地址)。"""
+    models: dict[str, tuple[str, str]] = {}
     providers = (
-        ("deepseek", settings.deepseek_api_key, settings.deepseek_base_url, settings.deepseek_model_ids),
-        ("qwen", settings.qwen_api_key, settings.qwen_base_url, settings.qwen_model_ids),
+        (settings.deepseek_api_key, settings.deepseek_base_url, settings.deepseek_model_ids),
+        (settings.qwen_api_key, settings.qwen_base_url, settings.qwen_model_ids),
     )
-    for provider, api_key, base_url, configured_ids in providers:
+    for api_key, base_url, configured_ids in providers:
         if not api_key:
             continue
         for model_id in _model_ids(configured_ids):
             if any(existing.casefold() == model_id.casefold() for existing in models):
                 raise ValueError(f"duplicate model ID: {model_id}")
-            models[model_id] = (provider, api_key, base_url)
+            models[model_id] = (api_key, base_url)
     return models
 
 
@@ -246,8 +227,8 @@ def get_llm_client(settings: Settings | None = None, *, model: str | None = None
         logger.error("No LLM model configured")
         raise ValueError("no LLM model configured")
     model_id = resolve_model_id(model or settings.default_model, list(configured))
-    _provider, api_key, base_url = configured[model_id]
-    return LangChainChatClient(
+    api_key, base_url = configured[model_id]
+    return LLMClient(
         api_key=api_key,
         base_url=base_url,
         model_id=model_id,

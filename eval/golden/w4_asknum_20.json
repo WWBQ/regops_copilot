@@ -231,10 +231,11 @@
     {
       "id": "ask-015",
       "category": "missing",
-      "question": "宁德时代2024年净利润多少",
+      "question": "宁德时代2023年净利润多少",
       "expected_route": "metric_blocked",
       "expected_companies": ["300750"],
       "expected_concepts": ["net_profit"],
+      "expected_year": 2023,
       "expect_no_amount": true,
       "expected_lookups": [
         {

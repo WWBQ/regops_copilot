@@ -134,6 +134,12 @@ def test_parse_slots_qualitative_skips_asknum():
     assert slots.narrative is True
     assert try_answer("比亚迪利润怎么样", persist_trace=False) is None
 
+    operating = parse_slots("美的2024经营的怎么样")
+    assert operating.company_codes == ("000333",)
+    assert operating.years == (2024,)
+    assert operating.narrative is True
+    assert try_answer("美的2024经营的怎么样", persist_trace=False) is None
+
 
 def test_parse_concepts_does_not_steal_profit_before_tax():
     assert parse_concepts("利润总额是多少") == ["profit_before_tax"]
@@ -272,6 +278,59 @@ def test_try_answer_last_year_reports_coverage():
     assert result.slots.year == 2023
     assert "没有 2023 年" in result.reply
     assert "777" not in result.reply
+
+
+def test_try_answer_compares_two_companies_deterministically():
+    values = {
+        "002594": Decimal("777102547000"),
+        "601633": Decimal("202195469900"),
+    }
+
+    def fake_find(_conn, *, company_code, concept, year, scope):
+        return [
+            _row(
+                company_code=company_code,
+                concept=concept,
+                value=values[company_code],
+            )
+        ]
+
+    with patch("app.asknum.lookup.get_connection", return_value=_Conn()), patch(
+        "app.asknum.lookup.find_company_metrics", side_effect=fake_find
+    ):
+        result = try_answer(
+            "比亚迪和长城汽车2024年营业收入谁更高",
+            persist_trace=False,
+        )
+
+    assert result is not None
+    assert result.route == "metric"
+    assert result.intent == "asknum_compare"
+    assert "确定性比较" in result.reply
+    assert "比亚迪高于长城汽车" in result.reply
+    assert "差额为 574,907,077,100.00 元" in result.reply
+    assert len(result.lookups) == 2
+
+
+def test_try_answer_refuses_comparison_when_one_company_is_missing():
+    def fake_find(_conn, *, company_code, concept, year, scope):
+        if company_code == "002594":
+            return [_row(company_code=company_code, concept=concept)]
+        return []
+
+    with patch("app.asknum.lookup.get_connection", return_value=_Conn()), patch(
+        "app.asknum.lookup.find_company_metrics", side_effect=fake_find
+    ), patch("app.asknum.lookup.list_company_metric_years", return_value=[2024]):
+        result = try_answer(
+            "比亚迪和长城汽车2024年营业收入谁更高",
+            persist_trace=False,
+        )
+
+    assert result is not None
+    assert result.route == "metric_blocked"
+    assert "拒绝直接比较" in result.reply
+    assert "不会改用模型补全" in result.reply
+    assert "确定性比较" not in result.reply
 
 
 def test_try_answer_derived_looks_up_then_incomplete():

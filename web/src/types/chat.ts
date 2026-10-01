@@ -31,6 +31,28 @@ export interface PendingAsknum {
   hint?: string
 }
 
+export interface ComparisonClaim {
+  statement: string
+  citation_ids: number[]
+}
+
+export interface ComparisonCompanyResult {
+  company_code: string
+  company_name: string
+  summary: string
+  citation_ids: number[]
+}
+
+export interface CompanyComparisonResult {
+  answer_type: 'company_comparison'
+  comparison_allowed: boolean
+  periods: number[]
+  companies: ComparisonCompanyResult[]
+  similarities: ComparisonClaim[]
+  differences: ComparisonClaim[]
+  missing_evidence: string[]
+}
+
 export interface ChatResponse {
   reply: string
   model: string
@@ -44,7 +66,11 @@ export interface ChatResponse {
   prompt_tokens?: number
   completion_tokens?: number
   total_tokens?: number
+  /** 最终回答模型自身耗时 */
   latency_ms?: number
+  /** Python 端路由、检索、重排、模型和校验的端到端总耗时 */
+  total_latency_ms?: number
+  comparison?: CompanyComparisonResult | null
 }
 
 export interface ChatMessage {
@@ -62,11 +88,16 @@ export interface ChatMessage {
   tokenCount?: number
   /** AI 回复时 RAG/系统提示等输入侧 Token */
   promptTokenCount?: number
+  /** 最终回答模型自身耗时 */
   latencyMs?: number
+  /** 完整请求耗时；回答框展示此值 */
+  totalLatencyMs?: number
   /** 正在流式输出 */
   streaming?: boolean
   /** 流式等待时的状态文案 */
   statusText?: string
+  /** 多公司 RAG 的已校验结构化结果 */
+  comparison?: CompanyComparisonResult | null
   /** @deprecated 兼容旧缓存，请用 tokenCount */
   totalTokens?: number
 }

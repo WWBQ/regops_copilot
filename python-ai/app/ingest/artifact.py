@@ -8,7 +8,7 @@ from typing import Any
 
 from app.ingest.models import BBox, PageBlock, TableBlock, TableCellBlock
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -54,6 +54,8 @@ def table_block_to_dict(table: TableBlock) -> dict[str, Any]:
         "cells": [table_cell_to_dict(cell) for cell in table.cells],
         "bbox": _bbox_to_json(table.bbox),
         "markdown": table.markdown,
+        "html": table.html,
+        "title": table.title,
     }
 
 
@@ -87,6 +89,8 @@ def table_block_from_dict(raw: dict[str, Any]) -> TableBlock:
         cells=cells,
         bbox=_bbox_from_json(raw.get("bbox")),
         markdown=str(raw.get("markdown", "")),
+        html=str(raw.get("html", "")),
+        title=str(raw.get("title", "")),
     )
 
 

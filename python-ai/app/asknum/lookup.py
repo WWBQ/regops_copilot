@@ -350,6 +350,99 @@ def _footer() -> str:
     return "数字来自财务事实库已通过记录；点金额旁引用可打开事实库或年报页。不从年报估算，不手算 ROE / 毛利率。"
 
 
+def _format_comparison_value(concept: str, value: Decimal) -> str:
+    if concept == "eps":
+        return f"{value.quantize(Decimal('0.0001'))} 元/股"
+    return _format_cny(value)
+
+
+def _comparison_sentence(left: MetricLookup, right: MetricLookup, *, subject: str) -> str:
+    """只比较同科目、同期间、同口径且通过质量门的两个事实。"""
+    if left.row is None or right.row is None:
+        raise ValueError("comparison requires accepted facts")
+    left_value = left.row.value_yuan
+    right_value = right.row.value_yuan
+    if left_value is None or right_value is None:
+        raise ValueError("comparison requires numeric facts")
+    label = CONCEPT_LABELS.get(left.concept, left.concept)
+    if left_value == right_value:
+        return f"{subject}「{label}」相同，均为 {_format_comparison_value(left.concept, left_value)}。"
+    if left_value > right_value:
+        higher, lower = left, right
+        difference = left_value - right_value
+    else:
+        higher, lower = right, left
+        difference = right_value - left_value
+    higher_name = company_display_name(higher.company_code)
+    lower_name = company_display_name(lower.company_code)
+    return (
+        f"{subject}「{label}」中，{higher_name}高于{lower_name}，"
+        f"差额为 {_format_comparison_value(left.concept, difference)}。"
+    )
+
+
+def _year_comparison_sentence(older: MetricLookup, newer: MetricLookup) -> str:
+    if older.row is None or newer.row is None:
+        raise ValueError("comparison requires accepted facts")
+    older_value = older.row.value_yuan
+    newer_value = newer.row.value_yuan
+    if older_value is None or newer_value is None:
+        raise ValueError("comparison requires numeric facts")
+    company = company_display_name(newer.company_code)
+    label = CONCEPT_LABELS.get(newer.concept, newer.concept)
+    scope = SCOPE_LABELS.get(newer.scope, newer.scope)
+    if newer_value == older_value:
+        return f"{company}{scope}「{label}」在 {older.year} 年和 {newer.year} 年相同。"
+    direction = "增加" if newer_value > older_value else "减少"
+    difference = abs(newer_value - older_value)
+    return (
+        f"{company}{scope}「{label}」从 {older.year} 年到 {newer.year} 年{direction}"
+        f" {_format_comparison_value(newer.concept, difference)}。"
+    )
+
+
+def _deterministic_comparison_lines(
+    lookups: tuple[MetricLookup, ...],
+    slots: AsknumSlots,
+) -> list[str]:
+    """按公司或年份做确定性比较；不跨科目、不跨期间、不跨口径。"""
+    if not lookups or any(
+        hit.outcome != "ok" or hit.row is None or hit.row.value_yuan is None
+        for hit in lookups
+    ):
+        return []
+
+    by_key = {
+        (hit.company_code, hit.concept, hit.year, hit.scope): hit
+        for hit in lookups
+    }
+    lines: list[str] = []
+    if len(slots.company_codes) == 2:
+        left_code, right_code = slots.company_codes
+        for concept in slots.concepts:
+            for year in slots.years:
+                left = by_key.get((left_code, concept, year, slots.scope))
+                right = by_key.get((right_code, concept, year, slots.scope))
+                if left is None or right is None:
+                    continue
+                scope = SCOPE_LABELS.get(slots.scope, slots.scope)
+                lines.append(
+                    _comparison_sentence(left, right, subject=f"{year} 年{scope}")
+                )
+
+    if len(slots.years) >= 2:
+        ordered_years = sorted(set(slots.years))
+        for company_code in slots.company_codes:
+            for concept in slots.concepts:
+                for older_year, newer_year in zip(ordered_years, ordered_years[1:]):
+                    older = by_key.get((company_code, concept, older_year, slots.scope))
+                    newer = by_key.get((company_code, concept, newer_year, slots.scope))
+                    if older is None or newer is None:
+                        continue
+                    lines.append(_year_comparison_sentence(older, newer))
+    return lines
+
+
 def _session_uuid(session_id: str | None) -> str | None:
     if not session_id:
         return None
@@ -495,6 +588,17 @@ def _lookup_ready_result(slots: AsknumSlots, *, intent: str) -> AsknumResult:
         reply = f"{head}\n{bullets}"
         if route == "metric":
             reply = f"{reply}\n{_footer()}"
+    if intent == "asknum_compare":
+        comparison_lines = _deterministic_comparison_lines(lookups, slots)
+        if route == "metric" and comparison_lines:
+            reply = f"{reply}\n确定性比较：\n" + "\n".join(
+                f"- {line}" for line in comparison_lines
+            )
+        elif route != "metric":
+            reply = (
+                f"{reply}\n至少一项数据缺失、冲突或未通过质量门，"
+                "因此拒绝直接比较，也不会改用模型补全。"
+            )
     logger.info(
         "asknum route=%s companies=%s concepts=%s years=%s cites=%d",
         route,

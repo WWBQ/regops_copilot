@@ -29,6 +29,8 @@ class TableBlock:
     cells: list[TableCellBlock] = field(default_factory=list)
     bbox: BBox | None = None
     markdown: str = ""
+    html: str = ""
+    title: str = ""
 
 
 @dataclass

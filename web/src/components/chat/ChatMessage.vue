@@ -20,6 +20,33 @@ const displayTokenCount = computed(() => {
   return props.message.tokenCount ?? props.message.totalTokens
 })
 
+const displayTotalLatency = computed(() => {
+  return props.message.totalLatencyMs ?? props.message.latencyMs
+})
+
+const showModelOnlyNotice = computed(() => {
+  if (
+    props.message.role !== 'assistant'
+    || props.message.id === 'welcome'
+    || props.message.error
+    || props.message.streaming
+  ) {
+    return false
+  }
+  if (props.message.ragUsed || (props.message.citations?.length ?? 0) > 0) {
+    return false
+  }
+  return ![
+    'metric',
+    'metric_blocked',
+    'metric_clarify',
+    'rag',
+    'rag_blocked',
+    'rag_compare',
+    'rag_compare_blocked',
+  ].includes(props.message.route ?? '')
+})
+
 const routeLabel = computed(() => {
   const route = props.message.route
   if (typeof props.message.content === 'string' && props.message.content.includes('【数字校验拦截】')) {
@@ -41,7 +68,7 @@ const showUsage = computed(() => {
   if (props.message.role === 'user') {
     return displayTokenCount.value != null && displayTokenCount.value > 0
   }
-  return displayTokenCount.value != null && props.message.latencyMs != null
+  return displayTokenCount.value != null || displayTotalLatency.value != null
 })
 
 const boundCitations = computed(() => {
@@ -120,6 +147,7 @@ function openCitation(citation: Citation) {
   <article class="message" :class="message.role" @click="closePopover">
     <div class="avatar">{{ message.role === 'user' ? '你' : 'AI' }}</div>
     <div class="bubble" @click.stop>
+      <p v-if="showModelOnlyNotice" class="model-only-notice">模型回答，仅供参考</p>
       <p v-if="routeLabel" class="route-tag" :data-route="message.route || ''">{{ routeLabel }}</p>
       <p v-if="message.attachmentName" class="attachment-tag">📎 {{ message.attachmentName }}</p>
       <p v-if="message.streaming && !message.content" class="typing-status">
@@ -160,11 +188,16 @@ function openCitation(citation: Citation) {
           输入 Token {{ formatTokenCount(displayTokenCount ?? 0) }}
         </template>
         <template v-else>
-          输出 Token {{ formatTokenCount(displayTokenCount ?? 0) }}
+          <template v-if="displayTokenCount != null">
+            输出 Token {{ formatTokenCount(displayTokenCount) }}
+          </template>
           <template v-if="message.promptTokenCount">
             · 上下文 Token {{ formatTokenCount(message.promptTokenCount) }}
           </template>
-          · 耗时 {{ formatLatency(message.latencyMs ?? 0) }}
+          <template v-if="displayTotalLatency != null">
+            <template v-if="displayTokenCount != null || message.promptTokenCount"> · </template>
+            总耗时 {{ formatLatency(displayTotalLatency) }}
+          </template>
         </template>
       </p>
 
@@ -202,6 +235,19 @@ function openCitation(citation: Citation) {
 .route-tag[data-route='rag_blocked'] {
   background: #fff7ed;
   color: #c2410c;
+}
+
+.model-only-notice {
+  display: table;
+  margin: 0 0 10px;
+  padding: 3px 9px;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .attachment-tag {

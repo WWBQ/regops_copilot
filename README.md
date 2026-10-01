@@ -46,6 +46,10 @@ cd python-ai && python3 -m venv .venv && .venv/bin/pip install -r requirements.t
 cd web && npm install && cd ..
 ```
 
+默认 PDF 解析器是 Docling。如果需要切到 MinerU 4.x，再按需安装
+`python-ai/requirements-mineru.txt`，并设置 `DOCUMENT_PARSER_BACKEND=mineru`。详见
+[`python-ai/app/README.md`](./python-ai/app/README.md#pdf-解析器切换)。
+
 一键启停四个服务：
 
 ```bash

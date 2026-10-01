@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 
@@ -12,6 +12,7 @@ from app.core.dependencies import get_document_service
 from app.db.connection import get_connection
 from app.db.ingest_job_repository import create_job
 from app.documents.service import DocumentService
+from app.ingest.parser import normalize_parser_backend
 from app.ingest.pipeline import ingest_pdf_to_vectors
 from app.ingest.schemas import IngestJobResponse
 from app.storage.exceptions import ObjectNotFoundError
@@ -28,6 +29,7 @@ def _run_corpus_ingest(
     doc_id: str,
     job_id: str,
     use_parse_cache: bool,
+    parser_backend: str | None,
 ) -> None:
     try:
         ingest_pdf_to_vectors(
@@ -35,6 +37,7 @@ def _run_corpus_ingest(
             doc_id=doc_id,
             job_id=job_id,
             use_parse_cache=use_parse_cache,
+            parser_backend=parser_backend,
         )
     except Exception:
         logger.exception("background corpus ingest failed doc_id=%s job_id=%s", doc_id, job_id)
@@ -47,9 +50,11 @@ async def start_pdf_ingest(
     file: UploadFile | None = File(default=None),
     doc_id: str | None = Form(default=None),
     use_parse_cache: bool = Form(default=True),
+    parser_backend: Literal["docling", "mineru"] | None = Form(default=None),
     sync: bool = Form(default=False),
 ) -> IngestJobResponse:
     """上传或按已有 doc_id 触发批量 ingest，写入 ingest_job 全阶段状态。"""
+    selected_parser = normalize_parser_backend(parser_backend)
     resolved_doc_id: str | None = doc_id.strip() if doc_id else None
     source_filename: str | None = None
     reused = False
@@ -99,6 +104,7 @@ async def start_pdf_ingest(
             doc_id=resolved_doc_id,
             job_id=job_id,
             use_parse_cache=use_parse_cache,
+            parser_backend=selected_parser,
         )
         return IngestJobResponse(
             job_id=job_id,
@@ -109,6 +115,7 @@ async def start_pdf_ingest(
             chunks=result.chunks,
             reused=reused,
             source_filename=source_filename,
+            parser_backend=result.parser_backend,
         )
 
     background_tasks.add_task(
@@ -117,6 +124,7 @@ async def start_pdf_ingest(
         doc_id=resolved_doc_id,
         job_id=job_id,
         use_parse_cache=use_parse_cache,
+        parser_backend=selected_parser,
     )
     logger.info(
         "queued corpus ingest doc_id=%s job_id=%s filename=%s",
@@ -130,5 +138,6 @@ async def start_pdf_ingest(
         status="PENDING",
         reused=reused,
         source_filename=source_filename,
+        parser_backend=selected_parser,
         message="queued",
     )

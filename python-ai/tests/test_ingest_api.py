@@ -9,7 +9,6 @@ from httpx import ASGITransport, AsyncClient
 
 from app.core.dependencies import get_document_service, get_object_store, get_settings_dep
 from app.config import Settings
-from app.documents.registry import DocumentRegistry
 from app.documents.service import DocumentService
 from app.ingest.pipeline import IngestResult
 from app.main import app
@@ -22,7 +21,7 @@ def anyio_backend():
 
 
 @pytest.fixture
-async def ingest_client(tmp_path: Path):
+async def ingest_client(tmp_path: Path, document_repository_stub):
     root = tmp_path / "objects"
     store = LocalObjectStore(
         root,
@@ -30,8 +29,7 @@ async def ingest_client(tmp_path: Path):
         public_base_url="http://test",
         presign_secret="test-secret",
     )
-    registry = DocumentRegistry(root / "_registry" / "documents.json")
-    service = DocumentService(store, registry, default_bucket="regops-docs")
+    service = DocumentService(store, default_bucket="regops-docs")
     settings = Settings(
         object_store_root=str(root),
         object_store_bucket="regops-docs",
@@ -62,6 +60,7 @@ async def test_post_ingest_sync_runs_pipeline(ingest_client: AsyncClient, monkey
     def fake_ingest(pdf_path, **kwargs):
         assert kwargs["doc_id"] == "002594_2024"
         assert kwargs["job_id"] == "11111111-1111-1111-1111-111111111111"
+        assert kwargs["parser_backend"] == "mineru"
         assert Path(pdf_path).is_file()
         return IngestResult(
             doc_id="002594_2024",
@@ -70,6 +69,7 @@ async def test_post_ingest_sync_runs_pipeline(ingest_client: AsyncClient, monkey
             deleted_chunks=0,
             parse_cached=True,
             job_id=kwargs["job_id"],
+            parser_backend=kwargs["parser_backend"],
         )
 
     monkeypatch.setattr("app.ingest.router.ingest_pdf_to_vectors", fake_ingest)
@@ -77,7 +77,7 @@ async def test_post_ingest_sync_runs_pipeline(ingest_client: AsyncClient, monkey
     response = await ingest_client.post(
         "/ingest",
         files=files,
-        data={"doc_id": "002594_2024", "sync": "true"},
+        data={"doc_id": "002594_2024", "sync": "true", "parser_backend": "mineru"},
     )
     assert response.status_code == 200
     body = response.json()
@@ -86,6 +86,7 @@ async def test_post_ingest_sync_runs_pipeline(ingest_client: AsyncClient, monkey
     assert body["status"] == "DONE"
     assert body["pages"] == 3
     assert body["chunks"] == 9
+    assert body["parser_backend"] == "mineru"
 
 
 @pytest.mark.anyio

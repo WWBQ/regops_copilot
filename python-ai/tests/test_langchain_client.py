@@ -20,6 +20,13 @@ class FakeChatModel:
             raise self.response
         return self.response
 
+    def invoke(self, messages, *, temperature):
+        self.messages = messages
+        self.temperature = temperature
+        if isinstance(self.response, Exception):
+            raise self.response
+        return self.response
+
     async def astream(self, messages, *, temperature):
         self.messages = messages
         self.temperature = temperature
@@ -86,6 +93,27 @@ async def test_langchain_client_converts_messages_and_usage(monkeypatch):
     assert result.content == "已查到"
     assert result.total_tokens == 20
     assert result.latency_ms >= 0
+
+
+def test_langchain_client_supports_sync_rag_call(monkeypatch):
+    fake = FakeChatModel(
+        AIMessage(
+            content='{"supports_answer":false,"ranked":[]}',
+            usage_metadata={"input_tokens": 30, "output_tokens": 8, "total_tokens": 38},
+        )
+    )
+    monkeypatch.setattr("app.models.llm.init_chat_model", lambda **_kwargs: fake)
+    client = get_llm_client(_settings())
+
+    result = client.chat_with_usage_sync(
+        [{"role": "system", "content": "重排"}, {"role": "user", "content": "候选"}],
+        temperature=0.0,
+    )
+
+    assert isinstance(fake.messages[0], SystemMessage)
+    assert isinstance(fake.messages[1], HumanMessage)
+    assert fake.temperature == 0.0
+    assert result.total_tokens == 38
 
 
 

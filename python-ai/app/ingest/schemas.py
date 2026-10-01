@@ -12,4 +12,5 @@ class IngestJobResponse(BaseModel):
     chunks: int | None = None
     reused: bool | None = None
     source_filename: str | None = None
+    parser_backend: str | None = None
     message: str | None = None
