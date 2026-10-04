@@ -19,8 +19,10 @@ class FakeAgent:
 CAPTURED_CONTENTS: list[str] = []
 
 
-def fake_build_agent_for_runtime(*, thread_id: str, task_kind: str, repo_url: str | None = None):
-    del thread_id, task_kind, repo_url
+def fake_build_agent_for_runtime(
+    *, thread_id: str, task_kind: str, repo_url: str | None = None, model_id: str | None = None
+):
+    del thread_id, task_kind, repo_url, model_id
     return FakeAgent()
 
 
@@ -58,7 +60,7 @@ def main() -> None:
     thread_id = f"plan-response-runtime-{uuid4()}"
     try:
         result = runtime.run_plan_response_task(
-            repo_url="https://gitee.com/msb-goldbin/ai_coding",
+            repo_url="https://gitee.com/example-org/sample_repo",
             prompt="我想把这个项目的数据存储改为：sqlite数据库",
             thread_id=thread_id,
         )
@@ -98,7 +100,7 @@ def main() -> None:
         }
 
         revision_result = runtime.run_agent_task(
-            repo_url="https://gitee.com/msb-goldbin/ai_coding",
+            repo_url="https://gitee.com/example-org/sample_repo",
             prompt="一个用户只能授予一个角色，再生成新的方案",
             thread_id=thread_id,
         )
@@ -115,7 +117,7 @@ def main() -> None:
 
         captured_before_qa = len(CAPTURED_CONTENTS)
         qa_result = runtime.run_agent_task(
-            repo_url="https://gitee.com/msb-goldbin/ai_coding",
+            repo_url="https://gitee.com/example-org/sample_repo",
             prompt="当前项目的记忆文件内容是什么？",
             thread_id=thread_id,
         )

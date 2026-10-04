@@ -13,6 +13,11 @@ const props = withDefaults(
     backendOk?: boolean | null
     javaOk?: boolean | null
     pythonOk?: boolean | null
+    allowAttachment?: boolean
+    showModelSelector?: boolean
+    placeholderText?: string
+    stopLabel?: string
+    unavailableText?: string
   }>(),
   {
     models: () => [],
@@ -20,6 +25,11 @@ const props = withDefaults(
     backendOk: null,
     javaOk: undefined,
     pythonOk: undefined,
+    allowAttachment: true,
+    showModelSelector: true,
+    placeholderText: '',
+    stopLabel: '停止',
+    unavailableText: '问答暂不可用，复核和审计仍可用',
   },
 )
 
@@ -63,9 +73,9 @@ const placeholder = computed(() => {
     return 'Java BFF 不可用'
   }
   if (pythonOk.value === false || props.disabled) {
-    return '问答暂不可用，复核和审计仍可用'
+    return props.unavailableText
   }
-  return '输入合规/监管或年报相关问题，Enter 发送'
+  return props.placeholderText || '输入合规/监管或年报相关问题，Enter 发送'
 })
 
 const statusDotClass = computed(() => {
@@ -86,7 +96,7 @@ const statusTitle = computed(() => {
     return 'Java BFF 不可用'
   }
   if (pythonOk.value === false) {
-    return '问答不可用，复核和审计仍可用'
+    return props.unavailableText
   }
   if (javaOk.value === true && pythonOk.value === true) {
     return '服务已连接'
@@ -145,6 +155,7 @@ function onModelChange(event: Event) {
   <div class="composer">
     <div class="composer-row">
       <button
+        v-if="allowAttachment"
         type="button"
         class="attach-btn"
         title="上传 PDF（本会话有效）"
@@ -154,6 +165,7 @@ function onModelChange(event: Event) {
         {{ uploading ? '…' : '📎' }}
       </button>
       <input
+        v-if="allowAttachment"
         ref="fileInputRef"
         type="file"
         accept=".pdf,application/pdf"
@@ -173,7 +185,7 @@ function onModelChange(event: Event) {
       <label class="model-select-wrap" :title="statusTitle">
         <span class="status-dot" :class="statusDotClass" aria-hidden="true" />
         <select
-          v-if="hasModels"
+          v-if="showModelSelector && hasModels"
           class="model-select"
           :value="model"
           :disabled="loading || uploading || inputLocked"
@@ -183,11 +195,11 @@ function onModelChange(event: Event) {
             {{ modelLabel(item) }}
           </option>
         </select>
-        <span v-else class="model-unavailable">无模型</span>
+        <span v-else class="model-unavailable">{{ showModelSelector ? '无模型' : 'Agent' }}</span>
       </label>
 
       <button type="button" class="send-btn" :disabled="!canSend" @click="submit">
-        {{ loading ? '停止' : '发送' }}
+        {{ loading ? stopLabel : '发送' }}
       </button>
     </div>
   </div>

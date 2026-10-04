@@ -20,6 +20,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: '问答',
     items: [
       { id: 'chat', label: '合规问答', path: '/', enabled: true },
+      { id: 'risk-agent', label: '金融风险审计助手', path: '/risk-agent', enabled: true },
     ],
   },
   {

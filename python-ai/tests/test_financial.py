@@ -242,6 +242,8 @@ def test_g3_pdf_bbox_required_web_hash_ok():
     web_fail, reason = validate_fact_evidence({"source_type": "web", "content_hash": ""})
     assert web_fail is False
     assert "content_hash" in reason
+    short_hash, _ = validate_fact_evidence({"source_type": "web", "content_hash": "sha256:short"})
+    assert short_hash is False
 
 
 def test_extract_f10_and_gates_pass(tmp_path: Path):

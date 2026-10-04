@@ -13,10 +13,10 @@ from agent.prompt import get_system_prompt
 
 def main() -> None:
     review_prompts = [
-        "请审查这个 PR：https://gitee.com/msb-goldbin/ai_coding/pulls/8",
+        "请审查这个 PR：https://gitee.com/example-org/sample_repo/pulls/8",
         "帮我做一次代码审查，只 review，不要修改代码",
         "请调用 reviewer 检查 Pull Request",
-        "请帮我审查这个PR：https://gitee.com/msb-goldbin/abc-test/pulls/3，只做代码 review，不要修改代码。请读取 PR diff，审查规则，并输出中文审查报告。",
+        "请帮我审查这个PR：https://gitee.com/example-org/abc-test/pulls/3，只做代码 review，不要修改代码。请读取 PR diff，审查规则，并输出中文审查报告。",
     ]
     for prompt in review_prompts:
         task_kind = classify_task_kind(prompt)
@@ -24,7 +24,7 @@ def main() -> None:
         assert is_read_only_task(task_kind), "review 必须是只读任务"
 
     review_fix_plan_prompts = [
-        "请读取 /reviews/ai_coding/pr-8-review.md，并结合 review findings 生成修复方案，先不要修改代码",
+        "请读取 /reviews/sample_repo/pr-8-review.md，并结合 review findings 生成修复方案，先不要修改代码",
         "根据审查报告和结构化 findings，给我一个修复方案",
         "请读取 /reviews/abc-test/pr-3-review.md，并结合 review findings 生成修复方案，先不要修改代码。",
     ]

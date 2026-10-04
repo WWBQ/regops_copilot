@@ -13,6 +13,29 @@ export interface Citation {
   kind?: string | null
 }
 
+export interface RiskFinding {
+  id?: string | null
+  risk_type: string
+  severity: 'low' | 'medium' | 'high'
+  conclusion: string
+  evidence_ids: number[]
+  data_points: string[]
+  uncertainty: string
+  review_question: string
+  review_status?: string | null
+}
+
+export interface RiskAuditResult {
+  id?: string | null
+  company_code: string
+  company_name: string
+  year: number
+  status: 'completed' | 'partial' | 'insufficient_evidence'
+  summary: string
+  evidence_gaps: string[]
+  findings: RiskFinding[]
+}
+
 export interface ChatRequest {
   message: string
   temperature?: number
@@ -96,8 +119,14 @@ export interface ChatMessage {
   streaming?: boolean
   /** 流式等待时的状态文案 */
   statusText?: string
+  /** Agent 单轮执行中的已完成阶段；最终结论仍放在 content */
+  stages?: string[]
+  /** 当前正在生成的阶段文本 */
+  stageText?: string
   /** 多公司 RAG 的已校验结构化结果 */
   comparison?: CompanyComparisonResult | null
+  /** 金融风险审计 Agent 保存的结构化初筛结果 */
+  riskResult?: RiskAuditResult | null
   /** @deprecated 兼容旧缓存，请用 tokenCount */
   totalTokens?: number
 }

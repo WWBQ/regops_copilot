@@ -18,6 +18,7 @@ main.py
 | `chat/` | 统一聊天入口，路由到普通对话、RAG 或问数 | `router.py` |
 | `models/` | LangChain 模型调用、模型选择、Token 与延迟 | `llm.py` |
 | `rag/` | 向量与关键词召回、RRF、精排、引用、数字校验 | `service.py` |
+| `mcp/` | 对 Agent 提供金融事实和年报证据的只读 MCP 服务端 | `financial_server.py` |
 | `asknum/` | 公司/科目/年份解析，查询财务事实库，拒绝不可靠数字 | `lookup.py` |
 | `documents/` | 文档上传、元数据、预签名查看地址 | `router.py` → `service.py` |
 | `ingest/` | PDF 解析、清洗、切分、Embedding、财务数据校验与入库 | `pipeline.py` |
@@ -39,6 +40,21 @@ main.py
 | `security/` | Java → Python 服务身份校验 |
 | `config.py` | 环境变量与全局配置 |
 | `logging_config.py` / `request_id.py` | 日志、Request ID 与 Trace 上下文 |
+
+## 金融 MCP 服务端
+
+金融工具放在本项目的 `app/mcp/`；`app/rag/` 只负责检索算法。现有 FastAPI 在受服务令牌保护的 `/mcp/` 挂载 FastMCP HTTP 服务，Agent 项目的 `agent/mcp/` 作为客户端只发现两项白名单工具。服务不可达或工具不完整时，风险初筛页面仍返回 503。
+
+普通启动已从 `requirements.txt` 安装 FastMCP，无需另外启动进程。可选的 stdio 独立验证环境：进入 `python-ai` 目录后运行：
+
+```bash
+python3.14 -m venv .venv-mcp
+./.venv-mcp/bin/python -m pip install -r requirements-mcp.txt
+./.venv-mcp/bin/python scripts/verify_financial_mcp.py
+./.venv-mcp/bin/python -m app.mcp.financial_server
+```
+
+最后一条命令是可选的 stdio 服务，不用于 RegOps 页面。页面实际使用 `http://127.0.0.1:8000/mcp/`（Compose 内为 `http://python-ai:8000/mcp/`）。`lookup_financial_facts` 通过 `REGOPS_API_BASE_URL` 读取 F10 网页结构化事实：只接受质量门 `auto_accepted`、合并报表、人民币、完整 SHA-256 来源哈希；返回中明确标注 `source_type=web` 和 `content_hash`，不伪造 PDF 页码。哈希在入库时由原始 F10 文件包计算，查询时只校验已存哈希格式与质量门状态，不重新读取原始文件。`search_report_evidence` 则在本服务内按公司、年份和入库状态锁定 PDF 年报，再直接复用 RAG 检索，返回带页码的候选片段，不经过 `/chat` 或回答模型。配置为本地 BGE 时可执行重排；配置为 LLM 重排时退回 Hybrid 检索，避免工具额外调用聊天模型。候选片段仍需核对年报原文。
 
 ## PDF 解析器切换
 

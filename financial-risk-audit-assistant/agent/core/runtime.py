@@ -33,6 +33,8 @@ from agent.core.repo_memory import ensure_repo_memory_initialized, repo_project_
 from agent.core.repo_memory_update import RepoMemoryUpdate, update_repo_memory_from_text
 from agent.core.settings import PROJECTS_DIR, WORKSPACE_ROOT
 from agent.core.streaming_runtime import run_agent_with_event_stream
+from agent.financial.citations import citations_from_messages
+from agent.financial.risk_result import answer_hash, parse_risk_audit_output
 from agent.core.task_intent import classify_task_kind, is_pull_only_task, is_workspace_listing_task
 from agent.server import get_agent
 from agent.tools.gitee_api import mask_token, parse_gitee_repo_url
@@ -49,6 +51,7 @@ def _build_agent_for_runtime(
     thread_id: str,
     task_kind: str,
     repo_url: str | None = None,
+    model_id: str | None = None,
 ):
     """为 FastAPI runtime 构造 open-swe 风格的 Agent config。
 
@@ -74,6 +77,8 @@ def _build_agent_for_runtime(
     if repo_url:
         # 仓库地址在 Agent 工厂中会被用于初始化本地仓库上下文和仓库记忆。
         configurable["repo_url"] = repo_url
+    if model_id:
+        configurable["model_id"] = model_id
     return get_agent({"configurable": configurable})
 
 
@@ -187,7 +192,7 @@ def _local_workspace_notice(repo_url: str | None) -> str:
     return (
         "本轮没有绑定 Gitee 仓库。只在当前会话已经绑定的本地工作目录里读写，"
         "不要跳出工作区，不要克隆，不要 fetch，不要访问 Gitee。"
-        "禁止回落到 https://gitee.com/msb-goldbin/ai_coding 或任何默认仓库。\n"
+        "未提供仓库地址时不绑定任何远程仓库。\n"
         "只有用户明确说上传、推上去或提交到仓库时，才调用 upload_to_gitee，仓库地址从这句话里取。\n"
         "开 PR 调用 open_gitee_pull_request，写审查评论调用 publish_gitee_pr_comment，同样只在用户明确要求时用。\n"
         "密钥没配好时要说明缺少 GITEE_TOKEN 或 SCM_GITEE_TOKEN，不要假装已经上传成功。\n\n"
@@ -232,9 +237,9 @@ def _build_agent_user_content(
         )
     elif task_kind == "financial_audit":
         task_instruction = (
-            "这是公开财报风险线索初筛任务。只能调用已授权的财务事实与年报证据工具；"
+            "这是公开财报风险线索初筛任务。只能使用已接入的两项金融 MCP 工具核查事实与年报证据；"
             "不得执行本机命令、修改文件或操作 Git/Gitee。"
-            "如果工具未配置、证据不足或数据冲突，明确告知用户并停止推断。"
+            "工具不可用或证据不足时明确告知用户并停止推断。"
         )
     else:
         task_instruction = (
@@ -662,7 +667,7 @@ def run_pull_only_task(*, repo_url: str | None, prompt: str, thread_id: str | No
         repo_url = match.group(0) if match else ""
     if not repo_url:
         raise RuntimeError(
-            "没有仓库地址。同步远程代码需要你在这句话里给出 Gitee 仓库，不会使用默认仓库 https://gitee.com/msb-goldbin/ai_coding。"
+            "没有仓库地址。同步远程代码需要你在这句话里给出 Gitee 仓库地址。"
         )
     should_record_user_message = thread_id is None
     thread_id = initialize_task_record(
@@ -855,6 +860,8 @@ def run_agent_task(
     prompt: str,
     thread_id: str | None = None,
     event_sink: RuntimeEventSink | None = None,
+    forced_financial_audit: bool = False,
+    model_id: str | None = None,
 ) -> dict[str, Any]:
     """运行一次普通 Agent 任务的总入口。
 
@@ -871,15 +878,15 @@ def run_agent_task(
     """
 
     # 两个直达分支都不需要 LLM，能显著减少模型调用和等待时间。
-    if is_workspace_listing_task(prompt):
+    if not forced_financial_audit and is_workspace_listing_task(prompt):
         return run_workspace_listing_task(repo_url=repo_url, prompt=prompt, thread_id=thread_id)
 
-    if is_pull_only_task(prompt):
+    if not forced_financial_audit and is_pull_only_task(prompt):
         return run_pull_only_task(repo_url=repo_url, prompt=prompt, thread_id=thread_id)
 
     # 第一层用户意图识别。这里只得到粗粒度 task_kind，后续还会经过方案确认、
     # 只读权限和 coding 前置方案等 runtime 策略兜底。
-    task_kind = classify_task_kind(prompt)
+    task_kind = "financial_audit" if forced_financial_audit else classify_task_kind(prompt)
     # 新任务创建新 thread；继续对话时使用前端已有 thread_id，确保 checkpoint 接上历史。
     thread_id = thread_id or str(uuid.uuid4())
     store = get_store()
@@ -890,7 +897,7 @@ def run_agent_task(
     display_prompt = prompt
     coding_prompt = prompt
 
-    if existing_thread and _is_approval_prompt(prompt):
+    if not forced_financial_audit and existing_thread and _is_approval_prompt(prompt):
         # 讲课重点：
         # “确认实施”不能直接等价于“执行当前这几个字”。
         # 必须先回到当前 thread 的历史消息里，找到最近一条仍在等待确认的技术方案；
@@ -904,7 +911,7 @@ def run_agent_task(
                 or _latest_non_approval_user_prompt(thread_id, existing_thread.get("user_prompt") or prompt)
             )
             task_kind = "coding"
-    elif existing_thread:
+    elif not forced_financial_audit and existing_thread:
         # 如果当前会话已经有一版等待确认的技术方案，而用户没有确认实施，
         # 只有用户明确说“修改/重新生成/补充方案”时，才把这轮输入视为方案修订。
         # 普通问答、代码审查、查看记忆文件等只读任务不能被历史方案劫持。
@@ -919,7 +926,7 @@ def run_agent_task(
                 revision_prompt=prompt,
                 event_sink=event_sink,
             )
-    if existing_thread and approved_plan_text is None and _is_approval_prompt(prompt):
+    if not forced_financial_audit and existing_thread and approved_plan_text is None and _is_approval_prompt(prompt):
         # 没有可确认的技术方案时，把“确认”当作普通问题处理，避免误执行旧任务。
         task_kind = classify_task_kind(prompt)
 
@@ -970,7 +977,10 @@ def run_agent_task(
     record_event(thread_id, "agent", "构建 Agent 运行图", status="in_progress")
     # get_agent 会根据 config 注入 backend、tools、skills、middleware 和系统提示词。
     # runtime 不直接拼装这些底层能力，避免调度层和 Agent 工厂耦合过深。
-    agent = _build_agent_for_runtime(thread_id=thread_id, task_kind=task_kind, repo_url=repo.clone_url if repo else None)
+    agent = _build_agent_for_runtime(
+        thread_id=thread_id, task_kind=task_kind,
+        repo_url=repo.clone_url if repo else None, model_id=model_id,
+    )
     logger.info("Agent 图已构建：thread_id=%s", thread_id)
     record_event(thread_id, "agent", "构建 Agent 运行图", status="completed")
     try:
@@ -995,9 +1005,48 @@ def run_agent_task(
         store.finish_open_run_events(thread_id, status="completed")
         store.update_thread_status(thread_id, "completed")
         store.record_run(run_id=run_id, thread_id=thread_id, status="completed", finished=True)
-        record_event(thread_id, "done", "任务完成", status="completed")
         messages = result.get("messages", [])
         final_answer = _extract_final_assistant_text(messages)
+        citations = citations_from_messages(messages) if task_kind == "financial_audit" else []
+        risk_result = None
+        if task_kind == "financial_audit" and final_answer:
+            final_answer, parsed_result, structure_error = parse_risk_audit_output(
+                final_answer,
+                available_citation_ids=set(range(1, len(citations) + 1)),
+            )
+            if parsed_result is not None:
+                risk_result = store.save_risk_audit_result(
+                    result_id=str(uuid.uuid4()),
+                    run_id=run_id,
+                    thread_id=thread_id,
+                    payload=parsed_result.model_dump(),
+                    report_markdown=final_answer,
+                    answer_hash=answer_hash(final_answer),
+                )
+                record_event(
+                    thread_id,
+                    f"risk-structure:{run_id}",
+                    "保存结构化风险线索",
+                    kind="other",
+                    status="completed",
+                    detail=f"findings={len(parsed_result.findings)}",
+                )
+            else:
+                logger.warning(
+                    "金融初筛未形成可保存的结构化结果：thread_id=%s run_id=%s reason=%s",
+                    thread_id,
+                    run_id,
+                    structure_error,
+                )
+                record_event(
+                    thread_id,
+                    f"risk-structure:{run_id}",
+                    "结构化风险线索校验未通过",
+                    kind="other",
+                    status="error",
+                    detail=structure_error,
+                )
+        record_event(thread_id, "done", "任务完成", status="completed")
         if final_answer and repo is not None:
             # 仓库记忆只记录最终稳定结论，不记录所有中间 chunk。普通本地任务没有仓库记忆。
             # branch/pr 信息来自 Store 中的最新业务状态，通常由 Gitee 工具在执行过程中写入。
@@ -1013,13 +1062,21 @@ def run_agent_task(
                 ),
             )
         logger.info("任务完成：thread_id=%s run_id=%s messages=%s", thread_id, run_id, len(messages))
-        return {"thread_id": thread_id, "run_id": run_id, "status": "completed", "messages": messages}
+        return {
+            "thread_id": thread_id,
+            "run_id": run_id,
+            "status": "completed",
+            "messages": messages,
+            "final_answer": final_answer,
+            "citations": citations,
+            "risk_result": risk_result,
+        }
     except Exception as exc:
         # 异常路径必须同时关闭未完成事件、更新 thread 状态和 run 状态。
         # 如果漏掉其中任何一项，前端可能会一直停留在“ 运行中”。
         store.finish_open_run_events(thread_id, status="error")
         store.update_thread_status(thread_id, "failed")
-        record_event(thread_id, "model", "调用 deepseek-v4-pro", status="error")
+        record_event(thread_id, "model", f"调用 {model_id or '默认模型'}", status="error")
         record_event(thread_id, "failed", "任务失败", status="error", detail=mask_token(str(exc)))
         store.record_run(
             run_id=run_id,
@@ -1044,12 +1101,13 @@ def get_task(thread_id: str) -> dict[str, Any] | None:
     if thread is None:
         return None
     thread["findings"] = store.list_findings(thread_id)
+    thread["risk_audit_results"] = store.list_risk_audit_results(thread_id)
     thread["latest_run"] = store.get_latest_run(thread_id)
     thread["run_events"] = store.list_run_events(thread_id)
     return thread
 
 
-def list_tasks(limit: int = 50) -> list[dict[str, Any]]:
+def list_tasks(limit: int = 50, *, owner_prefix: str | None = None) -> list[dict[str, Any]]:
     """读取最近任务列表，供页面展示历史运行记录。
 
     返回值包含最新 run 和 run_events，方便列表页展示任务状态、运行耗时和简要步骤。
@@ -1057,11 +1115,12 @@ def list_tasks(limit: int = 50) -> list[dict[str, Any]]:
     """
 
     store = get_store()
-    threads = store.list_threads(limit=limit)
+    threads = store.list_threads(limit=limit, owner_prefix=owner_prefix)
     for thread in threads:
         thread_id = thread["thread_id"]
         thread["latest_run"] = store.get_latest_run(thread_id)
         thread["run_events"] = store.list_run_events(thread_id)
+        thread["risk_audit_results"] = store.list_risk_audit_results(thread_id)
     return threads
 
 

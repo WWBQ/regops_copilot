@@ -44,6 +44,7 @@ const showModelOnlyNotice = computed(() => {
     'rag_blocked',
     'rag_compare',
     'rag_compare_blocked',
+    'risk_agent',
   ].includes(props.message.route ?? '')
 })
 
@@ -153,14 +154,57 @@ function openCitation(citation: Citation) {
       <p v-if="message.streaming && !message.content" class="typing-status">
         {{ message.statusText || '正在回复…' }}
       </p>
+      <details
+        v-if="message.route === 'risk_agent' && ((message.stages?.length ?? 0) > 0 || message.stageText)"
+        class="agent-stages"
+        :open="Boolean(message.streaming && !message.content)"
+      >
+        <summary>执行过程（{{ (message.stages?.length ?? 0) + (message.stageText ? 1 : 0) }} 个阶段）</summary>
+        <ol>
+          <li v-for="(stage, index) in message.stages" :key="index">{{ stage }}</li>
+          <li v-if="message.stageText" class="agent-current-stage">{{ message.stageText }}</li>
+        </ol>
+      </details>
       <div
-        v-else-if="htmlContent"
+        v-if="message.content && htmlContent"
         class="content markdown-body"
         :class="{ streaming: message.streaming }"
         v-html="htmlContent"
         @click="onContentClick"
       />
-      <p v-else class="content" :class="{ streaming: message.streaming }">{{ message.content }}</p>
+      <p v-else-if="message.content" class="content" :class="{ streaming: message.streaming }">{{ message.content }}</p>
+
+      <details v-if="message.role === 'assistant' && message.riskResult" class="risk-result">
+        <summary>
+          结构化风险线索（{{ message.riskResult.findings.length }}）
+          · {{ message.riskResult.company_name }} {{ message.riskResult.year }}
+        </summary>
+        <p class="risk-summary">{{ message.riskResult.summary }}</p>
+        <article
+          v-for="finding in message.riskResult.findings"
+          :key="finding.id || `${finding.risk_type}-${finding.conclusion}`"
+          class="risk-finding"
+        >
+          <header>
+            <strong>{{ finding.risk_type }}</strong>
+            <span class="risk-severity" :data-severity="finding.severity">
+              {{ finding.severity === 'high' ? '高' : finding.severity === 'medium' ? '中' : '低' }}
+            </span>
+          </header>
+          <p>{{ finding.conclusion }}</p>
+          <p v-if="finding.evidence_ids.length" class="risk-evidence">
+            证据：{{ finding.evidence_ids.map((id) => `[${id}]`).join(' ') }}
+          </p>
+          <p class="risk-review-question"><strong>人工核查：</strong>{{ finding.review_question }}</p>
+          <p class="risk-uncertainty"><strong>不确定性：</strong>{{ finding.uncertainty }}</p>
+        </article>
+        <div v-if="message.riskResult.evidence_gaps.length" class="risk-gaps">
+          <strong>证据缺口</strong>
+          <ul>
+            <li v-for="gap in message.riskResult.evidence_gaps" :key="gap">{{ gap }}</li>
+          </ul>
+        </div>
+      </details>
 
       <div
         v-if="activeCitation"
@@ -254,6 +298,109 @@ function openCitation(citation: Citation) {
   margin: 0 0 8px;
   font-size: 13px;
   color: var(--muted);
+}
+
+.agent-stages {
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.agent-stages summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.agent-stages ol {
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 8px 0 0;
+  padding-left: 22px;
+}
+
+.agent-stages li {
+  margin: 6px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.agent-current-stage {
+  color: var(--text-strong);
+}
+
+.risk-result {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+  background: #f0f9ff;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.risk-result summary {
+  cursor: pointer;
+  color: #075985;
+  font-weight: 700;
+}
+
+.risk-summary,
+.risk-finding p {
+  margin: 8px 0 0;
+}
+
+.risk-finding {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.risk-finding header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.risk-severity {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 11px;
+}
+
+.risk-severity[data-severity='medium'] {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.risk-severity[data-severity='high'] {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.risk-evidence,
+.risk-uncertainty {
+  color: var(--muted);
+}
+
+.risk-review-question {
+  color: #334155;
+}
+
+.risk-gaps {
+  margin-top: 10px;
+}
+
+.risk-gaps ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
 }
 
 .usage-stats {

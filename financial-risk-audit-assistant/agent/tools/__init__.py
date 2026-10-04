@@ -15,7 +15,6 @@ from __future__ import annotations
 
 # 网页读取工具：用于读取用户给定的官方文档、错误页面或资料链接。
 from .fetch_url_tools import fetch_url
-from .financial_audit import lookup_financial_facts, search_report_evidence
 # Gitee 工具：用于把已经推送的分支转换为 PR，并支持向 PR 写评论。
 from .gitee_tools import get_gitee_pull_request_context, open_gitee_pull_request, publish_gitee_pr_comment, upload_to_gitee
 # Review 工具：用于结构化保存和读取代码审查发现。
@@ -37,10 +36,8 @@ __all__ = [
     "get_review_diff_summary",
     "list_review_findings",
     "load_default_review_rules",
-    "lookup_financial_facts",
     "open_gitee_pull_request",
     "publish_gitee_pr_comment",
-    "search_report_evidence",
     "upload_to_gitee",
     "validate_review_finding_location",
     "web_search",

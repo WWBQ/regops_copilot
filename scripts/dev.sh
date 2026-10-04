@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# RegOps Copilot 本地开发编排：db(pgvector 容器) + python-ai + java-service + web
+# RegOps Copilot 本地开发编排：db + python-ai + risk-agent + java-service + web
 #
 #   ./scripts/dev.sh up                 启动全部
 #   ./scripts/dev.sh up db python       只启动指定服务
@@ -15,7 +15,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$ROOT/.dev-logs"
 
-# 本地四个进程统一读取根目录配置；导出的环境变量也会覆盖各框架默认值。
+# 本地服务统一读取根目录配置；导出的环境变量也会覆盖各框架默认值。
 if [ -f "$ROOT/.env" ]; then
   set -a
   # shellcheck disable=SC1091
@@ -25,12 +25,13 @@ fi
 
 DB_CONTAINER="regops-db"
 PY_PORT=8000
+AGENT_PORT=2024
 JAVA_PORT=8080
 WEB_PORT=5173
 
 MVN_OFFLINE="${MVN_OFFLINE:-1}"
 
-ALL_SERVICES="db python java web"
+ALL_SERVICES="db python agent java web"
 
 # 非 TTY（重定向 / CI）时不输出颜色转义，避免日志里出现乱码
 if [ -t 1 ]; then
@@ -147,6 +148,21 @@ start_python() {
   ok "python-ai 就绪 (:$PY_PORT)"
 }
 
+start_agent() {
+  local busy managed uvicorn
+  busy="$(port_pid "$AGENT_PORT")"
+  managed="$(pid_of agent || true)"
+  if [ -n "$busy" ]; then
+    [ -n "$managed" ] && [ "$busy" = "$managed" ] && { warn "risk-agent 已在 :$AGENT_PORT 运行"; return 0; }
+    die "端口 :$AGENT_PORT 已被其他进程占用；请先确认并停止旧独立 Agent，避免连接错误的服务"
+  fi
+  uvicorn="$ROOT/financial-risk-audit-assistant/.venv/bin/uvicorn"
+  [ -x "$uvicorn" ] || die "缺少 Agent 虚拟环境；先执行：cd financial-risk-audit-assistant && python3.14 -m venv .venv && .venv/bin/pip install -r requirements.txt"
+  start_bg agent "$ROOT/financial-risk-audit-assistant" "$uvicorn" agent.app:app --host 127.0.0.1 --port "$AGENT_PORT"
+  wait_service agent "http://127.0.0.1:$AGENT_PORT/health" 60 || die "risk-agent 启动失败"
+  ok "risk-agent 就绪 (:$AGENT_PORT)"
+}
+
 start_java() {
   local busy
   busy="$(port_pid "$JAVA_PORT")"
@@ -217,12 +233,28 @@ stop_db() {
   ok "db 已停止（数据保留在 volume db_data）"
 }
 
+stop_agent() {
+  local managed i
+  managed="$(pid_of agent || true)"
+  if [ -n "$managed" ]; then
+    kill -TERM "$managed" 2>/dev/null || true
+    # uvicorn 优雅退出需要一点时间；立即 up 会误判旧进程占用端口。
+    for ((i = 0; i < 50; i++)); do
+      [ -z "$(port_pid "$AGENT_PORT")" ] && break
+      sleep 0.2
+    done
+    ok "risk-agent 已停止 (PID $managed)"
+  fi
+  rm -f "$LOG_DIR/agent.pid"
+}
+
 cmd_up() {
   local services="${*:-$ALL_SERVICES}" svc
   for svc in $services; do
     case "$svc" in
       db)     start_db ;;
       python) start_python ;;
+      agent)  start_agent ;;
       java)   start_java ;;
       web)    start_web ;;
       *)      die "未知服务：$svc（可选：$ALL_SERVICES）" ;;
@@ -233,9 +265,10 @@ cmd_up() {
   echo "  前端        http://localhost:$WEB_PORT"
   echo "  Java BFF    http://localhost:$JAVA_PORT/api/health"
   echo "  python-ai   http://localhost:$PY_PORT/docs"
+  echo "  风险 Agent  http://localhost:$WEB_PORT/risk-agent"
   echo "  Postgres    localhost:5432  (regops/regops123, db=regops_db)"
   echo
-  info "日志目录 .dev-logs/ ｜ 跟踪日志 ./scripts/dev.sh logs {python|java|web}"
+  info "日志目录 .dev-logs/ ｜ 跟踪日志 ./scripts/dev.sh logs {python|agent|java|web}"
 }
 
 cmd_stop() {
@@ -244,6 +277,7 @@ cmd_stop() {
     case "$svc" in
       db)     stop_db ;;
       python) stop_proc python "$PY_PORT" ;;
+      agent)  stop_agent ;;
       java)   stop_proc java "$JAVA_PORT" ;;
       web)    stop_proc web "$WEB_PORT" ;;
       *)      die "未知服务：$svc（可选：$ALL_SERVICES）" ;;
@@ -262,6 +296,9 @@ cmd_status() {
 
   pid="$(port_pid "$PY_PORT")"
   row python-ai "$PY_PORT" "${pid:--}" "$(http_ok "http://localhost:$PY_PORT/health" && echo ok || echo down)"
+
+  pid="$(port_pid "$AGENT_PORT")"
+  row risk-agent "$AGENT_PORT" "${pid:--}" "$(http_ok "http://127.0.0.1:$AGENT_PORT/health" && echo ok || echo down)"
 
   pid="$(port_pid "$JAVA_PORT")"
   row java "$JAVA_PORT" "${pid:--}" "$(http_ok "http://localhost:$JAVA_PORT/actuator/health" && echo ok || echo down)"
@@ -284,9 +321,9 @@ cmd_status() {
 cmd_logs() {
   local name="${1:-}"
   case "$name" in
-    python|java|web) tail -f "$LOG_DIR/$name.log" ;;
+    python|agent|java|web) tail -f "$LOG_DIR/$name.log" ;;
     db)              docker logs -f "$DB_CONTAINER" ;;
-    *)               die "用法：./scripts/dev.sh logs {python|java|web|db}" ;;
+    *)               die "用法：./scripts/dev.sh logs {python|agent|java|web|db}" ;;
   esac
 }
 
@@ -296,5 +333,5 @@ case "${1:-up}" in
   restart) shift || true; cmd_stop "$@"; echo; cmd_up "$@" ;;
   status)  cmd_status ;;
   logs)    shift || true; cmd_logs "$@" ;;
-  *)       die "用法：./scripts/dev.sh {up|stop|restart|status|logs} [db python java web]" ;;
+  *)       die "用法：./scripts/dev.sh {up|stop|restart|status|logs} [db python agent java web]" ;;
 esac

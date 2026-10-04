@@ -161,15 +161,14 @@ def _missing_gitee_token() -> str | None:
 
 
 def _resolve_explicit_repo(repo_url: str):
-    """只接受这句话里给出的仓库地址，空值不回落默认仓库。"""
+    """只接受用户本轮明确给出的仓库地址。"""
 
     import re
 
     text = (repo_url or "").strip()
     if not text:
         return None, (
-            "没有仓库地址。请在这句话里给出要上传到的 Gitee 仓库，"
-            "不会使用默认仓库 https://gitee.com/msb-goldbin/ai_coding。"
+            "没有仓库地址。请在这句话里给出要上传到的 Gitee 仓库。"
         )
     if not text.startswith(("http://", "https://")):
         shorthand = text.removesuffix(".git").strip().strip("/")
@@ -188,7 +187,7 @@ def upload_to_gitee(repo_url: str, commit_message: str = "上传本地工作区�
     """把当前会话本地工作区提交并推送到用户指定的 Gitee 仓库。
 
     只有用户明确说出上传、推上去、提交到仓库时才调用。
-    repo_url 必须来自用户这句话，不能留空，不能使用默认仓库。
+    repo_url 必须来自用户这句话，不能留空。
     缺少 GITEE_TOKEN 或 SCM_GITEE_TOKEN 时返回 ok=False，并写明缺什么。
     """
 

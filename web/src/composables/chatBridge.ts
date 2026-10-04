@@ -11,6 +11,7 @@ export interface ChatSessionMeta {
 export interface ChatBridge {
   ready: boolean
   busy: boolean
+  canRename?: boolean
   activeSessionId: string
   sessions: ChatSessionMeta[]
   newChat: () => void | Promise<void>

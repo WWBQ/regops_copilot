@@ -1,0 +1,10 @@
+.venv/
+ui/
+data/
+logs/
+workspace/
+__pycache__/
+*.pyc
+*.egg-info/
+.env
+.git/

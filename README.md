@@ -5,32 +5,54 @@
 > 模型输出一律附免责声明，不构成合规意见或投资建议。
 > 详见 [`docs/DATA_SOURCES.md`](./docs/DATA_SOURCES.md)。
 
-## 解决什么问题
+## 项目定位
 
-金融机构的合规与投研人员每天要在**上千页的年报和监管制度**里找依据：
-某条业务是否触碰监管红线、某个财务数字出自哪一页、结论能不能追溯到具体条款。
-翻 PDF 靠人力，而直接问通用大模型会得到**无法追溯、可能编造**的答案——这在合规场景里不可用。
+RegOps Copilot 是一个面向大模型应用开发学习与求职展示的完整工程项目，包含两条业务主线：
 
-RegOps Copilot 的做法是把「能不能追溯」当作硬约束：
+- **合规问答**：在监管制度和上市公司年报中检索证据，回答必须带页码和原文引用。
+- **金融风险审计助手**：Agent 自主查询财务事实、检索年报证据，输出待人工复核的风险线索，而不是自动作出审计结论。
+
+项目把“可追溯、可拒答、可评测”作为硬约束：
 
 - **答案必须带出处**：RAG 检索年报后作答，每条引用返回 `doc_id` + 页码 + 原文片段 + 可跳转链接，答不出就拒答，不猜。
-- **结论必须结构化可校验**：合规结论走 Pydantic DTO（风险等级、条款编号至少一条、置信度），
-  高风险结论不允许过高置信度，坏数据在入库前就被拦下。
+- **数字必须经过质量门**：标准财务指标只读取已校验的 F10 结构化事实；缺来源、冲突或待复核数据不能进入确定性分析。
+- **Agent 线索必须结构化**：每条风险线索包含严重程度、证据编号、数据点、不确定性和人工核查问题，并保存到 SQLite。
 - **评测必须可复跑**：自建黄金集 + 落盘报告，改了 Prompt 或检索参数后能立刻看出是否变差，
   而不是凭感觉。评测资产见 [`eval/`](./eval)。
 
 ## 架构与分工
 
+```mermaid
+flowchart LR
+    U[用户浏览器] --> WEB[Vue 3 Web<br/>:5173]
+    WEB -->|JWT / REST / POST SSE| JAVA[Spring Boot BFF<br/>:8080]
+
+    subgraph PYAI[python-ai / FastAPI :8000]
+        PY[聊天 · AskNum · RAG · 文档入库]
+        MCP[内置 Financial MCP<br/>/mcp/]
+    end
+
+    JAVA -->|合规问答、问数、文档、运维| PY
+    JAVA -->|金融风险会话、SSE| AGENT[Risk Agent / FastAPI<br/>:2024]
+    AGENT -->|FastMCP · 仅两项只读工具| MCP
+
+    PY --> PG[(PostgreSQL + pgvector<br/>文档、向量、财务事实)]
+    MCP --> PG
+    AGENT --> CP[(checkpoints.sqlite<br/>对话与 Agent 状态)]
+    AGENT --> BS[(store.sqlite<br/>运行记录与结构化风险线索)]
+    PY --> LLM[DeepSeek / Qwen API]
+    AGENT --> LLM
 ```
-浏览器 → web(:5173) → java-service(:8080) → python-ai(:8000) → Postgres + pgvector
-                       BFF/鉴权/审计         LLM/RAG/评测        向量与业务表
-```
+
+详细的组件边界、金融 Agent 时序和数据归属见
+[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)。
 
 | 服务 | 技术栈 | 负责 |
 |------|--------|------|
 | `python-ai` | FastAPI · Python 3.14 | LLM 调用、RAG 检索与引用、问数、文档解析入库、评测任务 |
 | `java-service` | Spring Boot · JDK 21 | 对外 API 聚合、认证与 RBAC、审计 |
-| `web` | Vue 3 · Vite | 合规问答、文档标注、评测与运维看板 |
+| `risk-agent` | FastAPI · LangChain Agent | 公开财报风险线索初筛、MCP 工具循环、引用、结构化线索、checkpoint 与 SSE；见 [`financial-risk-audit-assistant/`](./financial-risk-audit-assistant/) |
+| `web` | Vue 3 · Vite | 合规问答、金融风险审计助手、文档标注、评测与运维看板 |
 
 服务边界、端点契约、`X-Request-ID` 关联 ID 约定见 [`docs/api-spec.md`](./docs/api-spec.md)。
 W9-1 双栈链路与超时/降级见 [`docs/W9_E2E.md`](./docs/W9_E2E.md)。
@@ -43,6 +65,7 @@ W9-1 双栈链路与超时/降级见 [`docs/W9_E2E.md`](./docs/W9_E2E.md)。
 ```bash
 cp .env.example .env                                        # 填入 DEEPSEEK_API_KEY / QWEN_API_KEY
 cd python-ai && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && cd ..
+cd financial-risk-audit-assistant && python3.14 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/python scripts/sync_skills.py && cd ..
 cd web && npm install && cd ..
 ```
 
@@ -50,7 +73,7 @@ cd web && npm install && cd ..
 `python-ai/requirements-mineru.txt`，并设置 `DOCUMENT_PARSER_BACKEND=mineru`。详见
 [`python-ai/app/README.md`](./python-ai/app/README.md#pdf-解析器切换)。
 
-一键启停四个服务：
+一键启停全部服务：
 
 ```bash
 ./scripts/dev.sh up          # 启动全部；Docker 未开会自动拉起 Docker Desktop
@@ -58,11 +81,14 @@ cd web && npm install && cd ..
 ./scripts/dev.sh stop        # 停止全部，db 数据保留在 volume db_data
 ```
 
+若旧版独立 Agent 还占用 2024 端口，先手动停止旧实例；新脚本不会替你终止来源不明的进程。
+
 | 服务 | 地址 |
 | --- | --- |
 | 前端 | <http://localhost:5173> |
 | Java BFF | <http://localhost:8080/api/health> |
 | python-ai Swagger | <http://localhost:8000/docs> |
+| 金融风险审计助手 | <http://localhost:5173/risk-agent>（先登录） |
 | Postgres + pgvector | localhost:5432 · regops/regops123 · regops_db |
 
 脚本用法与注意事项见下方[「本地开发脚本」](#本地开发脚本)。
@@ -132,6 +158,14 @@ curl -s -X POST http://localhost:8080/api/auth/login \
 # 7. W9-1 健康、RAG 与问数冒烟（经 Java :8080；详见 docs/W9_E2E.md）
 python-ai/.venv/bin/python eval/run_w9_e2e.py
 
+# 8. 金融风险审计助手（先登录后在页面选择模型）
+# 浏览器访问 http://localhost:5173/risk-agent
+
+# 9. Agent 结构化结果、历史恢复和只读工具验证（不调用真实模型）
+financial-risk-audit-assistant/.venv/bin/python financial-risk-audit-assistant/scripts/verify_risk_audit_result.py
+financial-risk-audit-assistant/.venv/bin/python financial-risk-audit-assistant/scripts/verify_risk_agent_messages.py
+financial-risk-audit-assistant/.venv/bin/python financial-risk-audit-assistant/scripts/verify_financial_audit.py
+
 ```
 
 评测报告落在 `eval/reports/<任务>/<时间戳>/`，含 `report.json` 与 `report.md`。
@@ -186,6 +220,15 @@ regops-copilot/
 │   ├── requirements.txt                  # Python 依赖
 │   └── Dockerfile                        # Python 服务 Dockerfile
 │
+├── financial-risk-audit-assistant/       # 金融风险审计 Agent 服务
+│   ├── agent/api/                        # 会话、模型选项、POST SSE
+│   ├── agent/mcp/                        # FastMCP 客户端与工具白名单
+│   ├── agent/financial/                  # 引用编号、RiskFinding 结构化结果
+│   ├── agent/core/                       # runtime、checkpoint、事件流、模型配置
+│   ├── agent/store/                      # 业务 SQLite（运行与风险线索）
+│   ├── scripts/                          # 离线验证脚本
+│   └── README.md                         # Agent 设计、边界和运行说明
+│
 ├── eval/                                  # 评测资产（可复跑、版本固定）
 │   ├── golden/                           # RAG、对话、问数与数字校验黄金集
 │   ├── reports/                          # 回归报告（按任务 / 时间戳归档）
@@ -194,15 +237,14 @@ regops-copilot/
 │
 ├── web/                                   # 前端 (Vue3 + Vite)
 │   ├── src/
-│   │   ├── assets/                       # 静态资源
-│   │   ├── components/                   # 公共组件
-│   │   ├── views/                        # 页面视图
-│   │   ├── router/                       # 路由配置
-│   │   ├── store/                        # 状态管理（Pinia/Vuex）
-│   │   ├── api/                          # 前端 API 封装
-│   │   ├── utils/                        # 工具函数
+│   │   ├── components/                   # 聊天气泡、输入框和公共布局
+│   │   ├── views/agent/                  # 金融风险审计助手页面
+│   │   ├── views/ops/ · views/quality/   # 运维与质量看板
+│   │   ├── router/                       # 页面路由
+│   │   ├── api/                          # Java BFF API 与 SSE 客户端
+│   │   ├── types/ · utils/               # DTO、引用渲染与工具函数
 │   │   ├── App.vue                       # 根组件
-│   │   └── main.js                       # 前端入口
+│   │   └── main.ts                       # 前端入口
 │   ├── index.html                        # 页面入口
 │   ├── package.json                      # 前端依赖
 │   ├── vite.config.js                    # Vite 配置
@@ -210,6 +252,7 @@ regops-copilot/
 │
 ├── docs/                                  # 文档目录
 │   ├── api-spec.md                       # API 规范（Java + Python）
+│   ├── ARCHITECTURE.md                   # 当前系统架构、Agent 时序和数据归属
 │   ├── DATA_SOURCES.md                   # 公开数据源清单与使用边界声明
 │   ├── BUG_NOTES.md                      # 坏例记录与已知限制（编号 + 归因层）
 │   ├── W4_ASKNUM.md ~ W9_UX.md           # 各周专题：问数 / RBAC / Prompt / 交付
@@ -219,7 +262,7 @@ regops-copilot/
 │
 ├── k8s/                                   # 最小 K8s 清单（kind / minikube 可跑）
 ├── scripts/
-│   └── dev.sh                            # 本地一键启停（db + python-ai + java + web）
+│   └── dev.sh                            # 本地一键启停（db + python-ai + risk-agent + java + web）
 ├── compose.yaml                           # Docker Compose 编排文件
 ├── .env.example                           # 环境变量示例
 └── README.md                              # 项目说明文档
@@ -230,7 +273,7 @@ regops-copilot/
 `scripts/dev.sh` 支持 `up / stop / restart / status / logs`：
 
 ```bash
-./scripts/dev.sh logs java   # 跟踪日志（python | java | web | db）
+./scripts/dev.sh logs java   # 跟踪日志（python | agent | java | web | db）
 ./scripts/dev.sh restart
 ./scripts/dev.sh up db python   # 也可只操作部分服务
 ```
@@ -238,7 +281,7 @@ regops-copilot/
 说明：
 
 - 前端 `/api/*` 经 Vite 代理打到 Java BFF，Java 再转发 python-ai，因此三者需同时在线。
-- 三个应用进程均为热重载模式（uvicorn `--reload`、Vite HMR、Spring DevTools），改代码无需重启。
+- `python-ai` 使用 Uvicorn reload，`web` 使用 Vite HMR，Java 使用 Spring DevTools；`risk-agent` 修改 Python 代码后需执行 `./scripts/dev.sh restart agent`。
 - `scripts/dev.sh` 会把根目录 `.env` 统一注入 Python 与 Java；修改环境变量后需用 `./scripts/dev.sh restart` 重启进程。
 - `java-service` 用系统 `mvn` 的离线模式启动（`./mvnw` 需联网下载 Maven 发行包）。若依赖有变动需联网拉取，用 `MVN_OFFLINE=0 ./scripts/dev.sh up java`。
 - 表结构由 `compose.yaml` 挂载的 `docs/sql/*.sql` 在容器首次初始化时建立；`ddl-auto: none`，Hibernate 不改表。

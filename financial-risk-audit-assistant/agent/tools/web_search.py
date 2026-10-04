@@ -36,19 +36,10 @@ def _get_zhipu_client() -> Any:
     # API Key 在真正搜索时才读取，避免导入模块阶段对环境变量产生强依赖。
     api_key = require_env("ZHIPU_API_KEY")
     try:
-        # 优先兼容新版 `zai` SDK。
         from zai import ZhipuAiClient
-
-        return ZhipuAiClient(api_key=api_key)
-    except (ImportError, AttributeError):
-        pass
-
-    try:
-        # 回退兼容旧版 `zhipuai` SDK，降低部署环境升级成本。
-        from zhipuai import ZhipuAI
     except ImportError as exc:
-        raise RuntimeError("缺少智谱 SDK，请先安装依赖：pip install zhipuai") from exc
-    return ZhipuAI(api_key=api_key)
+        raise RuntimeError("缺少智谱 SDK，请先安装依赖：pip install zai-sdk") from exc
+    return ZhipuAiClient(api_key=api_key)
 
 
 @tool("web_search", parse_docstring=True)

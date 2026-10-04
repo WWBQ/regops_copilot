@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import ChatPanel from '../components/chat/ChatPanel.vue'
+import RiskAgentView from '../views/agent/RiskAgentView.vue'
 import DocumentViewerView from '../views/documents/DocumentViewerView.vue'
 import SystemHealthView from '../views/ops/SystemHealthView.vue'
 import IngestMonitorView from '../views/ops/IngestMonitorView.vue'
@@ -27,6 +28,12 @@ const router = createRouter({
       name: 'chat',
       component: ChatPanel,
       meta: { title: '合规问答' },
+    },
+    {
+      path: '/risk-agent',
+      name: 'risk-agent',
+      component: RiskAgentView,
+      meta: { title: '金融风险审计助手' },
     },
     {
       path: '/rag',

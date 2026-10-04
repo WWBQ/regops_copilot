@@ -1,0 +1,5 @@
+# MCP 服务端单独运行，只依赖轻量 HTTP 与配置库；不用安装完整 RAG/模型依赖。
+# FastMCP 4 与 Agent 的 zhipuai SDK 对 PyJWT 的要求冲突，不放进 Agent 环境。
+fastmcp==4.0.10
+requests==2.34.2
+python-dotenv==1.2.3

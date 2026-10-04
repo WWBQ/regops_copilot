@@ -17,9 +17,9 @@ from agent.tools.gitee_api import authenticated_clone_url, get_gitee_token, mask
 def main() -> None:
     """验证 Gitee 认证链路按 open-swe 方式工作。"""
 
-    repo = parse_gitee_repo_url("https://gitee.com/msb-goldbin/ai_coding.git")
+    repo = parse_gitee_repo_url("https://gitee.com/example-org/sample_repo.git")
     clone_url = authenticated_clone_url(repo)
-    if clone_url != "https://gitee.com/msb-goldbin/ai_coding.git":
+    if clone_url != "https://gitee.com/example-org/sample_repo.git":
         raise AssertionError(f"clone URL 不应包含 token: {clone_url}")
     if "oauth2:" in clone_url:
         raise AssertionError("clone URL 禁止包含 oauth2 token")

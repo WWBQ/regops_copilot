@@ -5,6 +5,7 @@
 
 # Python
 python-ai/.venv/
+python-ai/.venv-mcp/
 python-ai/__pycache__/
 python-ai/**/__pycache__/
 **/__pycache__/

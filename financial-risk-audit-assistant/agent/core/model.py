@@ -11,32 +11,60 @@ DEEPSEEK_V4_MAX_TOKENS = 25600
 INTENT_MODEL_MAX_TOKENS = 200
 
 
-def make_main_model() -> BaseChatModel:
-    """创建编码智能体使用的 DeepSeek 模型。
+def available_agent_models() -> dict[str, tuple[str, str, str]]:
+    """只列出已配置凭据的模型，顺序与 RegOps 问答的模型列表一致。"""
+    models: dict[str, tuple[str, str, str]] = {}
+    providers = (
+        ("deepseek", "DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL", "https://api.deepseek.com",
+         "DEEPSEEK_MODEL_IDS", "deepseek-flash,deepseek-v4-pro"),
+        ("qwen", "QWEN_API_KEY", "QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1",
+         "QWEN_MODEL_IDS", "qwen3.8-max,qwen3.8-flash,qwen3.7-plus"),
+    )
+    for provider, key_name, url_name, default_url, ids_name, default_ids in providers:
+        api_key = get_env(key_name).strip()
+        if not api_key:
+            continue
+        base_url = get_env(url_name, default_url).strip()
+        configured_ids = dict.fromkeys(
+            item.strip() for item in get_env(ids_name, default_ids).split(",") if item.strip()
+        )
+        for model_id in configured_ids:
+            if any(existing.casefold() == model_id.casefold() for existing in models):
+                raise ValueError(f"duplicate model ID: {model_id}")
+            models[model_id] = (provider, api_key, base_url)
+    return models
 
-    课程版只保留一个主模型，默认对齐 open-swe 使用的 `deepseek-v4-pro`。
-    这里不引入多模型 profile、fallback、路由器等生产级能力，
-    让学生先理解“模型配置”和“Agent 编排”之间的关系。
 
-    `thinking: disabled` 与 open-swe 的 DeepSeek 调用方式保持一致，
-    避免模型输出额外思考内容影响工具调用和最终回复。
+def default_agent_model_id(models: dict[str, tuple[str, str, str]] | None = None) -> str | None:
+    models = available_agent_models() if models is None else models
+    preferred = get_env("MAIN_MODEL", "deepseek-v4-pro").strip()
+    return preferred if preferred in models else next(iter(models), None)
 
-    这里使用 LangChain 1.x 推荐的 `init_chat_model` 统一初始化模型。
-    DeepSeek 官方 API 兼容 OpenAI Chat Completions 协议，所以 provider 使用
-    `openai`，并通过 `base_url` 指向 DeepSeek 服务地址。这样既保留当前
-    `ChatOpenAI` 的稳定行为，又便于后续把模型供应商抽象成配置。
-    """
 
-    return init_chat_model(
-        model=get_env("MAIN_MODEL", "deepseek-v4-pro"),
+def require_agent_model_id(model_id: str | None) -> str:
+    models = available_agent_models()
+    selected = default_agent_model_id(models) if model_id is None else model_id.strip()
+    if not selected or selected not in models:
+        raise ValueError(f"模型 {selected or '未配置'} 不可用；请从已配置的模型列表中选择")
+    return selected
+
+
+def make_main_model(model_id: str | None = None) -> BaseChatModel:
+    """用用户选择的模型构建 DeepAgents 所需的 LangChain ChatModel。"""
+    selected = require_agent_model_id(model_id)
+    provider, api_key, base_url = available_agent_models()[selected]
+    options = dict(
+        model=selected,
         model_provider="openai",
         temperature=1.1,
-        api_key=require_env("DEEPSEEK_API_KEY"),
-        base_url=get_env("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        api_key=api_key,
+        base_url=base_url,
         max_tokens=DEEPSEEK_V4_MAX_TOKENS,
         streaming=True,
-        extra_body={"thinking": {"type": "disabled"}},
     )
+    if provider == "deepseek":
+        options["extra_body"] = {"thinking": {"type": "disabled"}}
+    return init_chat_model(**options)
 
 
 @lru_cache(maxsize=1)

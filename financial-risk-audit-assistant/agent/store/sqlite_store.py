@@ -142,6 +142,47 @@ class LocalSqliteStore:
               FOREIGN KEY(thread_id) REFERENCES threads(thread_id)
             );
 
+            CREATE TABLE IF NOT EXISTS risk_audit_results (
+              result_id TEXT PRIMARY KEY,
+              run_id TEXT NOT NULL UNIQUE,
+              thread_id TEXT NOT NULL,
+              company_code TEXT NOT NULL,
+              company_name TEXT NOT NULL,
+              year INTEGER NOT NULL,
+              status TEXT NOT NULL,
+              summary TEXT NOT NULL,
+              evidence_gaps TEXT NOT NULL,
+              report_markdown TEXT NOT NULL,
+              answer_hash TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              FOREIGN KEY(thread_id) REFERENCES threads(thread_id),
+              FOREIGN KEY(run_id) REFERENCES runs(run_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS risk_audit_findings (
+              id TEXT PRIMARY KEY,
+              result_id TEXT NOT NULL,
+              thread_id TEXT NOT NULL,
+              ordinal INTEGER NOT NULL,
+              risk_type TEXT NOT NULL,
+              severity TEXT NOT NULL,
+              conclusion TEXT NOT NULL,
+              evidence_ids TEXT NOT NULL,
+              data_points TEXT NOT NULL,
+              uncertainty TEXT NOT NULL,
+              review_question TEXT NOT NULL,
+              review_status TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              FOREIGN KEY(result_id) REFERENCES risk_audit_results(result_id),
+              FOREIGN KEY(thread_id) REFERENCES threads(thread_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_risk_results_thread_created
+              ON risk_audit_results(thread_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_risk_findings_result_ordinal
+              ON risk_audit_findings(result_id, ordinal);
+
             CREATE TABLE IF NOT EXISTS settings (
               key TEXT PRIMARY KEY,
               value TEXT NOT NULL,
@@ -227,11 +268,17 @@ class LocalSqliteStore:
             ).fetchone()
             return self._row_to_dict(row)
 
-    def list_threads(self, limit: int = 50) -> list[dict[str, Any]]:
+    def list_threads(self, limit: int = 50, *, owner_prefix: str | None = None) -> list[dict[str, Any]]:
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT * FROM threads ORDER BY updated_at DESC LIMIT ?", (limit,)
-            ).fetchall()
+            if owner_prefix is None:
+                rows = self._conn.execute(
+                    "SELECT * FROM threads ORDER BY updated_at DESC LIMIT ?", (limit,)
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    "SELECT * FROM threads WHERE substr(thread_id, 1, ?) = ? ORDER BY updated_at DESC LIMIT ?",
+                    (len(owner_prefix), owner_prefix, limit),
+                ).fetchall()
             return [dict(row) for row in rows]
 
     def update_thread_status(
@@ -561,6 +608,8 @@ class LocalSqliteStore:
             existing = self.get_thread(thread_id)
             if existing is None:
                 return False
+            self._conn.execute("DELETE FROM risk_audit_findings WHERE thread_id = ?", (thread_id,))
+            self._conn.execute("DELETE FROM risk_audit_results WHERE thread_id = ?", (thread_id,))
             self._conn.execute("DELETE FROM review_findings WHERE thread_id = ?", (thread_id,))
             self._conn.execute("DELETE FROM thread_plans WHERE thread_id = ?", (thread_id,))
             self._conn.execute("DELETE FROM thread_messages WHERE thread_id = ?", (thread_id,))
@@ -569,6 +618,137 @@ class LocalSqliteStore:
             self._conn.execute("DELETE FROM threads WHERE thread_id = ?", (thread_id,))
             self._conn.commit()
             return True
+
+    def save_risk_audit_result(
+        self,
+        *,
+        result_id: str,
+        run_id: str,
+        thread_id: str,
+        payload: dict[str, Any],
+        report_markdown: str,
+        answer_hash: str,
+    ) -> dict[str, Any]:
+        """原子保存一次结构化金融初筛结果及其风险线索。"""
+
+        with self._lock:
+            now = utc_now()
+            previous = self._conn.execute(
+                "SELECT result_id FROM risk_audit_results WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            if previous is not None:
+                self._conn.execute(
+                    "DELETE FROM risk_audit_findings WHERE result_id = ?",
+                    (previous["result_id"],),
+                )
+                self._conn.execute("DELETE FROM risk_audit_results WHERE run_id = ?", (run_id,))
+            self._conn.execute(
+                """
+                INSERT INTO risk_audit_results (
+                  result_id, run_id, thread_id, company_code, company_name, year,
+                  status, summary, evidence_gaps, report_markdown, answer_hash, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    result_id,
+                    run_id,
+                    thread_id,
+                    payload["company_code"],
+                    payload["company_name"],
+                    payload["year"],
+                    payload["status"],
+                    payload["summary"],
+                    json.dumps(payload.get("evidence_gaps") or [], ensure_ascii=False),
+                    report_markdown,
+                    answer_hash,
+                    now,
+                ),
+            )
+            for ordinal, finding in enumerate(payload.get("findings") or [], start=1):
+                finding_id = f"{result_id}-finding-{ordinal}"
+                self._conn.execute(
+                    """
+                    INSERT INTO risk_audit_findings (
+                      id, result_id, thread_id, ordinal, risk_type, severity, conclusion,
+                      evidence_ids, data_points, uncertainty, review_question, review_status,
+                      created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review', ?, ?)
+                    """,
+                    (
+                        finding_id,
+                        result_id,
+                        thread_id,
+                        ordinal,
+                        finding["risk_type"],
+                        finding["severity"],
+                        finding["conclusion"],
+                        json.dumps(finding.get("evidence_ids") or [], ensure_ascii=False),
+                        json.dumps(finding.get("data_points") or [], ensure_ascii=False),
+                        finding["uncertainty"],
+                        finding["review_question"],
+                        now,
+                        now,
+                    ),
+                )
+            self._conn.commit()
+            saved = self.get_risk_audit_result(result_id)
+            if saved is None:
+                raise RuntimeError("结构化风险初筛结果保存失败")
+            return saved
+
+    @staticmethod
+    def _json_list(value: Any) -> list[Any]:
+        if not isinstance(value, str):
+            return []
+        try:
+            parsed = json.loads(value)
+        except ValueError:
+            return []
+        return parsed if isinstance(parsed, list) else []
+
+    def get_risk_audit_result(self, result_id: str) -> dict[str, Any] | None:
+        """读取一次结构化结果，并附上按顺序排列的 findings。"""
+
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM risk_audit_results WHERE result_id = ?",
+                (result_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            result = dict(row)
+            result["evidence_gaps"] = self._json_list(result.get("evidence_gaps"))
+            findings = self._conn.execute(
+                "SELECT * FROM risk_audit_findings WHERE result_id = ? ORDER BY ordinal ASC",
+                (result_id,),
+            ).fetchall()
+            result["findings"] = []
+            for finding_row in findings:
+                finding = dict(finding_row)
+                finding["evidence_ids"] = self._json_list(finding.get("evidence_ids"))
+                finding["data_points"] = self._json_list(finding.get("data_points"))
+                result["findings"].append(finding)
+            return result
+
+    def list_risk_audit_results(self, thread_id: str) -> list[dict[str, Any]]:
+        """按运行时间读取一个会话的全部结构化初筛结果。"""
+
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT result_id
+                FROM risk_audit_results
+                WHERE thread_id = ?
+                ORDER BY created_at ASC
+                """,
+                (thread_id,),
+            ).fetchall()
+            return [
+                result
+                for row in rows
+                if (result := self.get_risk_audit_result(str(row["result_id"]))) is not None
+            ]
 
     def add_finding(
         self,

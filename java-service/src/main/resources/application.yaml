@@ -18,9 +18,12 @@ spring:
     open-in-view: false
   mvc:
     async:
-      request-timeout: 180000
+      request-timeout: 600000
 
 regops:
+  risk-agent:
+    base-url: ${REGOPS_RISK_AGENT_BASE_URL:http://127.0.0.1:2024}
+    service-token: ${REGOPS_SERVICE_TOKEN:dev-service-token}
   python-ai:
     base-url: ${REGOPS_PYTHON_AI_BASE_URL:http://localhost:8000}
     # 超时预算：建连 5s / 读 120s / 流式 ≥180s / 探活 2.5s。读路径 5xx 最多再试 2 次，超时不重试。

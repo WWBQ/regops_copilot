@@ -37,7 +37,11 @@ def load_environment() -> None:
     _load_non_empty_env(
         PROJECT_ROOT.parent / ".env",
         override=False,
-        allowed_keys={"DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL", "REGOPS_SERVICE_TOKEN"},
+        allowed_keys={
+            "DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL", "DEEPSEEK_MODEL_IDS",
+            "QWEN_API_KEY", "QWEN_BASE_URL", "QWEN_MODEL_IDS",
+            "MAIN_MODEL", "REGOPS_SERVICE_TOKEN", "REGOPS_MCP_URL",
+        },
     )
     _load_non_empty_env(LOCAL_ENV, override=True)
 

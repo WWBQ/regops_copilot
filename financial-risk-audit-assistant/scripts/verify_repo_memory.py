@@ -39,8 +39,8 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         store, conn = _make_store(Path(tmp) / "langgraph-store.sqlite")
         try:
-            ai_repo = parse_gitee_repo_url("https://gitee.com/msb-goldbin/ai_repo.git")
-            ai_coding = parse_gitee_repo_url("https://gitee.com/msb-goldbin/ai_coding.git")
+            ai_repo = parse_gitee_repo_url("https://gitee.com/example-org/ai_repo.git")
+            sample_repo = parse_gitee_repo_url("https://gitee.com/example-org/sample_repo.git")
 
             # ---- 1. 首次初始化应创建记忆文件 ----
             created = ensure_repo_memory_initialized(
@@ -63,14 +63,14 @@ def main() -> None:
             # ---- 3. 验证使用按仓库命名的 key ----
             repo_namespace = build_repo_memory_namespace(ai_repo.owner, ai_repo.repo)
             new_key = repo_memory_store_key(ai_repo.owner, ai_repo.repo)
-            if new_key != "/msb-goldbin/ai_repo.md":
+            if new_key != "/example-org/ai_repo.md":
                 raise AssertionError(f"unexpected store key: {new_key}")
 
             repo_item = store.get(repo_namespace, new_key)
             if repo_item is None:
                 raise AssertionError("repo memory was not written with new per-repo key")
             repo_content = repo_item.value.get("content", "")
-            if "msb-goldbin/ai_repo" not in repo_content or "/projects/ai_repo" not in repo_content:
+            if "example-org/ai_repo" not in repo_content or "/projects/ai_repo" not in repo_content:
                 raise AssertionError(f"unexpected repo memory content: {repo_content}")
 
             # ---- 4. 旧版 key 应不存在（新代码不写入旧 key） ----
@@ -82,12 +82,12 @@ def main() -> None:
             # ---- 5. 不同仓库的 namespace 应该隔离 ----
             ensure_repo_memory_initialized(
                 store=store,
-                repo=ai_coding,
-                project_dir="projects/ai_coding",
+                repo=sample_repo,
+                project_dir="projects/sample_repo",
             )
-            coding_namespace = build_repo_memory_namespace(ai_coding.owner, ai_coding.repo)
-            coding_key = repo_memory_store_key(ai_coding.owner, ai_coding.repo)
-            if coding_key != "/msb-goldbin/ai_coding.md":
+            coding_namespace = build_repo_memory_namespace(sample_repo.owner, sample_repo.repo)
+            coding_key = repo_memory_store_key(sample_repo.owner, sample_repo.repo)
+            if coding_key != "/example-org/sample_repo.md":
                 raise AssertionError(f"unexpected coding store key: {coding_key}")
 
             coding_item = store.get(coding_namespace, coding_key)
@@ -102,7 +102,7 @@ def main() -> None:
 
             # ---- 6. CompositeBackend 应能通过按仓库命名的虚拟路径读取 ----
             virtual_path = repo_memory_virtual_path(ai_repo.owner, ai_repo.repo)
-            if virtual_path != "/memories/msb-goldbin/ai_repo.md":
+            if virtual_path != "/memories/example-org/ai_repo.md":
                 raise AssertionError(f"unexpected virtual path: {virtual_path}")
 
             backend = create_repo_backend(
@@ -112,11 +112,11 @@ def main() -> None:
                 repo=ai_repo.repo,
             )
             read_result = backend.read(virtual_path)
-            if read_result.error or "msb-goldbin/ai_repo" not in read_result.file_data["content"]:
+            if read_result.error or "example-org/ai_repo" not in read_result.file_data["content"]:
                 raise AssertionError("CompositeBackend should read repo memory through per-repo virtual path")
 
             # ---- 7. 旧版 /memories/repo.md 迁移到新版 /{owner}/{repo}.md ----
-            legacy_repo = parse_gitee_repo_url("https://gitee.com/msb-goldbin/legacy_repo.git")
+            legacy_repo = parse_gitee_repo_url("https://gitee.com/example-org/legacy_repo.git")
             legacy_namespace = build_repo_memory_namespace(legacy_repo.owner, legacy_repo.repo)
             store.put(legacy_namespace, _LEGACY_REPO_MEMORY_PATH, {"content": "legacy v1 memory", "encoding": "utf-8"})
             migrated_created = ensure_repo_memory_initialized(
@@ -132,7 +132,7 @@ def main() -> None:
                 raise AssertionError("legacy v1 repo memory should be copied to new per-repo key")
 
             # ---- 8. 旧版 /repo.md 也应迁移到新版 /{owner}/{repo}.md ----
-            legacy_v2_repo = parse_gitee_repo_url("https://gitee.com/msb-goldbin/legacy-v2-repo.git")
+            legacy_v2_repo = parse_gitee_repo_url("https://gitee.com/example-org/legacy-v2-repo.git")
             legacy_v2_namespace = build_repo_memory_namespace(legacy_v2_repo.owner, legacy_v2_repo.repo)
             store.put(legacy_v2_namespace, _LEGACY_STORE_KEY, {"content": "legacy v2 memory", "encoding": "utf-8"})
             migrated_v2_created = ensure_repo_memory_initialized(
@@ -182,7 +182,7 @@ def main() -> None:
                 if not injected:
                     raise AssertionError("repo memory should be injected before agent")
                 injected_text = injected["messages"][0].content
-                if "/memories/msb-goldbin/ai_repo.md" not in injected_text:
+                if "/memories/example-org/ai_repo.md" not in injected_text:
                     raise AssertionError(
                         f"injected message should reference per-repo path, got: {injected_text[:200]}"
                     )
@@ -214,7 +214,7 @@ def main() -> None:
                             "- 运行 `python -m pytest ai_repo`，6 passed。\n"
                         ),
                         branch_name="feat/user-login",
-                        pr_url="https://gitee.com/msb-goldbin/ai_repo/pulls/2",
+                        pr_url="https://gitee.com/example-org/ai_repo/pulls/2",
                     ),
                 )
                 if not updated:
@@ -233,7 +233,7 @@ def main() -> None:
                     "/register",
                     "## 分支与 PR",
                     "feat/user-login",
-                    "https://gitee.com/msb-goldbin/ai_repo/pulls/2",
+                    "https://gitee.com/example-org/ai_repo/pulls/2",
                 ]:
                     if term not in structured_content:
                         raise AssertionError(f"structured repo memory missing term: {term}")

@@ -10,6 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from agent.app import app
+from agent.env_utils import get_env
 from agent.backends.permissions import ensure_safe_command
 from agent.core.graph import build_agent
 from agent.tools.gitee_api import parse_gitee_repo_url
@@ -26,23 +27,22 @@ def main() -> None:
     client = TestClient(app)
 
     assert_status("health", client.get("/health").status_code, 200)
+    auth_headers = {
+        "X-Regops-Service-Token": get_env("REGOPS_SERVICE_TOKEN"),
+        "X-Regops-User": "00000000-0000-0000-0000-000000000001",
+    }
+    assert_status("dashboard unauthorized", client.get("/regops/agent/threads").status_code, 401)
     for path in [
-        "/dashboard/api/me",
-        "/dashboard/api/options",
-        "/dashboard/api/threads",
+        "/regops/agent/options",
+        "/regops/agent/threads",
     ]:
-        assert_status(path, client.get(path).status_code, 200)
-    cors_resp = client.options(
-        "/dashboard/api/threads",
-        headers={
-            "Origin": "http://127.0.0.1:3000",
-            "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": "content-type",
-        },
+        assert_status(path, client.get(path, headers=auth_headers).status_code, 200)
+    other_id = "00000000-0000-0000-0000-000000000002_00000000-0000-0000-0000-000000000003"
+    assert_status(
+        "cross-user thread hidden",
+        client.get(f"/regops/agent/threads/{other_id}", headers=auth_headers).status_code,
+        404,
     )
-    assert_status("dashboard cors preflight", cors_resp.status_code, 200)
-    if cors_resp.headers.get("access-control-allow-origin") != "http://127.0.0.1:3000":
-        raise AssertionError("dashboard cors preflight did not allow frontend origin")
 
     repo = parse_gitee_repo_url("https://gitee.com/owner/repo.git")
     assert repo.owner == "owner"

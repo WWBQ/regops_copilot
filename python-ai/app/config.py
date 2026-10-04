@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     object_store_root: str = str(ROOT_DIR / "data" / "objects")
     object_store_bucket: str = "regops-docs"
     api_public_base_url: str = "http://localhost:8000"
+    regops_api_base_url: str = "http://127.0.0.1:8000"
     object_store_presign_secret: str = "dev-presign-secret-change-me"
     object_store_presign_ttl_seconds: int = 300
     document_parser_backend: Literal["docling", "mineru"] = "docling"

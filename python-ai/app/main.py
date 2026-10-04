@@ -9,6 +9,17 @@ from app.request_id import RequestIdMiddleware
 from app.router import api_router
 from app.config import get_settings
 from app.core.warmup import warmup_models
+from app.mcp.financial_server import mcp as financial_mcp
+from app.mcp.http import MCPServiceTokenGuard
+
+
+financial_mcp_http_app = financial_mcp.http_app(
+    path="/",
+    stateless_http=True,
+    json_response=True,
+    host_origin_protection=True,
+    allowed_hosts=["localhost:*", "127.0.0.1:*", "python-ai:*", "testserver"],
+)
 
 
 @asynccontextmanager
@@ -25,7 +36,8 @@ async def lifespan(_app: FastAPI):
             result.reranker_ready,
             result.errors,
         )
-    yield
+    async with financial_mcp_http_app.lifespan(financial_mcp_http_app):
+        yield
 
 
 app = FastAPI(
@@ -53,6 +65,7 @@ app.add_middleware(
 app.add_middleware(RequestIdMiddleware)
 
 app.include_router(api_router)
+app.mount("/mcp", MCPServiceTokenGuard(financial_mcp_http_app))
 
 
 @app.get("/")

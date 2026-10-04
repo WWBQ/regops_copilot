@@ -3,7 +3,7 @@ package com.wbq.java_service.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "regops")
-public record AppProperties(PythonAiProperties pythonAi, AuthProperties auth) {
+public record AppProperties(PythonAiProperties pythonAi, AuthProperties auth, RiskAgentProperties riskAgent) {
 
     public AppProperties {
         if (auth == null) {
@@ -63,6 +63,17 @@ public record AppProperties(PythonAiProperties pythonAi, AuthProperties auth) {
 
         public long ttlSeconds() {
             return jwtTtlSeconds;
+        }
+    }
+
+    public record RiskAgentProperties(String baseUrl, String serviceToken) {
+        public RiskAgentProperties {
+            if (baseUrl == null || baseUrl.isBlank()) {
+                baseUrl = "http://127.0.0.1:2024";
+            }
+            if (serviceToken == null) {
+                serviceToken = "";
+            }
         }
     }
 }

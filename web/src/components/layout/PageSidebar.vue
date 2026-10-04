@@ -9,7 +9,7 @@ const route = useRoute()
 const router = useRouter()
 const chatBridge = inject(CHAT_BRIDGE_KEY, null) as Ref<ChatBridge> | null
 
-const isChatPage = computed(() => route.path === '/' || route.path.startsWith('/rag'))
+const isChatPage = computed(() => route.path === '/' || route.path.startsWith('/rag') || route.path.startsWith('/risk-agent'))
 const pageItems = computed(() => pageMenuForPath(route.path))
 
 const renamingId = ref<string | null>(null)
@@ -128,6 +128,7 @@ async function onDelete(sessionId: string, event: Event) {
         </div>
         <div class="history-actions">
           <button
+            v-if="chatBridge?.canRename !== false"
             type="button"
             class="action-btn"
             title="重命名"

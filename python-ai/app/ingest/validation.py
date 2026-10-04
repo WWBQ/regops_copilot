@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable
@@ -245,7 +246,7 @@ def validate_fact_evidence(fact: dict[str, Any]) -> tuple[bool, str]:
     source_type = fact.get("source_type") or "pdf"
     if source_type == "web":
         digest = str(fact.get("content_hash") or "")
-        if not digest.startswith("sha256:"):
+        if re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None:
             return False, "missing_or_invalid_bbox: 结构化源缺少 content_hash"
         return True, ""
     return validate_bbox(

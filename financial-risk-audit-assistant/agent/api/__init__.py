@@ -1,4 +1,4 @@
-from .routes import router
-from .dashboard_routes import dashboard_router
+from .health import health_router
+from .risk_agent import risk_agent_router
 
-__all__ = ["router", "dashboard_router"]
+__all__ = ["health_router", "risk_agent_router"]

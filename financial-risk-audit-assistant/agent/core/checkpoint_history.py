@@ -5,9 +5,11 @@ import re
 from hashlib import sha1
 from typing import Any
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 
 from agent.core.graph import get_checkpointer
+from agent.financial.citations import citations_from_tool_message
+from agent.financial.risk_result import strip_risk_result_block
 
 logger = logging.getLogger("agent.checkpoint_history")
 
@@ -58,11 +60,15 @@ def _delta_messages_from_checkpoint(thread_id: str) -> list[Any]:
 
     channel_history = history.get("messages") if isinstance(history, dict) else None
     if not isinstance(channel_history, dict):
-        return []
+        channel_history = {}
 
     messages: list[Any] = []
     seed = channel_history.get("seed")
-    seed_value = getattr(seed, "value", None)
+    # langgraph-checkpoint-sqlite 不同版本返回的 seed 形态不同：
+    # - 旧版：带 `.value` 属性的对象；
+    # - 当前版：直接返回完整的 message list。
+    # 旧实现只处理第一种，因此升级依赖后刷新会得到空历史，虽然 SQLite 中的数据仍在。
+    seed_value = seed if isinstance(seed, list) else getattr(seed, "value", None)
     if isinstance(seed_value, list):
         messages.extend(seed_value)
 
@@ -77,7 +83,27 @@ def _delta_messages_from_checkpoint(thread_id: str) -> list[Any]:
             elif value is not None:
                 messages.append(value)
 
-    return messages
+    if messages:
+        return messages
+
+    # 某些 checkpointer 实现不提供 delta history，但最新 checkpoint 的
+    # channel_values 中仍保存完整 messages。这里作为兼容兜底，避免持久化数据存在、
+    # 页面刷新却显示空会话。
+    try:
+        checkpoint_tuple = checkpointer.get_tuple(config)
+    except Exception:
+        logger.exception("读取最新 checkpoint 失败：thread_id=%s", thread_id)
+        return []
+    if checkpoint_tuple is None:
+        return []
+    checkpoint = getattr(checkpoint_tuple, "checkpoint", None)
+    if not isinstance(checkpoint, dict):
+        return []
+    channel_values = checkpoint.get("channel_values")
+    if not isinstance(channel_values, dict):
+        return []
+    latest_messages = channel_values.get("messages")
+    return list(latest_messages) if isinstance(latest_messages, list) else []
 
 
 def _extract_user_prompt(text: str) -> str:
@@ -234,8 +260,21 @@ def visible_checkpoint_messages(thread_id: str) -> list[dict[str, Any]]:
 
     visible: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
+    pending_citations: list[dict[str, Any]] = []
 
     for message in _delta_messages_from_checkpoint(thread_id):
+        if isinstance(message, ToolMessage):
+            by_key = {
+                (item["kind"], item["doc_id"], item["page"], item["snippet"]): item
+                for item in pending_citations
+            }
+            for item in citations_from_tool_message(message):
+                by_key.setdefault(
+                    (item["kind"], item["doc_id"], item["page"], item["snippet"]),
+                    item,
+                )
+            pending_citations = list(by_key.values())
+            continue
         role = _message_role(message)
         if role is None:
             continue
@@ -244,9 +283,12 @@ def visible_checkpoint_messages(thread_id: str) -> list[dict[str, Any]]:
             continue
 
         if role == "user":
+            pending_citations = []
             text = _extract_user_prompt(text)
-        elif not _has_visible_markdown_value(text):
-            continue
+        else:
+            text = strip_risk_result_block(text)
+            if not _has_visible_markdown_value(text):
+                continue
 
         text = text.strip()
         if not text:
@@ -255,13 +297,14 @@ def visible_checkpoint_messages(thread_id: str) -> list[dict[str, Any]]:
         if key in seen:
             continue
         seen.add(key)
-        visible.append(
-            {
+        visible_message = {
                 "message_id": stable_history_message_id(thread_id, role, text),
                 "author": role,
                 "content": text,
                 "source": "checkpoint",
             }
-        )
+        if role == "agent" and pending_citations:
+            visible_message["citations"] = list(pending_citations)
+        visible.append(visible_message)
 
     return visible

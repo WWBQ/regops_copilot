@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""DeepAgents 工厂模块。
+"""Agent 工厂模块：金融初筛使用只读 MCP Agent，研发模式使用 DeepAgents。
 
 这个文件是课程版 Agent 的“装配中心”，负责把模型、工具、子 Agent、
 本地文件系统 backend、长期记忆 backend、权限规则、中间件和 checkpoint 串起来。
@@ -18,13 +18,13 @@ from deepagents import FilesystemPermission, create_deep_agent
 from deepagents.backends import CompositeBackend, StoreBackend
 from deepagents.middleware.subagents import GENERAL_PURPOSE_SUBAGENT, SubAgent
 from deepagents.middleware.summarization import create_summarization_tool_middleware
-from langchain.agents.middleware import ModelCallLimitMiddleware
+from langchain.agents import create_agent
+from langchain.agents.middleware import ModelCallLimitMiddleware, ToolCallLimitMiddleware
 from langchain_core.language_models import BaseChatModel
 from langgraph.graph.state import RunnableConfig
 from langgraph.store.base import BaseStore
 
 from agent.backends.local_shell import LocalShellBackend
-from agent.backends.financial_read_only import FinancialReadOnlyBackend
 from agent.backends.workspace import Workspace
 from agent.core.graph import get_langgraph_store
 from agent.core.middleware import (
@@ -34,6 +34,7 @@ from agent.core.middleware import (
     ToolErrorMiddleware,
 )
 from agent.core.model import make_main_model
+from agent.mcp.financial_client import load_financial_tools
 from agent.core.repo_memory import (
     build_repo_memory_namespace,
     ensure_repo_memory_initialized,
@@ -51,10 +52,8 @@ from agent.tools import (
     get_review_diff_summary,
     list_review_findings,
     load_default_review_rules,
-    lookup_financial_facts,
     open_gitee_pull_request,
     publish_gitee_pr_comment,
-    search_report_evidence,
     upload_to_gitee,
     validate_review_finding_location,
     web_search,
@@ -275,19 +274,6 @@ def _agent_filesystem_permissions() -> list[FilesystemPermission]:
     ]
 
 
-def _financial_filesystem_permissions() -> list[FilesystemPermission]:
-    """金融初筛只能读取专项 Skill；财务数据必须经过显式业务工具。"""
-
-    return [
-        FilesystemPermission(
-            operations=["read"],
-            paths=["/skills", "/skills/financial-risk-audit", "/skills/financial-risk-audit/**"],
-            mode="allow",
-        ),
-        FilesystemPermission(operations=["read", "write"], paths=["/**"], mode="deny"),
-    ]
-
-
 def _task_kind_from_config(configurable: dict[str, Any]) -> TaskKind:
     """从 config 中读取任务类型，非法值回退为只读的金融初筛。"""
 
@@ -378,7 +364,7 @@ def create_repo_backend(
 
 
 def get_agent(config: RunnableConfig):
-    """按照 指定 thread 构建 DeepAgent。
+    """按照指定 thread 和任务类型构建 Agent。
 
     之前项目 的入口是 `async def get_agent(config)`，因为它需要异步解析用户身份、
     远程 sandbox、团队模型配置等。课程版全部使用本地配置，因此这里保留同名
@@ -402,14 +388,27 @@ def get_agent(config: RunnableConfig):
 
     # task_kind 是系统提示词、权限策略和运行保护策略的共同输入。
     task_kind = _task_kind_from_config(configurable)
-
-    # backend 按 thread 复用，避免同一个会话内反复初始化 Windows 工作区封装。
     if task_kind == "financial_audit":
-        backend = FinancialReadOnlyBackend()
-        repo_url = None
-    else:
-        backend = ensure_backend_for_thread(thread_id)
-        repo_url = configurable.get("repo_url")
+        # 金融模式独立构图：仅有两个白名单 MCP 工具；不注入 DeepAgents 的文件、
+        # 命令、Gitee 工具或可写 backend。服务不可用时在构图前明确失败。
+        financial_tools = load_financial_tools()
+        from agent.core.graph import get_checkpointer
+
+        config["recursion_limit"] = 30
+        return create_agent(
+            model=make_main_model(configurable.get("model_id")),
+            tools=financial_tools,
+            system_prompt=get_system_prompt("financial_audit"),
+            checkpointer=get_checkpointer(),
+            middleware=[
+                ModelCallLimitMiddleware(run_limit=8, exit_behavior="end"),
+                ToolCallLimitMiddleware(run_limit=10, exit_behavior="end"),
+            ],
+        ).with_config(config)
+
+    # backend 按 thread 复用，避免同一个会话内反复初始化工作区封装。
+    backend = ensure_backend_for_thread(thread_id)
+    repo_url = configurable.get("repo_url")
     langgraph_store = get_langgraph_store()
     # server.py 在创建 Agent 之前，已经顺手读到了当前仓库记忆内容；
     # 那就把内容放进 config，后面的 ContextInjectionMiddleware 直接用，
@@ -424,12 +423,10 @@ def get_agent(config: RunnableConfig):
         # thread 级 backend。Agent 实例可以按请求重建，backend 和工作区继续复用。
         return agent_backend
 
-    # 课程版暂时主 Agent 和子 Agent 共用 deepseek-v4-pro。
-    # 后续如果要演示 之前项目 的 profile / fallback / team defaults，
-    # 可以从这里拆出 main_model 和 subagent_model 的不同配置。
-    # 这里每次创建 Agent 都重新创建 model wrapper，但模型调用状态不依赖该对象保存。
-    main_model = make_main_model()
-    subagent_model = make_main_model()
+    # 本轮选择只进入模型装配；thread/checkpoint 仍由 thread_id 隔离。
+    model_id = configurable.get("model_id")
+    main_model = make_main_model(model_id)
+    subagent_model = make_main_model(model_id)
 
     from agent.core.graph import get_checkpointer
 
@@ -440,7 +437,6 @@ def get_agent(config: RunnableConfig):
     # middleware 做上下文注入、消息兼容清洗、参数清洗、上下文压缩和异常恢复；
     # skills 提供任务方法论；
     # checkpointer 保存 LangGraph thread state。
-    financial_mode = task_kind == "financial_audit"
     engineering_tools = [
         web_search,
         fetch_url,
@@ -456,11 +452,11 @@ def get_agent(config: RunnableConfig):
     ]
     return create_deep_agent(  # 创建一个Agent
         model=main_model,
-        tools=[lookup_financial_facts, search_report_evidence] if financial_mode else engineering_tools,
+        tools=engineering_tools,
         system_prompt=get_system_prompt(task_kind),
-        subagents=[] if financial_mode else [_general_purpose_subagent(subagent_model), _code_reviewer_subagent(subagent_model)],
+        subagents=[_general_purpose_subagent(subagent_model), _code_reviewer_subagent(subagent_model)],
         backend=backend_factory,
-        permissions=_financial_filesystem_permissions() if financial_mode else _agent_filesystem_permissions(),
+        permissions=_agent_filesystem_permissions(),
         # 精简对话工具 compact_conversation
         # 你有一个名为 compact_conversation 的工具可用。该工具会刷新你的上下文窗口，以减少上下文膨胀和成本。
         #
