@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Agent 工厂模块：金融初筛使用只读 MCP Agent，研发模式使用 DeepAgents。
 
-这个文件是课程版 Agent 的“装配中心”，负责把模型、工具、子 Agent、
+这个文件是 Agent 的“装配中心”，负责把模型、工具、子 Agent、
 本地文件系统 backend、长期记忆 backend、权限规则、中间件和 checkpoint 串起来。
 
 需要特别注意：
@@ -70,9 +70,9 @@ DEFAULT_RECURSION_LIMIT = 9999
 # 用来防止 Agent 在工具失败、上下文异常或模型反复决策时无限循环。
 MODEL_CALL_RECURSION_LIMIT = 5000
 
-# 课程版只保留本地 workspace，不接入 之前项目 的远程 sandbox。
+# 当前实现只保留本地 workspace，不接入远程 sandbox。
 # 这里仍然按照 之前项目 的方式按 thread 缓存 backend，方便同一轮/同一会话复用
-# 工作区上下文，也方便后续讲解“thread -> backend -> Agent”的生命周期。
+# 工作区上下文，同时明确“thread -> backend -> Agent”的生命周期。
 _BACKENDS: dict[str, LocalShellBackend] = {}
 
 
@@ -367,7 +367,7 @@ def get_agent(config: RunnableConfig):
     """按照指定 thread 和任务类型构建 Agent。
 
     之前项目 的入口是 `async def get_agent(config)`，因为它需要异步解析用户身份、
-    远程 sandbox、团队模型配置等。课程版全部使用本地配置，因此这里保留同名
+    远程 sandbox、团队模型配置等。当前实现全部使用本地配置，因此这里保留同名
     工厂函数，但实现为同步函数，方便 FastAPI 后台任务直接调用。
     """
 
@@ -379,7 +379,7 @@ def get_agent(config: RunnableConfig):
     config["recursion_limit"] = config.get("recursion_limit", DEFAULT_RECURSION_LIMIT)
 
     if not isinstance(thread_id, str) or not thread_id or not graph_loaded_for_execution(config):
-        # 讲课重点：
+        # 关键实现：
         # 有些框架或调试脚本会“探测”Agent 图结构，但这不代表要真正执行任务。
         # 这里返回空 Agent，是为了避免没有 thread_id 时就创建 backend、加载工具、
         # 甚至触发文件系统副作用。真实任务必须带 thread_id 且标记执行态。
@@ -431,7 +431,7 @@ def get_agent(config: RunnableConfig):
     from agent.core.graph import get_checkpointer
 
     logger.info("返回带 backend 的 Agent：thread_id=%s task_kind=%s", thread_id, task_kind)
-    # 这里是整套 Agent 能力的装配点。讲课时建议从这些参数逐个展开：
+    # 这里是整套 Agent 能力的装配点，关键参数如下：
     # model 决定推理能力；tools 提供业务动作；system_prompt 提供任务规则；
     # subagents 负责分析委派；backend/permissions 决定文件系统边界；
     # middleware 做上下文注入、消息兼容清洗、参数清洗、上下文压缩和异常恢复；

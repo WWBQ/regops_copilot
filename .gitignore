@@ -37,6 +37,9 @@ web/dist-ssr/
 .DS_Store
 Thumbs.db
 
+# 本地会话导出（不属于项目交付物）
+docs/_export_chat_*.md
+
 # LangGraph Checkpoint（本地任务快照，不进仓库）
 data/checkpoints/
 

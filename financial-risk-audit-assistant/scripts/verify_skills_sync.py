@@ -32,7 +32,7 @@ def _read_skill(path: Path) -> str:
 def main() -> None:
     r"""验证项目内 skills 已同步到 DeepAgents 真实运行目录。
 
-    DeepAgents 运行时读取的是 `E:\ai_workspace\skills`，而课程项目源码保存在
+    DeepAgents 运行时读取的是 `E:\ai_workspace\skills`，而项目源码保存在
     `agent/skills`。这个脚本用于防止只改源码、不改运行目录，导致 Agent 继续
     使用旧规则。
     """

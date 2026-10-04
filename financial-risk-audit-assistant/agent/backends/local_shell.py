@@ -7,7 +7,7 @@
 3. 它为命令执行增加安全守卫、超时控制、Token 脱敏和 Gitee 非交互认证；
 4. 它保留了旧版 Gitee/Git 工具需要的兼容方法，降低业务代码迁移成本。
 
-讲课时可以把它理解为“Agent 与真实电脑之间的工程边界”：
+它是“Agent 与真实电脑之间的工程边界”：
 Prompt 负责告诉模型应该怎么做，LocalShellBackend 负责决定模型最终能不能读、写、执行。
 """
 
@@ -133,7 +133,7 @@ class LocalShellBackend(BaseSandbox):
     4. 实现 Gitee Git 非交互认证：通过 `GIT_ASKPASS` 注入 token，避免后台进程弹窗；
     5. 保留旧版兼容接口：`run/read_file/write_file/list_files`，避免一次性重构业务工具。
 
-    这个类不是“完全可信的 shell 代理”，而是课程项目里的受控本地执行层。
+    这个类不是“完全可信的 shell 代理”，而是项目里的受控本地执行层。
     真正企业生产环境还应叠加容器隔离、系统用户隔离、审计日志和更完整的权限策略。
     """
 
@@ -787,7 +787,7 @@ class LocalShellBackend(BaseSandbox):
     def _write_deny_reason(self, path: Path) -> str | None:
         """检查目录是否禁止写入。
 
-        课程项目只允许模型主要修改 `/projects` 下的业务仓库。
+        当前实现只允许模型主要修改 `/projects` 下的业务仓库。
         `skills/policies/runtimes/logs/.secrets` 都属于后端运行基础设施或规则资产，
         不允许在普通任务中被模型写入，避免 Agent 自己改掉工具、规则、运行时或敏感文件。
         """

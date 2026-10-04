@@ -51,6 +51,6 @@ python-ai/.venv/bin/python eval/run_w6_number_check.py --fail-on-regression
 
 `--fail-on-regression`：accuracy < 100% 或出现误放行则非零退出。JSON/Markdown 写到 `eval/reports/w6_number_check/<时间戳>/`（不入库）。
 
-## 4. 面试怎么讲
+## 4. 结果说明
 
 数字校验的价值不是「准确率 100%」好看，而是 **误放行必须为 0**：无出处的亿、万元当元、百分数量纲、手算比率，都在代码里拦，不靠 Prompt。`number_error_rate=50%` 是黄金集设计（一半题故意有问题），不要当成系统漏了一半数字。

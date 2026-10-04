@@ -1,7 +1,7 @@
 # NOISE_PATTERNS · 金融 PDF 噪声模式清单
 
 > W2-1 交付物。每条噪声：**描述 · 规则/正则 · 命中样例 · 处理结论**。  
-> 配合：`app/ingest/cleaner.py` · [W2 清单](./W2_引导式手写清单.html)
+> 对应实现：`app/ingest/cleaner.py`
 
 ---
 

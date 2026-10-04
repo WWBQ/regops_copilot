@@ -1,13 +1,13 @@
 # RegOps Copilot
 
-> **基于公开披露数据构建的学习作品集项目，不是任何金融机构的生产系统。**
+> **基于公开披露数据构建的金融智能应用工程，不是任何金融机构的生产系统。**
 > 全部业务数据来自上市公司公开年报与监管机构公开文件，不含客户数据或个人隐私信息；
 > 模型输出一律附免责声明，不构成合规意见或投资建议。
 > 详见 [`docs/DATA_SOURCES.md`](./docs/DATA_SOURCES.md)。
 
 ## 项目定位
 
-RegOps Copilot 是一个面向大模型应用开发学习与求职展示的完整工程项目，包含两条业务主线：
+RegOps Copilot 是一个面向金融合规与风险分析的大模型应用工程，包含两条业务主线：
 
 - **合规问答**：在监管制度和上市公司年报中检索证据，回答必须带页码和原文引用。
 - **金融风险审计助手**：Agent 自主查询财务事实、检索年报证据，输出待人工复核的风险线索，而不是自动作出审计结论。
@@ -215,7 +215,7 @@ regops-copilot/
 │   │   ├── ops/ · obs/                   # 运行监控与 LLM 可观测性
 │   │   ├── db/ · storage/ · security/    # 公共基础设施
 │   │   ├── router.py                     # 全部 HTTP 路由清单
-│   │   ├── README.md                     # 模块说明与学习顺序
+│   │   ├── README.md                     # 模块说明与调用链路
 │   │   └── main.py                       # FastAPI 启动入口
 │   ├── requirements.txt                  # Python 依赖
 │   └── Dockerfile                        # Python 服务 Dockerfile

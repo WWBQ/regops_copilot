@@ -111,7 +111,7 @@ def _timestamp_ms(value: str | None) -> int:
 
 
 def _status_for_frontend(status: str | None) -> str:
-    """把课程后端状态映射成 open-swe 前端 AgentStatus。"""
+    """把当前后端状态映射成 open-swe 前端 AgentStatus。"""
 
     if status in {"running", "pushed", "pr_created"}:
         return "running"

@@ -10,8 +10,8 @@
 3. Git 参数风险：
    - 分支名、提交信息来自模型输出，必须在进入 shell 前做归一化和校验。
 
-讲课时要强调：
-这里不是完整的企业沙箱，只是课程版本地 Windows backend 的安全收敛层。
+安全边界说明：
+这里不是完整的企业沙箱，只是本地 Windows backend 的安全收敛层。
 真正生产环境还应结合容器、系统权限、审计、网络隔离和更严格的命令执行策略。
 """
 
@@ -45,7 +45,7 @@ def assert_path_inside(path: Path, root: Path) -> Path:
         WorkspacePermissionError: 如果 path 不在 root 内。
 
     这是文件访问的基础安全边界，防止模型使用 `..`、盘符绝对路径等方式
-    读取或写入课程工作区外的文件。
+    读取或写入运行工作区外的文件。
     """
 
     resolved_root = root.resolve()
@@ -58,12 +58,12 @@ def assert_path_inside(path: Path, root: Path) -> Path:
 def normalize_safe_command(command: str) -> str:
     """校验 Agent 准备执行的本地命令。
 
-    课程版第一版只允许少量教学需要的命令族：
+    当前实现只允许少量项目运行所需的命令族：
     python/python3/py、pytest、pip、git、dir、type、ruff。
 
     模型经常会在命令末尾追加 `2>&1` 或 `| tail -5`。
     前者是为了合并 stderr，后者是 Unix 查看末尾输出的习惯。
-    课程版在 Python 中已经捕获 stdout/stderr，也会把完整输出返回给模型，
+    当前实现已经在 Python 中捕获 stdout/stderr，也会把完整输出返回给模型，
     所以这里剥离这两个尾部片段，既兼容模型习惯，又不放开任意管道/重定向能力。
     """
 
@@ -72,7 +72,7 @@ def normalize_safe_command(command: str) -> str:
     normalized = re.sub(r"\s+2>&1\s*$", "", normalized)
     lowered = normalized.lower()
     first_word = normalized.split(maxsplit=1)[0].lower() if normalized else ""
-    # 课程版只放开和 Python/Git 项目验证相关的命令。
+    # 仅放开和 Python/Git 项目验证相关的命令。
     # 如果未来要允许 npm、mvn、gradle 等命令，应在这里明确加白名单，
     # 同时补充对应的安全测试，而不是直接放开任意 shell。
     allowed_commands = {"python", "python3", "py", "pytest", "pip", "git", "dir", "type", "ruff"}
@@ -80,7 +80,7 @@ def normalize_safe_command(command: str) -> str:
         raise WorkspacePermissionError(f"Command is not allowed: {command}")
 
     # shell 操作符会显著扩大命令能力，例如管道、重定向、命令拼接、命令替换。
-    # 课程版不允许模型组合复杂 shell 片段，避免绕过上面的命令白名单。
+    # 不允许模型组合复杂 shell 片段，避免绕过上面的命令白名单。
     shell_operators = [
         "&&",
         "||",
@@ -148,7 +148,7 @@ def ensure_safe_git_message(message: str) -> str:
     """把模型生成的提交信息归一化为安全的单行 commit message。
 
     模型经常会生成多行提交说明，甚至包含 JSON 示例中的双引号。
-    Git 本身支持复杂 message，但课程版当前通过 Windows shell 执行 git commit，
+    Git 本身支持复杂 message，但当前实现通过 Windows shell 执行 git commit，
     所以这里把 message 压缩成单行，并移除 shell 风险字符。
     """
 

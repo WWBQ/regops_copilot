@@ -13,7 +13,7 @@ def _load_non_empty_env(path: Path, *, override: bool, allowed_keys: set[str] | 
     r"""加载 .env 中的非空变量。
 
     python-dotenv 默认会把 `DEEPSEEK_API_KEY=` 这种空值也写入环境变量。
-    课程项目的 `.env` 通常会保留空字段作为模板，如果直接加载空值，
+    项目的 `.env` 通常会保留空字段作为模板，如果直接加载空值，
 
     所以这里采用自定义加载规则：
     - 空值不写入环境变量。
@@ -45,8 +45,8 @@ def load_environment() -> None:
     )
     _load_non_empty_env(LOCAL_ENV, override=True)
 
-    # 课程版默认关闭 LangSmith/LangChain tracing。
-    # 这样学生启动项目时不需要额外配置 LangSmith，也不会把运行数据发到外部观测平台。
+    # 默认关闭 LangSmith/LangChain tracing。
+    # 这样启动项目时不需要额外配置 LangSmith，也不会把运行数据发到外部观测平台。
     os.environ.setdefault("LANGCHAIN_TRACING_V2", "false")
     os.environ.setdefault("LANGSMITH_TRACING", "false")
     os.environ.setdefault("LANGCHAIN_API_KEY", "")

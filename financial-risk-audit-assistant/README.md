@@ -27,7 +27,7 @@
 - 把 `missing`、`unverified`、`conflict`、`missing_provenance`、`insufficient_evidence`、`unavailable` 当成可靠事实。
 - 将候选原文直接表述为审计认定。
 
-仓库里仍保留通用 DeepAgents Harness 的编程、审查和 Skills 代码，供学习 Harness 架构；RegOps `/risk-agent` 接口会强制进入 `financial_audit`，这些代码工具不会装配到金融 Agent。
+仓库里仍保留通用 DeepAgents Harness 的编程、审查和 Skills 代码；RegOps `/risk-agent` 接口会强制进入 `financial_audit`，这些代码工具不会装配到金融 Agent。
 
 ## 架构
 

@@ -35,5 +35,3 @@ CORS 暴露 `X-Request-ID` 和 `traceparent`。Java 日志 `logging.pattern.leve
 ## 脱敏
 
 进缓冲 / Langfuse 的 input/output 走 `mask_for_log`（身份证、手机号、账号、`sk-`、`DEEPSEEK_API_KEY=`）。证明 Prompt 版本和成本可运营，不等于把 Key 送去第三方。
-
-课程口试对应 **q45 / q68**。

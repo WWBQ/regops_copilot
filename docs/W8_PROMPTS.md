@@ -34,7 +34,7 @@ python-ai/.venv/bin/python eval/run_w8_prompt_pin.py rollback --name chat.genera
 
 ## 三策略对照（w8-2）
 
-同一批 30 题：`eval/golden/w8_prompt_30.json`。题型有区分度（面试 q82）：闭卷概念、未入库数字、诱导手算、注入拒答、指定格式。Few-shot 示例是存款准备金率等**题外**样例，不抄黄金集原题。
+同一批 30 题：`eval/golden/w8_prompt_30.json`。题型覆盖闭卷概念、未入库数字、诱导手算、注入拒答和指定格式。Few-shot 示例是存款准备金率等**题外**样例，不抄黄金集原题。
 
 默认 **fixture**：组装真实模板，用题面标注的 `strategy_outcomes` 生成终稿，再交给 `evidence.py` 抽数字。pytest 和 CI 不调 LLM。这不是「线上 30 题准确率」，是策略失败形态对照。
 

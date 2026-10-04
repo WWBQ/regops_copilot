@@ -12,7 +12,7 @@ from __future__ import annotations
 4. 通过 streaming_runtime.py 消费 DeepAgents V3 event stream，把运行过程展示给前端。
 5. 在任务结束后更新仓库级长期记忆，并在删除会话时同步清理 Store 与 checkpoint。
 
-讲课时可以把 runtime.py 理解成“产品流程控制层”：它保证用户没有确认方案前不会
+runtime.py 是“产品流程控制层”：它保证用户没有确认方案前不会
 进入 coding，也保证 Store 只保存业务数据，真实对话历史以 LangGraph checkpoint 为准。
 """
 
@@ -55,7 +55,7 @@ def _build_agent_for_runtime(
 ):
     """为 FastAPI runtime 构造 open-swe 风格的 Agent config。
 
-    open-swe 由 LangGraph Server 注入 `RunnableConfig`。课程版不用
+    open-swe 由 LangGraph Server 注入 `RunnableConfig`。当前实现不用
     langgraph dev，所以在这里显式组装 config，再交给 `agent.server.get_agent`。
 
     `thread_id` 用于绑定 LangGraph checkpoint、Store 业务记录和前端事件流。
@@ -630,7 +630,7 @@ def _run_git_with_fetch_head_retry(
     FETCH_HEAD 是 git fetch/pull 写入的临时状态文件，不是仓库源码。
     如果上一次任务异常中断或 IDE 短暂占用导致 Git 无法打开它，可以删除后重试。
 
-    这个兼容逻辑主要服务 Windows 教学环境。PyCharm、杀毒软件或文件索引服务
+    这个兼容逻辑主要服务 Windows 本地开发环境。PyCharm、杀毒软件或文件索引服务
     偶尔会短暂占用 `.git/FETCH_HEAD`，直接失败会让“同步代码”体验很差。
     """
 
@@ -695,7 +695,7 @@ def run_pull_only_task(*, repo_url: str | None, prompt: str, thread_id: str | No
         PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
         if target.exists() and (target / ".git").exists():
             # 本地已经存在 Git 仓库时，只更新远程地址并快进拉取 master。
-            # 这里使用 --ff-only，避免自动产生 merge commit，保持教学项目历史清晰。
+            # 这里使用 --ff-only，避免自动产生 merge commit，保持项目历史清晰。
             record_event(thread_id, "workspace", "准备本地工作区", status="completed")
             record_event(thread_id, "sync", "同步远程仓库", kind="execute", status="in_progress")
             remote_result = backend.run(f"git remote set-url origin {clone_url}", cwd=str(relative_dir), timeout=60)
@@ -715,7 +715,7 @@ def run_pull_only_task(*, repo_url: str | None, prompt: str, thread_id: str | No
             outputs = [remote_result, checkout_result, fetch_result, pull_result]
         else:
             # 本地还没有对应目录时，直接 clone 到 workspace/projects 下。
-            # 课程版目录固定为 projects/<repo>，不再写入仓库目录映射表。
+            # 当前目录固定为 projects/<repo>，不再写入仓库目录映射表。
             record_event(thread_id, "workspace", "准备本地工作区", status="completed")
             record_event(thread_id, "sync", "克隆 Gitee 仓库", kind="execute", status="in_progress")
             clone_result = backend.run(f"git clone {clone_url} {target.name}", cwd="projects", timeout=600)
@@ -898,7 +898,7 @@ def run_agent_task(
     coding_prompt = prompt
 
     if not forced_financial_audit and existing_thread and _is_approval_prompt(prompt):
-        # 讲课重点：
+        # 关键实现：
         # “确认实施”不能直接等价于“执行当前这几个字”。
         # 必须先回到当前 thread 的历史消息里，找到最近一条仍在等待确认的技术方案；
         # 再用该方案的 source_prompt 还原用户最初的开发需求，避免把“确认”当作新需求执行。

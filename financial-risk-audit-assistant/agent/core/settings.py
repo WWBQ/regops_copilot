@@ -6,15 +6,15 @@ from pathlib import Path
 
 from agent.env_utils import get_env
 
-# 项目根目录固定为当前课程项目目录。Windows 开发环境通常是
+# 项目根目录固定为当前项目目录。Windows 开发环境通常是
 # 本地项目目录，Linux/Docker 部署时可使用 /opt/financial-risk-audit-assistant/app。
 # 后续所有本项目自己的数据文件、日志文件都默认放在这个目录下面，
 # 避免 LangGraph dev 或第三方工具把文件散落到隐藏目录中。
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # SQLite 数据目录：默认使用项目内 data/。
-# 用户仍然可以通过 .env 覆盖，但课程版推荐显式落在项目目录中，
-# 方便讲课时直接打开 SQLite 文件观察 checkpoint 和业务 Store 的区别。
+# 用户仍然可以通过 .env 覆盖，但默认推荐显式落在项目目录中，
+# 方便直接打开 SQLite 文件观察 checkpoint 和业务 Store 的区别。
 DATA_DIR = Path(get_env("FIN_RISK_AUDIT_DATA_DIR", get_env("AI_CODING_DATA_DIR", str(PROJECT_ROOT / "data")))).resolve()
 CHECKPOINT_DB_PATH = Path(
     get_env("CHECKPOINT_DB_PATH", str(DATA_DIR / "checkpoints.sqlite"))
@@ -87,6 +87,6 @@ def _default_workspace_root() -> str:
 WORKSPACE_ROOT = Path(get_env("AI_WORKSPACE_ROOT", _default_workspace_root())).expanduser().resolve()
 PROJECTS_DIR = WORKSPACE_ROOT / "projects"
 
-# DeepAgents skills 目录。课程版统一放在 WORKSPACE_ROOT/skills，
+# DeepAgents skills 目录。当前实现统一放在 WORKSPACE_ROOT/skills，
 # 这样可以通过 DeepAgents 原生 backend route 暴露为 `/skills/`。
 SKILLS_DIR = WORKSPACE_ROOT / "skills"

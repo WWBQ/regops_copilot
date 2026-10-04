@@ -40,4 +40,4 @@ Java 在 Compose 网络里访问 `http://python-ai:8000`，不要写 `localhost`
 - `java-service` 只等 Postgres healthy，**不等 python-ai**。Python 还在构建或被停掉时，Java 探活仍是 200，登录与审计可用（W9-6）
 - K8s 最小清单见 [`W9_K8S.md`](./W9_K8S.md)
 
-课程口试对应 **q45 / q46**：Compose 适合可复现样板；上规模再 K8s，不为简历先堆集群。
+Compose 用于提供可复现的本地和测试环境；达到规模化部署条件后再引入 K8s，避免无业务需求地增加集群复杂度。

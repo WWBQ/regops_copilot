@@ -27,7 +27,7 @@ yue_qwen_lora（154MB adapter）
 - **用** `merged_model/`（未量化底模合并后的目录）。
 - **不要用** 训练时的 4-bit 底模（`unsloth/Qwen2.5-7B-Instruct-bnb-4bit`）。
 - **不要用** Q4 GGUF 当 vLLM 主路径（那是 llama.cpp 格式）。
-- 合并必须挂在 FP16 的 `Qwen/Qwen2.5-7B-Instruct` 上再 `merge`，原因见 [`INTERVIEW.md`](./INTERVIEW.md) §3.6。
+- 合并必须挂在 FP16 的 `Qwen/Qwen2.5-7B-Instruct` 上再执行 `merge`，避免将量化误差固化到合并权重中。
 
 也可不合并：vLLM 加载原版 Qwen，再挂 LoRA。已经合过就优先 serve `merged_model/`。
 
@@ -213,7 +213,7 @@ curl -s http://127.0.0.1:8000/v1/chat/completions \
 | 回复又在翻译 | 推理侧 system 写清「不要把提问当成翻译」；这是已知行为，不是 vLLM 配错 |
 | 想用 GGUF | 走 Ollama，不要硬塞给 vLLM |
 
-## 面试三句
+## 部署结论
 
 1. vLLM 是推理服务：自己的卡、连续批处理，对外 OpenAI 兼容接口。
 2. 粤语模型 serve 的是合并后的 HF 目录，不是训练用的 4-bit，也不是给 Ollama 的 GGUF。

@@ -1,7 +1,7 @@
 # 入库三道质量门 · 完整设计稿
 
 > **W2-2 核心文档** · RegOps Copilot ingest 验收标准  
-> 配合：[NOISE_PATTERNS.md](./NOISE_PATTERNS.md)（w2-1 上游清洗）· [ACCOUNTING_RULES.md](./ACCOUNTING_RULES.md)（勾稽规则索引）· [W2 清单](./W2_引导式手写清单.html#day23)
+> 配合：[NOISE_PATTERNS.md](./NOISE_PATTERNS.md)（上游清洗）· [ACCOUNTING_RULES.md](./ACCOUNTING_RULES.md)（勾稽规则索引）
 
 ---
 
@@ -200,7 +200,7 @@ cash_end = cash_begin + net_cash_change
 net_profit = profit_before_tax - income_tax
 ```
 
-**明确不做：** 看到「毛利率、ROE、EPS」等名称 **相似就手算**——必须 **直读报表字段** 或 XBRL tag（见 [Q26 面试笔记](./面试_工程化笔记.md)）。
+**明确不做：** 看到「毛利率、ROE、EPS」等名称 **相似就手算**——必须 **直读报表字段** 或 XBRL tag。
 
 ### 3.2 通用勾稽函数
 
@@ -372,11 +372,11 @@ app/ingest/
 
 ## 6. W2-2 总验收清单
 
-完成 Day 2–3（w2-2）时，**以下全部勾选**方可勾主学习系统 w2-2：
+完成本阶段实现时，以下检查项必须全部通过：
 
 ### 文档
 
-- [ ] 本文档 `INGEST_VALIDATION.md` 已读通，三道门能口述
+- [ ] 本文档 `INGEST_VALIDATION.md` 已完成评审，三道质量门定义明确
 - [ ] `ACCOUNTING_RULES.md` ≥3 条勾稽规则已写会计依据
 
 ### G1 金额一致性
@@ -412,7 +412,7 @@ app/ingest/
 
 W2-2 落地：`python-ai/scripts/download_xbrl.py` 拉 F10，`scripts/ingest_fin_metric.py` 过门入库；看板 `/quality/gates`、`/quality/facts`。
 
-见 [NOISE_PATTERNS.md §2](./NOISE_PATTERNS.md) · 面试笔记 Q26。
+见 [NOISE_PATTERNS.md §2](./NOISE_PATTERNS.md)。
 
 ---
 

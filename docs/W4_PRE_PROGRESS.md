@@ -211,7 +211,7 @@ flowchart LR
 
 ## 10. 进 W4 前的推荐优先级
 
-若时间有限，按 **W4 依赖 + 面试证据** 排序：
+若时间有限，按 **W4 依赖 + 验收证据** 排序：
 
 1. **W4 Text2SQL**：查 `fin_metric`（status=auto_accepted）+ 口径说明
 2. **W3 最小通关**：dept_acl 过滤雏形 + 10 条 badcase 归因文档（1 天）
@@ -220,7 +220,7 @@ flowchart LR
 
 ---
 
-## 11. 一句话状态（对外 / 面试）
+## 11. 当前状态摘要
 
 > RegOps W1–W3 已完成 **金融 RAG 主链路**：5 份 A 股年报入库、Hybrid 检索（向量+BM25 RRF+Cross-Encoder）、会话 PDF 问答、100 题检索评测（现网 Recall@12 **79%**、CiteAcc **15.5%**）与 baseline/hybrid/rerank 消融、全链路 trace 与运维看板。  
 > **未完成（有意降级）**：年报 PDF 表格 bbox 交叉验证、FinanceBench 全量复跑。  

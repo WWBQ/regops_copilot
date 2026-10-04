@@ -12,7 +12,7 @@
 
 - `projects/`：Gitee 仓库克隆目录，真实业务项目通常位于 `projects/仓库名`。
 - `skills/`：DeepAgents 原生 skill 目录，Agent 运行时通过 `/skills` 虚拟路径读取。
-- `runtimes/`：共享运行环境目录，例如 Python 虚拟环境、Node 或其它课程运行时。
+- `runtimes/`：共享运行环境目录，例如 Python 虚拟环境、Node 或其它项目运行时。
 - `policies/`：编码规范、审查规范、安全规范目录。
 - `reviews/`：代码审查、分析结果、历史评审资料目录。
 - `logs/`：工作区级运行日志目录，用于排查 Agent 或项目运行过程。

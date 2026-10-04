@@ -91,6 +91,4 @@ kubectl apply --dry-run=client --validate=false -k k8s/
 
 JDK：当前镜像是 Eclipse Temurin 21。信创主机可换成 **Alibaba Dragonwell 21** 或 **毕昇 JDK 21**，作为 Temurin 的 drop-in（需回归 `mvn test`）。容器化后宿主机 libc（麒麟 / 统信）锁得住的是节点 OS，不是把业务绑死在某套国产中间件认证上。
 
-面试时说清楚：**Compose 可复现样板；K8s 是上规模路径；信创先锁模型与 PG 协议，再谈发行版采购。** 不要说「已经过某家等保/信创测评」——仓库没有那些证书。
-
-课程口试对应 **q46**。
+边界说明：**Compose 提供可复现样板；K8s 是规模化路径；信创适配先锁定模型与 PostgreSQL 协议，再评估发行版。** 仓库没有等保或信创测评证书，不作相关声明。

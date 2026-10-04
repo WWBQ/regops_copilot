@@ -101,7 +101,7 @@ CiteAcc（15.7%）远低于 Recall（76%）：题级 page_hit 只要求 top-12 �
 
 CiteAcc 整体偏低；精排主要抬高治理 / 战略类引用纯度，对数字题几乎没帮助。
 
-## 3. 结论（面试可直接讲）
+## 3. 实验结论
 
 1. **现网不要再报 0.82 / 0.74 / 0.76。** 生产路径（BM25 + RRF + Cross-Encoder + 节标题提名，`max_chunks_per_page=2`）是 Recall **0.79** / MRR **0.50** / nDCG **0.34** / CiteAcc **0.155**。§2 消融表的 0.76 是同页不限时的 rerank 档。
 2. **CiteAcc 和 Recall 必须一起说。** 79% 只表示 top-12 里出现过 gold 页；去重后大约每 6–7 个检索页才有 1 页是 gold。检索很吵时 recall 仍可能为 1。

@@ -67,7 +67,7 @@
       "expected": "最低资本要求|监管审查|市场约束|信息披露",
       "grading": "contains",
       "source_doc": "巴塞尔III公开框架",
-      "why_clean": "国际监管常识，面试常问"
+      "why_clean": "国际监管通用概念，适合验证基础知识覆盖"
     },
     {
       "id": "w1-008",
