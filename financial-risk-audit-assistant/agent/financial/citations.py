@@ -48,6 +48,20 @@ class ToolCitationIndexer:
                     citation.get("page"), str(citation.get("snippet") or "").strip(),
                 )
                 citation["citation_id"] = self._id_for(key)
+        elif tool_name == "search_external_risk_signals":
+            for item in result.get("results") or []:
+                if not isinstance(item, dict):
+                    continue
+                url = str(item.get("url") or "").strip()
+                snippet = str(item.get("snippet") or "").strip()
+                if not url or not snippet:
+                    continue
+                key = (
+                    "web", url, str(item.get("title") or "").strip(),
+                    str(item.get("published_at") or "").strip(),
+                    str(item.get("content_hash") or "").strip(),
+                )
+                item["citation_id"] = self._id_for(key)
         return result
 
 
@@ -103,6 +117,7 @@ def _fact_citations(payload: dict[str, Any]) -> list[tuple[int, dict[str, Any]]]
             (
                 citation_id,
                 {
+                    "citation_id": citation_id,
                     "doc_id": str(source.get("doc_id") or f"{company_code}_{year}"),
                     # facts 引用优先使用 href；page=1 只是兼容统一前端类型，不代表 PDF 页码。
                     "page": 1,
@@ -110,6 +125,9 @@ def _fact_citations(payload: dict[str, Any]) -> list[tuple[int, dict[str, Any]]]
                     "title": f"财务事实库 · {company_code} {year} 年 {concept}",
                     "href": f"/quality/facts?{query}",
                     "kind": "facts",
+                    "company_code": company_code,
+                    "concept": concept,
+                    "year": year,
                 },
             )
         )
@@ -133,12 +151,49 @@ def _document_citations(payload: dict[str, Any]) -> list[tuple[int, dict[str, An
             (
                 citation_id,
                 {
+                    "citation_id": citation_id,
                     "doc_id": doc_id,
                     "page": page,
                     "snippet": snippet,
                     "title": doc_id,
                     "href": None,
                     "kind": "document",
+                },
+            )
+        )
+    return result
+
+
+def _web_citations(payload: dict[str, Any]) -> list[tuple[int, dict[str, Any]]]:
+    """把外部搜索结果转换成可点击的网页引用。"""
+
+    result: list[tuple[int, dict[str, Any]]] = []
+    for item in payload.get("results") or []:
+        if not isinstance(item, dict):
+            continue
+        citation_id = item.get("citation_id")
+        url = str(item.get("url") or "").strip()
+        snippet = str(item.get("snippet") or "").strip()
+        title = str(item.get("title") or item.get("publisher") or url).strip()
+        if type(citation_id) is not int or citation_id <= 0 or not url or not snippet:
+            continue
+        result.append(
+            (
+                citation_id,
+                {
+                    "citation_id": citation_id,
+                    "doc_id": url,
+                    # 前端 Citation 保持统一结构；网页引用不展示页码。
+                    "page": 0,
+                    "snippet": snippet,
+                    "title": title,
+                    "href": url,
+                    "kind": "web",
+                    "publisher": str(item.get("publisher") or ""),
+                    "published_at": str(item.get("published_at") or ""),
+                    "fetched_at": str(item.get("fetched_at") or ""),
+                    "content_hash": str(item.get("content_hash") or ""),
+                    "source_tier": str(item.get("source_tier") or "public_web"),
                 },
             )
         )
@@ -153,7 +208,12 @@ def citations_from_messages(messages: Iterable[Any]) -> list[dict[str, Any]]:
         payload = _payload(message)
         if payload is None:
             continue
-        pairs = _fact_citations(payload) if "facts" in payload else _document_citations(payload)
+        if "facts" in payload:
+            pairs = _fact_citations(payload)
+        elif "results" in payload:
+            pairs = _web_citations(payload)
+        else:
+            pairs = _document_citations(payload)
         for citation_id, citation in pairs:
             indexed.setdefault(citation_id, citation)
     return [indexed[citation_id] for citation_id in sorted(indexed)]

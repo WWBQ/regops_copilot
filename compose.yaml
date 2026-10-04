@@ -62,6 +62,18 @@ services:
       retries: 8
       start_period: 90s
 
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: regops-searxng
+    restart: unless-stopped
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8888/
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-dev-searxng-secret-change-me}
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      - ./deploy/searxng/settings.yml:/etc/searxng/settings.yml:ro
+
   risk-agent:
     build: ./financial-risk-audit-assistant
     container_name: regops-risk-agent
@@ -78,12 +90,15 @@ services:
       REGOPS_MCP_URL: http://python-ai:8000/mcp/
       FIN_RISK_AUDIT_LOG_DIR: /app/data/logs
       AI_WORKSPACE_ROOT: /app/workspace
+      SEARXNG_BASE_URL: http://searxng:8080
     volumes:
       - risk_agent_data:/app/data
       - risk_agent_workspace:/app/workspace
     depends_on:
       python-ai:
         condition: service_healthy
+      searxng:
+        condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:2024/health')"]
       interval: 10s

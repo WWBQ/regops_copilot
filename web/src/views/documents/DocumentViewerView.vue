@@ -1,34 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { documentContentUrl } from '../../api/documents'
+import DocumentPdfFrame from '../../components/documents/DocumentPdfFrame.vue'
 
 const route = useRoute()
 const router = useRouter()
-
-const loadError = ref<string | null>(null)
-const checking = ref(true)
 
 const docId = computed(() => String(route.params.docId ?? ''))
 const page = computed(() => {
   const raw = Number(route.query.page ?? 1)
   return Number.isFinite(raw) && raw > 0 ? raw : 1
-})
-
-const pdfSrc = computed(() => documentContentUrl(docId.value, page.value))
-
-onMounted(async () => {
-  try {
-    const response = await fetch(pdfSrc.value, { method: 'HEAD' })
-    if (!response.ok) {
-      loadError.value = `文档加载失败（HTTP ${response.status}）`
-    }
-  } catch {
-    loadError.value = '无法连接文档服务，请确认 Java BFF (8080) 已启动'
-  } finally {
-    checking.value = false
-  }
 })
 
 function goBack() {
@@ -50,23 +32,8 @@ function goBack() {
       </div>
     </header>
 
-    <div v-if="checking" class="doc-viewer-status">正在加载 PDF…</div>
-    <div v-else-if="loadError" class="doc-viewer-status error">
-      <p>{{ loadError }}</p>
-      <a class="retry-link" :href="pdfSrc" target="_blank" rel="noopener noreferrer">在新标签页尝试打开</a>
-    </div>
-
-    <div v-else class="doc-viewer-frame-wrap">
-      <object
-        class="doc-viewer-frame"
-        :data="pdfSrc"
-        type="application/pdf"
-      >
-        <p class="embed-fallback">
-          当前浏览器无法内嵌预览，
-          <a :href="pdfSrc" target="_blank" rel="noopener noreferrer">点击在新标签页打开 PDF</a>
-        </p>
-      </object>
+    <div class="doc-viewer-frame-wrap">
+      <DocumentPdfFrame :doc-id="docId" :page="page" />
     </div>
   </section>
 </template>
@@ -122,49 +89,9 @@ function goBack() {
   color: var(--muted);
 }
 
-.doc-viewer-status {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.doc-viewer-status.error {
-  color: #991b1b;
-  text-align: center;
-  padding: 24px;
-}
-
-.retry-link {
-  display: inline-block;
-  margin-top: 12px;
-  color: #0f766e;
-  font-weight: 600;
-}
-
 .doc-viewer-frame-wrap {
   flex: 1;
   min-height: 0;
   padding: 12px;
-}
-
-.doc-viewer-frame {
-  width: 100%;
-  height: 100%;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #ffffff;
-}
-
-.embed-fallback {
-  padding: 24px;
-  text-align: center;
-  color: var(--muted);
-}
-
-.embed-fallback a {
-  color: #0f766e;
-  font-weight: 600;
 }
 </style>

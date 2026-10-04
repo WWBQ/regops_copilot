@@ -78,10 +78,12 @@ def _sync_tool(
     )
 
 
-def load_financial_tools() -> list[BaseTool]:
+def load_financial_tools(
+    citation_indexer: ToolCitationIndexer | None = None,
+) -> list[BaseTool]:
     """同步运行线程中发现 MCP 工具，供 Agent 构图及 API 预检复用。"""
     try:
-        citation_indexer = ToolCitationIndexer()
+        citation_indexer = citation_indexer or ToolCitationIndexer()
         return [
             _sync_tool(tool, citation_indexer)
             for tool in asyncio.run(asyncio.wait_for(_discover_tools(), timeout=12))

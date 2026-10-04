@@ -14,6 +14,7 @@ flowchart LR
         MCP[内置 FastMCP<br/>金融只读工具合同]
     end
     AGENT[Financial Risk Agent / FastAPI<br/>模型选择 · Agent 循环 · 会话 · 结构化线索]
+    SEARCH[Web Search Provider<br/>SearXNG / 智谱 / Brave]
     PG[(PostgreSQL + pgvector)]
     SQLITE[(Agent SQLite)]
     OBJ[(本地对象存储)]
@@ -24,6 +25,7 @@ flowchart LR
     JAVA --> PY
     JAVA --> AGENT
     AGENT --> MCP
+    AGENT --> SEARCH
     PY --> PG
     MCP --> PG
     PY --> OBJ
@@ -78,6 +80,7 @@ sequenceDiagram
     participant A as Risk Agent :2024
     participant M as FastMCP :8000/mcp/
     participant D as 财务事实 / RAG
+    participant E as Web Search Provider
     participant L as DeepSeek / Qwen
     participant S as Agent SQLite
 
@@ -88,10 +91,19 @@ sequenceDiagram
     A->>L: 提交任务与可用工具 Schema
     loop Agent 在调用预算内自主调查
         L-->>A: 选择工具与参数
-        A->>M: tools/call
-        M->>D: 查询质量门事实或检索指定 PDF 年报
-        D-->>M: 状态 + 事实 / 候选原文
-        M-->>A: MCP 工具结果
+        alt 财务事实或年报证据
+            A->>M: tools/call
+            M->>D: 查询质量门事实或检索指定 PDF 年报
+            D-->>M: 状态 + 事实 / 候选原文
+            M-->>A: MCP 工具结果
+        else 已发现异常或用户要求调查外部原因
+            A->>E: 内部 search_external_risk_signals
+            E->>E: 官方域名限定查询
+            opt 官方结果不足
+                E->>E: 通用网页补充查询
+            end
+            E-->>A: 带 URL 的外部候选线索
+        end
         A->>A: 分配 citation_id，过滤不可用事实
         A->>L: 带证据的工具结果
     end
@@ -103,12 +115,15 @@ sequenceDiagram
     W-->>U: 报告、引用弹窗、结构化风险卡片
 ```
 
-金融 Agent 只装配两个 MCP 工具：
+金融 Agent 装配两个 MCP 工具和一个进程内只读搜索工具：
 
 1. `lookup_financial_facts`：读取经过质量门、带 SHA-256 来源的 F10 结构化事实。
 2. `search_report_evidence`：在指定公司、指定年份、已入库的 PDF 年报中检索带页码候选原文。
+3. `search_external_risk_signals`：通过 Agent 内部 Web Search 查询监管、问询、诉讼、违约等外部公开线索，不经过 MCP。
 
-工具不可用时会话创建直接返回 `503`；`missing`、`unverified`、`conflict`、`missing_provenance`、`insufficient_evidence` 和 `unavailable` 都不能进入确定性风险结论。
+外部搜索采用稳定的工具接口和可替换的 Provider：默认访问自建 SearXNG，失败时可按配置回退到智谱、Brave。检索先使用证监会、交易所、巨潮资讯等官方域名限定查询，结果不足才补通用检索；Provider 只产生候选结果，域名白名单、Prompt Injection 过滤、引用编号、哈希、缓存和限流仍由 Agent 工具层统一执行。
+
+两项 MCP 工具不可用时会话创建直接返回 `503`；外部搜索未配置时只返回 `unavailable`，不阻断财务事实和年报初筛。`missing`、`unverified`、`conflict`、`missing_provenance`、`insufficient_evidence` 和 `unavailable` 都不能进入确定性风险结论。
 
 ## 4. 风险结果与证据链
 
@@ -116,6 +131,7 @@ sequenceDiagram
 flowchart TB
     F10[F10 结构化事实<br/>value + scope + content_hash]
     PDF[PDF 年报证据<br/>doc_id + page + snippet]
+    WEB[外部风险线索<br/>url + publisher + published_at]
     IDX[ToolCitationIndexer<br/>分配 citation_id]
     MD[用户可读 Markdown<br/>句末标注 1、2…]
     DTO[Pydantic RiskAuditResult]
@@ -124,6 +140,7 @@ flowchart TB
 
     F10 --> IDX
     PDF --> IDX
+    WEB --> IDX
     IDX --> MD
     IDX --> DTO
     DTO -->|拒绝未知 citation_id| RF

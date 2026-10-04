@@ -16,6 +16,7 @@ import {
 import type { ChatMessage as ChatMessageType, Citation, RiskAuditResult } from '../../types/chat'
 import ChatInput from '../../components/chat/ChatInput.vue'
 import ChatMessage from '../../components/chat/ChatMessage.vue'
+import RiskEvidencePanel from './RiskEvidencePanel.vue'
 import {
   groupRiskAgentHistory,
   presentAgentRun,
@@ -34,6 +35,7 @@ const availableModels = ref<string[]>([])
 const selectedModel = ref('')
 const error = ref('')
 const listRef = ref<HTMLElement | null>(null)
+const activeEvidence = ref<Citation | null>(null)
 let abortController: AbortController | null = null
 let disposed = false
 let runParts: AgentTextPart[] = []
@@ -145,6 +147,7 @@ async function selectThread(id: string) {
   error.value = ''
   try {
     const thread = await getRiskAgentThread(id)
+    activeEvidence.value = null
     currentThreadId.value = thread.id
     messages.value = restoreMessages(thread)
     activeReplyId = null
@@ -161,6 +164,7 @@ function newChat() {
   if (loading.value) return
   currentThreadId.value = null
   messages.value = []
+  activeEvidence.value = null
   activeReplyId = null
   activeUserId = null
   runParts = []
@@ -312,54 +316,90 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="chat-panel risk-agent-panel">
-    <header class="chat-header">
-      <div>
-        <h1>金融风险审计助手</h1>
-        <p>对公开财报做风险线索初筛，结合财务事实与年报证据提出待核查问题；不出具审计或投资结论。</p>
-      </div>
-    </header>
+  <section class="risk-agent-workspace" :class="{ 'with-evidence': activeEvidence }">
+    <section class="chat-panel risk-agent-panel">
+      <header class="chat-header">
+        <div>
+          <h1>金融风险审计助手</h1>
+          <p>对公开财报做风险线索初筛，结合财务事实与年报证据提出待核查问题；不出具审计或投资结论。</p>
+        </div>
+      </header>
 
-    <div ref="listRef" class="message-list">
-      <div v-if="!messages.length" class="risk-welcome">
-        <h2>从一个核查目标开始</h2>
-        <p>例如：检查美的集团近三年财务数据中值得人工复核的风险信号，并列明证据缺口。</p>
+      <div ref="listRef" class="message-list">
+        <div v-if="!messages.length" class="risk-welcome">
+          <h2>从一个核查目标开始</h2>
+          <p>例如：检查美的集团近三年财务数据中值得人工复核的风险信号，并列明证据缺口。</p>
+        </div>
+        <ChatMessage
+          v-for="message in messages"
+          :key="message.id"
+          :message="message"
+          citation-display="panel"
+          @open-evidence="activeEvidence = $event"
+        />
       </div>
-      <ChatMessage v-for="message in messages" :key="message.id" :message="message" />
-    </div>
 
-    <div class="chat-composer-dock">
-      <div v-if="error" class="risk-error" role="alert">
-        {{ error }}
-        <button v-if="agentOk === false" type="button" @click="retryConnection">重试连接</button>
+      <div class="chat-composer-dock">
+        <div v-if="error" class="risk-error" role="alert">
+          {{ error }}
+          <button v-if="agentOk === false" type="button" @click="retryConnection">重试连接</button>
+        </div>
+        <div v-if="!messages.length" class="example-chips">
+          <button type="button" class="example-chip" @click="send('对美的集团2024年财报做风险线索初筛，列出需要人工核查的问题和证据缺口')">
+            美的 2024 风险初筛
+          </button>
+        </div>
+        <ChatInput
+          :loading="loading"
+          :disabled="!ready || !selectedModel"
+          :java-ok="true"
+          :python-ok="agentOk"
+          :allow-attachment="false"
+          :models="availableModels"
+          :model="selectedModel"
+          @update:model="selectModel"
+          placeholder-text="输入公司、年份和核查目标，Enter 发送"
+          stop-label="停止接收"
+          unavailable-text="金融风险审计助手暂不可用"
+          @send="send"
+          @stop="stopReceiving"
+        />
       </div>
-      <div v-if="!messages.length" class="example-chips">
-        <button type="button" class="example-chip" @click="send('对美的集团2024年财报做风险线索初筛，列出需要人工核查的问题和证据缺口')">
-          美的 2024 风险初筛
-        </button>
-      </div>
-      <ChatInput
-        :loading="loading"
-        :disabled="!ready || !selectedModel"
-        :java-ok="true"
-        :python-ok="agentOk"
-        :allow-attachment="false"
-        :models="availableModels"
-        :model="selectedModel"
-        @update:model="selectModel"
-        placeholder-text="输入公司、年份和核查目标，Enter 发送"
-        stop-label="停止接收"
-        unavailable-text="金融风险审计助手暂不可用"
-        @send="send"
-        @stop="stopReceiving"
-      />
-    </div>
+    </section>
+
+    <RiskEvidencePanel
+      v-if="activeEvidence"
+      :citation="activeEvidence"
+      @close="activeEvidence = null"
+    />
   </section>
 </template>
 
 <style scoped>
+.risk-agent-workspace {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  gap: 16px;
+  margin: 0 auto;
+}
+.risk-agent-workspace.with-evidence { max-width: 1680px; }
 .risk-agent-panel { min-height: 0; }
+.with-evidence .risk-agent-panel { max-width: none; margin: 0; }
 .risk-welcome { margin: auto; text-align: center; color: var(--muted); max-width: 500px; }
 .risk-welcome h2 { color: var(--text-strong); font-size: 18px; margin-bottom: 8px; }
 .risk-error { margin: 0 0 10px; padding: 10px 14px; border: 1px solid #fecaca; border-radius: 10px; background: #fef2f2; color: #991b1b; }
+
+@media (max-width: 800px) {
+  .risk-agent-workspace { position: relative; }
+  .risk-agent-workspace.with-evidence .risk-agent-panel { max-width: 960px; }
+  .risk-agent-workspace :deep(.risk-evidence-panel) {
+    position: absolute;
+    z-index: 20;
+    inset: 0 0 0 auto;
+    width: min(94vw, 680px);
+    min-width: 0;
+  }
+}
 </style>

@@ -1,6 +1,6 @@
 # W9-4 Docker Compose 一键交付
 
-编排 **web + java-service + python-ai + postgres**。没有绝对路径。密钥从 `.env` 注入，不打进镜像层。
+编排 **web + java-service + python-ai + risk-agent + SearXNG + postgres**。没有绝对路径。密钥从 `.env` 注入，不打进镜像层。
 
 日常开发仍用 `./scripts/dev.sh`（Vite :5173）。Compose 给新环境和演示用。
 
@@ -16,11 +16,12 @@ docker compose up --build
 | 前端（nginx） | <http://localhost:8088> |
 | Java BFF | <http://localhost:8080/api/health> |
 | python-ai | <http://localhost:8000/health> |
+| SearXNG（仅本机） | <http://127.0.0.1:8888> |
 | Postgres | localhost:5432 |
 
 首次构建 python-ai 会装 torch / docling，较慢。语料向量缓存在 volume `python_data`。
 
-Java 在 Compose 网络里访问 `http://python-ai:8000`，不要写 `localhost`（那是容器自己）。前端经 nginx 同源反代 `/api/`，SSE 关闭缓冲。
+Java 在 Compose 网络里访问 `http://python-ai:8000` 和 `http://risk-agent:2024`，不要写 `localhost`（那是容器自己）。风险 Agent 通过 `http://searxng:8080` 搜索外部公开线索。前端经 nginx 同源反代 `/api/`，SSE 关闭缓冲。
 
 ## 冒烟
 
@@ -34,9 +35,9 @@ Java 在 Compose 网络里访问 `http://python-ai:8000`，不要写 `localhost`
 
 ## 约定
 
-- 相对路径 volume：`./docs/sql/*.sql`、命名卷 `db_data` / `python_data`
+- 相对路径 volume：`./docs/sql/*.sql`、`./deploy/searxng/settings.yml`、命名卷 `db_data` / `python_data` / Agent 数据卷
 - `REGOPS_JWT_SECRET` / `REGOPS_SERVICE_TOKEN` / LLM Key 来自 env
-- 健康检查：db `pg_isready`；python `/health`；java `/api/health`；web `/healthz`
+- 健康检查：db `pg_isready`；python `/health`；risk-agent `/health`；java `/api/health`；web `/healthz`。SearXNG 由本地启动脚本请求根路径确认可用。
 - `java-service` 只等 Postgres healthy，**不等 python-ai**。Python 还在构建或被停掉时，Java 探活仍是 200，登录与审计可用（W9-6）
 - K8s 最小清单见 [`W9_K8S.md`](./W9_K8S.md)
 

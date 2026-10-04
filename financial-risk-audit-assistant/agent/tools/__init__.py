@@ -15,6 +15,8 @@ from __future__ import annotations
 
 # 网页读取工具：用于读取用户给定的官方文档、错误页面或资料链接。
 from .fetch_url_tools import fetch_url
+# 金融 Agent 内部工具：搜索外部公开风险线索，不经过 MCP。
+from .external_risk_search import create_external_risk_search_tool
 # Gitee 工具：用于把已经推送的分支转换为 PR，并支持向 PR 写评论。
 from .gitee_tools import get_gitee_pull_request_context, open_gitee_pull_request, publish_gitee_pr_comment, upload_to_gitee
 # Review 工具：用于结构化保存和读取代码审查发现。
@@ -31,6 +33,7 @@ from .web_search import web_search
 # 明确声明对外工具列表，避免调用方依赖模块内的临时变量或辅助函数。
 __all__ = [
     "add_review_finding",
+    "create_external_risk_search_tool",
     "fetch_url",
     "get_gitee_pull_request_context",
     "get_review_diff_summary",

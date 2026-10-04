@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# RegOps Copilot 本地开发编排：db + python-ai + risk-agent + java-service + web
+# RegOps Copilot 本地开发编排：db + SearXNG + python-ai + risk-agent + java-service + web
 #
 #   ./scripts/dev.sh up                 启动全部
 #   ./scripts/dev.sh up db python       只启动指定服务
@@ -26,12 +26,13 @@ fi
 DB_CONTAINER="regops-db"
 PY_PORT=8000
 AGENT_PORT=2024
+SEARCH_PORT=8888
 JAVA_PORT=8080
 WEB_PORT=5173
 
 MVN_OFFLINE="${MVN_OFFLINE:-1}"
 
-ALL_SERVICES="db python agent java web"
+ALL_SERVICES="db search python agent java web"
 
 # 非 TTY（重定向 / CI）时不输出颜色转义，避免日志里出现乱码
 if [ -t 1 ]; then
@@ -131,6 +132,17 @@ start_db() {
     sleep 2
   done
   die "db 健康检查超时，排查：docker logs $DB_CONTAINER"
+}
+
+start_search() {
+  ensure_docker
+  ( cd "$ROOT" && docker compose up -d searxng >/dev/null )
+  local i
+  for ((i = 0; i < 60; i++)); do
+    http_ok "http://127.0.0.1:$SEARCH_PORT/" && { ok "SearXNG 就绪 (:$SEARCH_PORT)"; return 0; }
+    sleep 1
+  done
+  die "SearXNG 健康检查超时，排查：docker logs regops-searxng"
 }
 
 start_python() {
@@ -233,6 +245,12 @@ stop_db() {
   ok "db 已停止（数据保留在 volume db_data）"
 }
 
+stop_search() {
+  docker info >/dev/null 2>&1 || return 0
+  ( cd "$ROOT" && docker compose stop searxng >/dev/null 2>&1 ) || true
+  ok "SearXNG 已停止"
+}
+
 stop_agent() {
   local managed i
   managed="$(pid_of agent || true)"
@@ -253,6 +271,7 @@ cmd_up() {
   for svc in $services; do
     case "$svc" in
       db)     start_db ;;
+      search) start_search ;;
       python) start_python ;;
       agent)  start_agent ;;
       java)   start_java ;;
@@ -266,9 +285,10 @@ cmd_up() {
   echo "  Java BFF    http://localhost:$JAVA_PORT/api/health"
   echo "  python-ai   http://localhost:$PY_PORT/docs"
   echo "  风险 Agent  http://localhost:$WEB_PORT/risk-agent"
+  echo "  SearXNG     http://127.0.0.1:$SEARCH_PORT"
   echo "  Postgres    localhost:5432  (regops/regops123, db=regops_db)"
   echo
-  info "日志目录 .dev-logs/ ｜ 跟踪日志 ./scripts/dev.sh logs {python|agent|java|web}"
+  info "日志目录 .dev-logs/ ｜ 跟踪日志 ./scripts/dev.sh logs {python|agent|java|web|db|search}"
 }
 
 cmd_stop() {
@@ -276,6 +296,7 @@ cmd_stop() {
   for svc in $services; do
     case "$svc" in
       db)     stop_db ;;
+      search) stop_search ;;
       python) stop_proc python "$PY_PORT" ;;
       agent)  stop_agent ;;
       java)   stop_proc java "$JAVA_PORT" ;;
@@ -293,6 +314,9 @@ cmd_status() {
   local state pid
   state="$(docker inspect --format '{{.State.Status}}/{{.State.Health.Status}}' "$DB_CONTAINER" 2>/dev/null || echo '-')"
   row db 5432 "$DB_CONTAINER" "$state"
+
+  state="$(docker inspect --format '{{.State.Status}}' regops-searxng 2>/dev/null || echo '-')"
+  row searxng "$SEARCH_PORT" regops-searxng "$(http_ok "http://127.0.0.1:$SEARCH_PORT/" && echo ok || echo "$state")"
 
   pid="$(port_pid "$PY_PORT")"
   row python-ai "$PY_PORT" "${pid:--}" "$(http_ok "http://localhost:$PY_PORT/health" && echo ok || echo down)"
@@ -322,8 +346,9 @@ cmd_logs() {
   local name="${1:-}"
   case "$name" in
     python|agent|java|web) tail -f "$LOG_DIR/$name.log" ;;
-    db)              docker logs -f "$DB_CONTAINER" ;;
-    *)               die "用法：./scripts/dev.sh logs {python|agent|java|web|db}" ;;
+    db)                    docker logs -f "$DB_CONTAINER" ;;
+    search)                docker logs -f regops-searxng ;;
+    *)                     die "用法：./scripts/dev.sh logs {python|agent|java|web|db|search}" ;;
   esac
 }
 
@@ -333,5 +358,5 @@ case "${1:-up}" in
   restart) shift || true; cmd_stop "$@"; echo; cmd_up "$@" ;;
   status)  cmd_status ;;
   logs)    shift || true; cmd_logs "$@" ;;
-  *)       die "用法：./scripts/dev.sh {up|stop|restart|status|logs} [db python agent java web]" ;;
+  *)       die "用法：./scripts/dev.sh {up|stop|restart|status|logs} [db search python agent java web]" ;;
 esac

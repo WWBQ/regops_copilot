@@ -34,6 +34,7 @@ from agent.core.middleware import (
     ToolErrorMiddleware,
 )
 from agent.core.model import make_main_model
+from agent.core.middleware.run_limits import AgentRunLimits
 from agent.mcp.financial_client import load_financial_tools
 from agent.core.repo_memory import (
     build_repo_memory_namespace,
@@ -45,8 +46,10 @@ from agent.core.repo_memory import (
 from agent.core.settings import WORKSPACE_ROOT
 from agent.core.task_intent import TaskKind
 from agent.prompt import get_system_prompt
+from agent.financial.citations import ToolCitationIndexer
 from agent.tools import (
     add_review_finding,
+    create_external_risk_search_tool,
     fetch_url,
     get_gitee_pull_request_context,
     get_review_diff_summary,
@@ -389,12 +392,18 @@ def get_agent(config: RunnableConfig):
     # task_kind 是系统提示词、权限策略和运行保护策略的共同输入。
     task_kind = _task_kind_from_config(configurable)
     if task_kind == "financial_audit":
-        # 金融模式独立构图：仅有两个白名单 MCP 工具；不注入 DeepAgents 的文件、
-        # 命令、Gitee 工具或可写 backend。服务不可用时在构图前明确失败。
-        financial_tools = load_financial_tools()
+        # 金融模式独立构图：两项白名单 MCP 工具负责内部事实和年报证据，
+        # 外部风险搜索作为 Agent 进程内只读工具装配。三者共享引用编号；不注入
+        # DeepAgents 的文件、命令、Gitee 工具或可写 backend。
+        citation_indexer = ToolCitationIndexer()
+        financial_tools = [
+            *load_financial_tools(citation_indexer),
+            create_external_risk_search_tool(citation_indexer),
+        ]
         from agent.core.graph import get_checkpointer
 
         config["recursion_limit"] = 30
+        financial_limits = AgentRunLimits.from_env("financial_audit")
         return create_agent(
             model=make_main_model(configurable.get("model_id")),
             tools=financial_tools,
@@ -402,7 +411,12 @@ def get_agent(config: RunnableConfig):
             checkpointer=get_checkpointer(),
             middleware=[
                 ModelCallLimitMiddleware(run_limit=8, exit_behavior="end"),
-                ToolCallLimitMiddleware(run_limit=10, exit_behavior="end"),
+                # 与 runtime 的金融任务预算共用一份配置，避免出现外层允许 20 次、
+                # Agent 图却在 10 次时提前终止的双重阈值冲突。
+                ToolCallLimitMiddleware(
+                    run_limit=financial_limits.max_tool_calls,
+                    exit_behavior="end",
+                ),
             ],
         ).with_config(config)
 

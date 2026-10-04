@@ -19,6 +19,7 @@ wait_url() {
 }
 
 wait_url "http://localhost:8000/health"
+wait_url "http://127.0.0.1:8888/"
 wait_url "http://localhost:8080/api/health"
 wait_url "http://localhost:8088/healthz"
 

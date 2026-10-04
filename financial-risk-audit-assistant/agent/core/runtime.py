@@ -143,6 +143,26 @@ def _extract_final_assistant_text(messages: list[dict[str, Any]]) -> str:
     return ""
 
 
+_TOOL_LIMIT_MESSAGE_RE = re.compile(
+    r"^Tool call limit reached: run limit exceeded \((\d+)/(\d+) calls\)\.?$",
+    re.IGNORECASE,
+)
+
+
+def _localize_financial_stop_message(text: str) -> str:
+    """把框架生成的英文工具限额消息转换成用户可理解的金融任务提示。"""
+
+    match = _TOOL_LIMIT_MESSAGE_RE.fullmatch((text or "").strip())
+    if match is None:
+        return text
+    attempted, limit = match.groups()
+    return (
+        f"本轮财务风险调查已达到工具调用保护上限（尝试 {attempted} 次，上限 {limit} 次），"
+        "系统已停止继续检索，避免重复调用和成本失控。当前结果不应视为完整初筛，"
+        "请缩小核查范围后继续，或由管理员调整金融任务的工具调用预算。"
+    )
+
+
 def _extract_best_plan_text(messages: list[dict[str, Any]]) -> str:
     """从多条 assistant 消息中提取最完整的技术方案。
 
@@ -237,7 +257,8 @@ def _build_agent_user_content(
         )
     elif task_kind == "financial_audit":
         task_instruction = (
-            "这是公开财报风险线索初筛任务。只能使用已接入的两项金融 MCP 工具核查事实与年报证据；"
+            "这是公开财报风险线索初筛任务。使用两项金融 MCP 工具核查事实与年报证据；"
+            "只有发现异常或用户明确要求调查外部原因时，才使用内部外部风险搜索工具；"
             "不得执行本机命令、修改文件或操作 Git/Gitee。"
             "工具不可用或证据不足时明确告知用户并停止推断。"
         )
@@ -1007,12 +1028,18 @@ def run_agent_task(
         store.record_run(run_id=run_id, thread_id=thread_id, status="completed", finished=True)
         messages = result.get("messages", [])
         final_answer = _extract_final_assistant_text(messages)
+        if task_kind == "financial_audit" and final_answer:
+            final_answer = _localize_financial_stop_message(final_answer)
         citations = citations_from_messages(messages) if task_kind == "financial_audit" else []
         risk_result = None
         if task_kind == "financial_audit" and final_answer:
             final_answer, parsed_result, structure_error = parse_risk_audit_output(
                 final_answer,
-                available_citation_ids=set(range(1, len(citations) + 1)),
+                available_citation_ids={
+                    citation_id
+                    for citation in citations
+                    if type(citation_id := citation.get("citation_id")) is int and citation_id > 0
+                },
             )
             if parsed_result is not None:
                 risk_result = store.save_risk_audit_result(

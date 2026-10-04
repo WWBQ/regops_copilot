@@ -18,6 +18,9 @@ function escapeAttr(text: string): string {
 /** 引用标记 hover 提示：文档标题 + 页码 */
 export function citationHoverLabel(citation: Citation): string {
   const docTitle = citation.title?.trim() || citation.doc_id
+  if (citation.kind === 'web') {
+    return `${docTitle} · ${citation.source_tier === 'official' ? '官方网页' : '公开网页'}`
+  }
   if (citation.kind === 'facts') {
     return docTitle
   }

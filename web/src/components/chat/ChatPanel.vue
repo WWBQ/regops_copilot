@@ -36,7 +36,8 @@ import { loadStoredModel, storeModel } from '../../utils/models'
 import { estimateTokens, resolveCompletionTokens } from '../../utils/tokens'
 import ChatInput from './ChatInput.vue'
 import ChatMessage from './ChatMessage.vue'
-import type { ChatMessage as ChatMessageType, PendingAsknum } from '../../types/chat'
+import RiskEvidencePanel from '../../views/agent/RiskEvidencePanel.vue'
+import type { ChatMessage as ChatMessageType, Citation, PendingAsknum } from '../../types/chat'
 
 const props = defineProps<{
   backendOk: boolean | null
@@ -66,6 +67,7 @@ const suppressSessionMeta = ref(false)
 const availableModels = ref<string[]>([])
 const selectedModel = ref('')
 const connectionAlert = ref<string | null>(null)
+const activeEvidence = ref<Citation | null>(null)
 
 const pendingRequest = ref<PendingAsknum | null>(null)
 
@@ -244,6 +246,7 @@ async function handleNewChat() {
   touchSessionMeta({ touchUpdatedAt: true })
   try {
     sessionId.value = await startNewSession()
+    activeEvidence.value = null
     rememberPending(sessionId.value, null)
     messages.value = [createWelcomeMessage()]
     sessionDocs.value = []
@@ -272,6 +275,7 @@ async function handleSwitchSession(targetSessionId: string) {
     return
   }
   storeSessionId(targetSessionId)
+  activeEvidence.value = null
   sessionId.value = targetSessionId
   pendingRequest.value = loadPendingAsknum(targetSessionId)
   suppressSessionMeta.value = true
@@ -587,39 +591,46 @@ watch(
 </script>
 
 <template>
-  <section class="chat-panel">
-    <header class="chat-header">
-      <div>
-        <h1>合规问答</h1>
-        <p>
-          一个助手：已核验的财务数字走问数，叙述问题走年报 RAG；缺少依据时会明确说明。
-          📎 可上传仅本会话有效的 PDF。生成中点「停止」取消。引用可点开年报页，不展示思维链。
-          <span v-if="sessionId" class="session-tag">会话 {{ sessionId.slice(0, 8) }}…</span>
-        </p>
-        <p v-if="sessionDocs.length" class="doc-strip">
-          本会话文档：
-          <span v-for="doc in sessionDocs" :key="doc.doc_id" class="doc-chip" :class="doc.status.toLowerCase()">
-            {{ doc.source_filename }}（{{ statusLabel(doc.status) }}）
-          </span>
-        </p>
-      </div>
-    </header>
+  <section class="compliance-workspace" :class="{ 'with-evidence': activeEvidence }">
+    <section class="chat-panel compliance-chat-panel">
+      <header class="chat-header">
+        <div>
+          <h1>合规问答</h1>
+          <p>
+            一个助手：已核验的财务数字走问数，叙述问题走年报 RAG；缺少依据时会明确说明。
+            📎 可上传仅本会话有效的 PDF。生成中点「停止」取消。引用可点开年报页，不展示思维链。
+            <span v-if="sessionId" class="session-tag">会话 {{ sessionId.slice(0, 8) }}…</span>
+          </p>
+          <p v-if="sessionDocs.length" class="doc-strip">
+            本会话文档：
+            <span v-for="doc in sessionDocs" :key="doc.doc_id" class="doc-chip" :class="doc.status.toLowerCase()">
+              {{ doc.source_filename }}（{{ statusLabel(doc.status) }}）
+            </span>
+          </p>
+        </div>
+      </header>
 
-    <div ref="listRef" class="message-list">
-      <ChatMessage v-for="item in messages" :key="item.id" :message="item" />
-      <p v-if="uploading" class="typing">PDF 解析入库中…</p>
-    </div>
-
-    <div class="chat-composer-dock">
-      <div v-if="connectionAlert" class="connection-alert" :class="{ warn: pythonDown && javaOk }" role="alert">
-        <p>{{ connectionAlert }}</p>
-        <p v-if="pythonDown && javaOk" class="alert-links">
-          <router-link to="/compliance/audit">审计追踪</router-link>
-        </p>
-        <button type="button" class="alert-close" aria-label="关闭" @click="connectionAlert = null">×</button>
+      <div ref="listRef" class="message-list">
+        <ChatMessage
+          v-for="item in messages"
+          :key="item.id"
+          :message="item"
+          citation-display="panel"
+          @open-evidence="activeEvidence = $event"
+        />
+        <p v-if="uploading" class="typing">PDF 解析入库中…</p>
       </div>
 
-      <div v-if="messages.length <= 1 && !loading" class="example-chips">
+      <div class="chat-composer-dock">
+        <div v-if="connectionAlert" class="connection-alert" :class="{ warn: pythonDown && javaOk }" role="alert">
+          <p>{{ connectionAlert }}</p>
+          <p v-if="pythonDown && javaOk" class="alert-links">
+            <router-link to="/compliance/audit">审计追踪</router-link>
+          </p>
+          <button type="button" class="alert-close" aria-label="关闭" @click="connectionAlert = null">×</button>
+        </div>
+
+        <div v-if="messages.length <= 1 && !loading" class="example-chips">
         <button type="button" class="example-chip" :disabled="Boolean(connectionBlockedMessage())" @click="handleSend('比亚迪2024年营业收入是多少')">
           问数
         </button>
@@ -640,11 +651,11 @@ watch(
         <button type="button" class="example-chip" :disabled="Boolean(connectionBlockedMessage())" @click="handleSend('美的2024年营收到底能不能用')">
           待复核
         </button>
-      </div>
+        </div>
 
-      <p v-if="pendingHint" class="pending-slot-chip" role="status">{{ pendingHint }}</p>
+        <p v-if="pendingHint" class="pending-slot-chip" role="status">{{ pendingHint }}</p>
 
-      <ChatInput
+        <ChatInput
         :model="selectedModel"
         :models="availableModels"
         :loading="loading"
@@ -655,16 +666,35 @@ watch(
         @send="handleSend"
         @stop="handleStop"
         @attach="handleAttach"
-      />
+        />
 
-      <footer class="chat-footer">
-        <p class="chat-disclaimer">{{ DISCLAIMER }}</p>
-      </footer>
-    </div>
+        <footer class="chat-footer">
+          <p class="chat-disclaimer">{{ DISCLAIMER }}</p>
+        </footer>
+      </div>
+    </section>
+
+    <RiskEvidencePanel
+      v-if="activeEvidence"
+      :citation="activeEvidence"
+      @close="activeEvidence = null"
+    />
   </section>
 </template>
 
 <style scoped>
+.compliance-workspace {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  gap: 16px;
+  margin: 0 auto;
+}
+.compliance-workspace.with-evidence { max-width: 1680px; }
+.compliance-chat-panel { min-height: 0; }
+.with-evidence .compliance-chat-panel { max-width: none; margin: 0; }
+
 .session-tag {
   margin-left: 8px;
   font-family: var(--mono);
@@ -776,6 +806,18 @@ watch(
   background: #fef2f2;
   color: #991b1b;
   font-size: 13px;
+}
+
+@media (max-width: 800px) {
+  .compliance-workspace { position: relative; }
+  .compliance-workspace.with-evidence .compliance-chat-panel { max-width: 960px; }
+  .compliance-workspace :deep(.risk-evidence-panel) {
+    position: absolute;
+    z-index: 20;
+    inset: 0 0 0 auto;
+    width: min(94vw, 680px);
+    min-width: 0;
+  }
 }
 
 .connection-alert.warn {

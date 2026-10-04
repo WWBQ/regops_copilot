@@ -4,11 +4,23 @@ import { useRouter } from 'vue-router'
 
 import { documentViewerPage } from '../../api/documents'
 import type { ChatMessage, Citation } from '../../types/chat'
-import { attachCitationMarks, citationAt, renderAssistantMarkdown } from '../../utils/citations'
+import {
+  attachCitationMarks,
+  citationAt,
+  citationHoverLabel,
+  renderAssistantMarkdown,
+} from '../../utils/citations'
 import { formatLatency, formatTokenCount } from '../../utils/tokens'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   message: ChatMessage
+  citationDisplay?: 'navigate' | 'panel'
+}>(), {
+  citationDisplay: 'navigate',
+})
+
+const emit = defineEmits<{
+  openEvidence: [citation: Citation]
 }>()
 
 const router = useRouter()
@@ -128,19 +140,61 @@ function onContentClick(event: MouseEvent) {
 }
 
 function citationActionLabel(citation: Citation): string {
+  if (citation.kind === 'web') {
+    return '打开原网页'
+  }
   if (citation.kind === 'facts' || citation.href) {
     return '打开事实库'
   }
   return '查看年报页'
 }
 
+function citationSourceLabel(citation: Citation): string {
+  if (citation.kind === 'facts') return '财务事实'
+  if (citation.kind === 'document') return '年报证据'
+  if (citation.kind === 'web' && citation.source_tier === 'official') return '官方网页'
+  if (citation.kind === 'web') return '公开网页'
+  return '引用来源'
+}
+
+function citationSourceMeta(citation: Citation): string {
+  if (citation.kind !== 'web') return ''
+  return [citation.publisher, citation.published_at].filter(Boolean).join(' · ')
+}
+
 function openCitation(citation: Citation) {
-  if (citation.href) {
+  if (citation.kind === 'web' && citation.href) {
+    window.open(citation.href, '_blank', 'noopener,noreferrer')
+  } else if (props.citationDisplay === 'panel') {
+    emit('openEvidence', citation)
+  } else if (citation.href) {
     void router.push(citation.href)
   } else if (citation.doc_id) {
     void router.push(documentViewerPage(citation.doc_id, citation.page))
   }
   closePopover()
+}
+
+function citationForEvidenceId(evidenceId: number): Citation | undefined {
+  const citations = props.message.citations ?? []
+  const explicit = citations.find((citation) => citation.citation_id === evidenceId)
+  if (explicit || citations.some((citation) => citation.citation_id != null)) {
+    return explicit
+  }
+  // 兼容修复前保存的历史消息：旧 Citation 没有 citation_id，只能按原数组位置映射。
+  return citations[evidenceId - 1]
+}
+
+function openEvidenceCitation(evidenceId: number) {
+  const citation = citationForEvidenceId(evidenceId)
+  if (citation) {
+    openCitation(citation)
+  }
+}
+
+function evidenceCitationTitle(evidenceId: number): string {
+  const citation = citationForEvidenceId(evidenceId)
+  return citation ? citationHoverLabel(citation) : `引用 [${evidenceId}] 暂无可跳转来源`
 }
 </script>
 
@@ -193,7 +247,22 @@ function openCitation(citation: Citation) {
           </header>
           <p>{{ finding.conclusion }}</p>
           <p v-if="finding.evidence_ids.length" class="risk-evidence">
-            证据：{{ finding.evidence_ids.map((id) => `[${id}]`).join(' ') }}
+            <span>证据：</span>
+            <template v-for="evidenceId in finding.evidence_ids" :key="evidenceId">
+              <button
+                v-if="citationForEvidenceId(evidenceId)"
+                type="button"
+                class="risk-cite-mark"
+                :title="evidenceCitationTitle(evidenceId)"
+                :aria-label="`打开引用 ${evidenceId}`"
+                @click="openEvidenceCitation(evidenceId)"
+              >[{{ evidenceId }}]</button>
+              <span
+                v-else
+                class="risk-cite-mark unavailable"
+                :title="evidenceCitationTitle(evidenceId)"
+              >[{{ evidenceId }}]</span>
+            </template>
           </p>
           <p class="risk-review-question"><strong>人工核查：</strong>{{ finding.review_question }}</p>
           <p class="risk-uncertainty"><strong>不确定性：</strong>{{ finding.uncertainty }}</p>
@@ -212,9 +281,20 @@ function openCitation(citation: Citation) {
         :style="{ top: `${popoverPos.top}px`, left: `${popoverPos.left}px` }"
         @click.stop
       >
+        <div class="cite-popover-source">
+          <span
+            class="cite-source-badge"
+            :class="{ official: activeCitation.kind === 'web' && activeCitation.source_tier === 'official' }"
+          >
+            {{ citationSourceLabel(activeCitation) }}
+          </span>
+          <span v-if="citationSourceMeta(activeCitation)" class="cite-source-meta">
+            {{ citationSourceMeta(activeCitation) }}
+          </span>
+        </div>
         <p class="cite-popover-title">
           {{ activeCitation.title || activeCitation.doc_id }}
-          <template v-if="activeCitation.kind !== 'facts' && activeCitation.page">
+          <template v-if="activeCitation.kind === 'document' && activeCitation.page">
             · 第 {{ activeCitation.page }} 页
           </template>
         </p>
@@ -390,6 +470,40 @@ function openCitation(citation: Citation) {
   color: var(--muted);
 }
 
+.risk-evidence {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.risk-cite-mark {
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: #ecfeff;
+  color: #0f766e;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.risk-cite-mark:hover,
+.risk-cite-mark:focus-visible {
+  background: #99f6e4;
+  color: #115e59;
+  outline: none;
+}
+
+.risk-cite-mark.unavailable {
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
 .risk-review-question {
   color: #334155;
 }
@@ -463,6 +577,37 @@ function openCitation(citation: Citation) {
   font-size: 12px;
   font-weight: 700;
   color: #0f766e;
+}
+
+.cite-popover-source {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+}
+
+.cite-source-badge {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.cite-source-badge.official {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.cite-source-meta {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cite-popover-snippet {

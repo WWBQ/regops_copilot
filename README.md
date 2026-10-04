@@ -35,6 +35,7 @@ flowchart LR
     JAVA -->|合规问答、问数、文档、运维| PY
     JAVA -->|金融风险会话、SSE| AGENT[Risk Agent / FastAPI<br/>:2024]
     AGENT -->|FastMCP · 仅两项只读工具| MCP
+    AGENT -->|内部只读工具| SEARCH[Web Search<br/>外部风险线索]
 
     PY --> PG[(PostgreSQL + pgvector<br/>文档、向量、财务事实)]
     MCP --> PG
@@ -51,7 +52,7 @@ flowchart LR
 |------|--------|------|
 | `python-ai` | FastAPI · Python 3.14 | LLM 调用、RAG 检索与引用、问数、文档解析入库、评测任务 |
 | `java-service` | Spring Boot · JDK 21 | 对外 API 聚合、认证与 RBAC、审计 |
-| `risk-agent` | FastAPI · LangChain Agent | 公开财报风险线索初筛、MCP 工具循环、引用、结构化线索、checkpoint 与 SSE；见 [`financial-risk-audit-assistant/`](./financial-risk-audit-assistant/) |
+| `risk-agent` | FastAPI · LangChain Agent | 公开财报风险线索初筛、MCP 工具循环、可切换 Web Search、引用、结构化线索、checkpoint 与 SSE；见 [`financial-risk-audit-assistant/`](./financial-risk-audit-assistant/) |
 | `web` | Vue 3 · Vite | 合规问答、金融风险审计助手、文档标注、评测与运维看板 |
 
 服务边界、端点契约、`X-Request-ID` 关联 ID 约定见 [`docs/api-spec.md`](./docs/api-spec.md)。
@@ -99,6 +100,8 @@ cd web && npm install && cd ..
 docker compose up --build
 ./scripts/compose-smoke.sh
 ```
+
+Compose 会同时启动仅绑定本机 `127.0.0.1:8888` 的 SearXNG，供金融风险 Agent 检索外部公开线索；默认不需要第三方搜索 API Key。
 
 详见 [`docs/W9_COMPOSE.md`](./docs/W9_COMPOSE.md)。日常改代码仍用 `./scripts/dev.sh`。
 
@@ -262,7 +265,7 @@ regops-copilot/
 │
 ├── k8s/                                   # 最小 K8s 清单（kind / minikube 可跑）
 ├── scripts/
-│   └── dev.sh                            # 本地一键启停（db + python-ai + risk-agent + java + web）
+│   └── dev.sh                            # 本地一键启停（db + SearXNG + python-ai + risk-agent + java + web）
 ├── compose.yaml                           # Docker Compose 编排文件
 ├── .env.example                           # 环境变量示例
 └── README.md                              # 项目说明文档

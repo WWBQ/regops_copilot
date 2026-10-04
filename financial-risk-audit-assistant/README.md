@@ -9,6 +9,7 @@
 - 在页面选择具体 DeepSeek 或 Qwen 模型，而不是只选择供应商。
 - Agent 在调用预算内自主决定查询哪些财务指标、检索哪些年报叙述。
 - 通过 FastMCP 只访问 `lookup_financial_facts`、`search_report_evidence` 两个金融只读工具。
+- Agent 内部提供 `search_external_risk_signals`，用于搜索监管、问询、诉讼、违约等外部公开线索。
 - F10 财务事实使用质量门状态和 SHA-256 来源校验；PDF 年报证据必须包含真实页码。
 - 工具证据统一分配 `citation_id`，回答中的 `[1]`、`[2]` 可以跳转到事实库或年报原页。
 - 同一次模型输出同时生成用户可读 Markdown 和机器可读 `RiskAuditResult`。
@@ -24,6 +25,7 @@
 - 执行本机命令、修改文件或操作 Git/Gitee。
 - 直接访问数据库或绕过 MCP 工具合同。
 - 使用模型记忆、网页摘要或未验证数据补造财务数值。
+- 把普通网页线索直接表述为财务造假、违规或因果关系认定。
 - 把 `missing`、`unverified`、`conflict`、`missing_provenance`、`insufficient_evidence`、`unavailable` 当成可靠事实。
 - 将候选原文直接表述为审计认定。
 
@@ -38,6 +40,7 @@ flowchart LR
     API --> RUNTIME[runtime.py<br/>会话与运行编排]
     RUNTIME --> GRAPH[LangChain Agent<br/>模型 + 调用限额]
     GRAPH --> CLIENT[MCP Client<br/>工具白名单]
+    GRAPH --> WEBSEARCH[Agent 内部 Web Search<br/>外部风险线索]
     CLIENT -->|Streamable HTTP| MCP[python-ai /mcp/]
     MCP --> FACTS[财务事实质量门]
     MCP --> RAG[指定 PDF 年报检索]
@@ -54,7 +57,7 @@ flowchart LR
 1. Vue 把问题和 `model_id` 发送到 Java BFF。
 2. Java 从登录上下文提取用户 UUID，将 POST SSE 转发到 Agent。
 3. Agent 在创建或继续会话前发现 MCP 工具；缺少任一白名单工具就返回 `503`。
-4. `runtime.py` 创建 run，`server.py` 只为金融模式装配模型、两个 MCP 工具、checkpoint 和调用限额。
+4. `runtime.py` 创建 run，`server.py` 为金融模式装配模型、两个 MCP 工具、一个内部 Web Search 工具、checkpoint 和调用限额。
 5. 模型自主调用工具；`ToolCitationIndexer` 给真实工具证据分配连续编号。
 6. 模型输出 Markdown 和末尾的 `risk_audit_result` JSON。
 7. `risk_result.py` 使用 Pydantic 校验 JSON，并确认每个 `evidence_id` 都来自本轮工具结果。
@@ -71,6 +74,8 @@ financial-risk-audit-assistant/
 │   │   ├── health.py                  健康检查
 │   │   └── risk_agent.py              鉴权、会话、历史、POST SSE
 │   ├── mcp/financial_client.py         MCP 工具发现、白名单和同步适配
+│   ├── tools/external_risk_search.py   Agent 内部外部风险线索搜索
+│   ├── tools/web_search_providers.py   SearXNG / 智谱 / Brave 适配层
 │   ├── financial/
 │   │   ├── citations.py               citation_id 分配与前端 Citation
 │   │   └── risk_result.py              RiskFinding / RiskAuditResult 契约
@@ -112,10 +117,25 @@ REGOPS_SERVICE_TOKEN=change-me
 REGOPS_MCP_URL=http://127.0.0.1:8000/mcp/
 DEEPSEEK_API_KEY=
 QWEN_API_KEY=
+FIN_RISK_WEB_SEARCH_PROVIDER=searxng
+FIN_RISK_WEB_FALLBACK_PROVIDERS=zhipu,brave
+SEARXNG_BASE_URL=http://127.0.0.1:8888
+ZHIPU_API_KEY=
+BRAVE_SEARCH_API_KEY=
+FIN_RISK_WEB_ALLOWED_DOMAINS=csrc.gov.cn,sse.com.cn,szse.cn,cninfo.com.cn,bse.cn,samr.gov.cn,court.gov.cn,wenshu.court.gov.cn,zxgk.court.gov.cn,xinhua.com,people.com.cn,stcn.com,cs.com.cn,cnstock.com,yicai.com,caixin.com
+FIN_RISK_WEB_TIMEOUT_SECONDS=10
+FIN_RISK_WEB_CACHE_TTL_SECONDS=600
+FIN_RISK_WEB_MAX_CALLS_PER_RUN=2
+AGENT_FINANCIAL_AUDIT_MAX_TOOL_CALLS=20
+AGENT_FINANCIAL_AUDIT_MAX_SECONDS=300
 MAIN_MODEL=deepseek-v4-pro
 ```
 
 - `REGOPS_SERVICE_TOKEN` 必须与 Java BFF、`python-ai` 一致，不能提交到 Git。
+- 外部搜索默认使用本地 SearXNG；`FIN_RISK_WEB_SEARCH_PROVIDER` 可切换为 `zhipu` 或 `brave`，`FIN_RISK_WEB_FALLBACK_PROVIDERS` 定义失败后的备用顺序。
+- SearXNG 不需要第三方 API Key；使用智谱或 Brave 时分别配置 `ZHIPU_API_KEY`、`BRAVE_SEARCH_API_KEY`。所有后端均不可用时只返回 `unavailable`，不阻断财务事实和年报初筛。
+- 每次搜索先执行证监会、交易所、巨潮资讯等官方域名限定查询，不足时再补通用检索；最终仍只保留白名单结果并把官方来源排在前面。单次最多 5 条、单轮默认最多调用 2 次，结果在进程内缓存 10 分钟。
+- `AGENT_FINANCIAL_AUDIT_MAX_TOOL_CALLS` 是整轮 Agent 的工具总预算，默认 20 次；财务事实、年报证据和外部搜索都计入。该值同时用于 Agent 图和运行保护，避免两套阈值互相冲突。
 - Compose 中 MCP 地址使用 `http://python-ai:8000/mcp/`。
 - 模型列表只返回已经配置对应 API Key 的具体型号。
 - `CHECKPOINT_DB_PATH`、`STORE_DB_PATH`、`LANGGRAPH_STORE_DB_PATH` 可覆盖默认 SQLite 路径。

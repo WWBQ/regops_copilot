@@ -159,13 +159,27 @@ def main() -> None:
                 }, ensure_ascii=False),
                 tool_call_id="evidence",
             ),
-            AIMessage(content="## 初筛结论\n营业收入已核查 [1]，年报披露显示增长 [2]。"),
+            ToolMessage(
+                content=json.dumps({
+                    "status": "ok", "results": [{
+                        "title": "交易所问询公告",
+                        "url": "https://www.szse.cn/example",
+                        "snippet": "交易所就年报事项发出问询函。",
+                        "publisher": "深圳证券交易所",
+                        "published_at": "2025-01-01",
+                        "source_tier": "official",
+                        "citation_id": 3,
+                    }],
+                }, ensure_ascii=False),
+                tool_call_id="external-risk",
+            ),
+            AIMessage(content="## 初筛结论\n营业收入已核查 [1]，年报披露显示增长 [2]，另有交易所问询线索 [3]。"),
         ]
         with patch.object(checkpoint_history, "_delta_messages_from_checkpoint", return_value=checkpoint_messages):
             restored = checkpoint_history.visible_checkpoint_messages("citation-history-test")
         assistant = restored[-1]
-        if [item["kind"] for item in assistant.get("citations", [])] != ["facts", "document"]:
-            raise AssertionError(f"checkpoint 历史没有恢复两类引用：{assistant}")
+        if [item["kind"] for item in assistant.get("citations", [])] != ["facts", "document", "web"]:
+            raise AssertionError(f"checkpoint 历史没有恢复三类引用：{assistant}")
 
         class CurrentVersionCheckpointer:
             """模拟当前 LangGraph：delta seed 直接就是消息列表。"""

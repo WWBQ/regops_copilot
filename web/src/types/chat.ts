@@ -1,6 +1,8 @@
 export type ChatRole = 'user' | 'assistant'
 
 export interface Citation {
+  /** Agent 工具证据的原始连续编号；结构化风险卡片通过它绑定来源。 */
+  citation_id?: number | null
   doc_id: string
   page: number
   snippet: string
@@ -9,8 +11,17 @@ export interface Citation {
   title?: string | null
   /** 应用内深链，如财务事实库 */
   href?: string | null
-  /** document = 年报页；facts = 财务事实库 */
+  /** document = 年报页；facts = 财务事实库；web = 外部公开网页 */
   kind?: string | null
+  publisher?: string | null
+  published_at?: string | null
+  fetched_at?: string | null
+  content_hash?: string | null
+  source_tier?: 'official' | 'public_web' | string | null
+  /** 财务事实引用的结构化定位信息。 */
+  company_code?: string | null
+  concept?: string | null
+  year?: number | null
 }
 
 export interface RiskFinding {
