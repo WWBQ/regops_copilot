@@ -5,6 +5,7 @@ export interface AgentTextPart {
   text: string
   citations?: Citation[]
   riskResult?: RiskAuditResult | null
+  citationConflicts?: number[]
 }
 
 interface HistoryMessage {
@@ -13,6 +14,7 @@ interface HistoryMessage {
   chunks: Array<{ kind: string; text?: string }>
   citations?: Citation[]
   risk_result?: RiskAuditResult | null
+  citation_conflicts?: number[]
 }
 
 /** 一轮用户提问只对应一条回答；此前的 assistant 文本是执行阶段。 */
@@ -31,6 +33,7 @@ export function groupRiskAgentHistory(history: HistoryMessage[]): ChatMessage[] 
       stages: assistantParts.slice(0, -1).map((part) => part.text),
       citations: [...assistantParts].reverse().find((part) => part.citations?.length)?.citations,
       riskResult: [...assistantParts].reverse().find((part) => part.riskResult)?.riskResult,
+      citationConflicts: [...assistantParts].reverse().find((part) => part.citationConflicts?.length)?.citationConflicts,
     })
     assistantParts = []
   }
@@ -52,6 +55,7 @@ export function groupRiskAgentHistory(history: HistoryMessage[]): ChatMessage[] 
         text: content,
         citations: message.citations,
         riskResult: message.risk_result,
+        citationConflicts: message.citation_conflicts,
       })
     }
   }

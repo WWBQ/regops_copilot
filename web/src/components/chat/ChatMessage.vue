@@ -205,6 +205,9 @@ function evidenceCitationTitle(evidenceId: number): string {
       <p v-if="showModelOnlyNotice" class="model-only-notice">模型回答，仅供参考</p>
       <p v-if="routeLabel" class="route-tag" :data-route="message.route || ''">{{ routeLabel }}</p>
       <p v-if="message.attachmentName" class="attachment-tag">📎 {{ message.attachmentName }}</p>
+      <p v-if="message.citationConflicts?.length" class="citation-conflict-notice">
+        历史引用编号 {{ message.citationConflicts.map((id) => `[${id}]`).join('、') }} 对应过不同来源，已停用这些链接。本次报告的相关结论需重新核查。
+      </p>
       <p v-if="message.streaming && !message.content" class="typing-status">
         {{ message.statusText || '正在回复…' }}
       </p>
@@ -378,6 +381,17 @@ function evidenceCitationTitle(evidenceId: number): string {
   margin: 0 0 8px;
   font-size: 13px;
   color: var(--muted);
+}
+
+.citation-conflict-notice {
+  margin: 0 0 12px;
+  padding: 9px 11px;
+  border: 1px solid #fdba74;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .agent-stages {

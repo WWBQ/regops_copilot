@@ -261,6 +261,8 @@ def visible_checkpoint_messages(thread_id: str) -> list[dict[str, Any]]:
     visible: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     pending_citations: list[dict[str, Any]] = []
+    seen_citation_sources: dict[int, tuple[Any, ...]] = {}
+    conflicting_citation_ids: set[int] = set()
 
     for message in _delta_messages_from_checkpoint(thread_id):
         if isinstance(message, ToolMessage):
@@ -269,6 +271,11 @@ def visible_checkpoint_messages(thread_id: str) -> list[dict[str, Any]]:
                 for item in pending_citations
             }
             for item in citations_from_tool_message(message):
+                citation_id = item["citation_id"]
+                source = (item["kind"], item["doc_id"], item["page"], item["snippet"])
+                previous = seen_citation_sources.setdefault(citation_id, source)
+                if previous != source:
+                    conflicting_citation_ids.add(citation_id)
                 by_key.setdefault(
                     (item["kind"], item["doc_id"], item["page"], item["snippet"]),
                     item,
@@ -284,6 +291,7 @@ def visible_checkpoint_messages(thread_id: str) -> list[dict[str, Any]]:
 
         if role == "user":
             pending_citations = []
+            conflicting_citation_ids = set()
             text = _extract_user_prompt(text)
         else:
             text = strip_risk_result_block(text)
@@ -304,7 +312,12 @@ def visible_checkpoint_messages(thread_id: str) -> list[dict[str, Any]]:
                 "source": "checkpoint",
             }
         if role == "agent" and pending_citations:
-            visible_message["citations"] = list(pending_citations)
+            visible_message["citations"] = [
+                item for item in pending_citations
+                if item["citation_id"] not in conflicting_citation_ids
+            ]
+            if conflicting_citation_ids:
+                visible_message["citation_conflicts"] = sorted(conflicting_citation_ids)
         visible.append(visible_message)
 
     return visible

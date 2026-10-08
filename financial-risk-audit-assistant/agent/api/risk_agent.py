@@ -155,9 +155,12 @@ def _message_payload(thread: dict[str, Any]) -> list[dict[str, Any]]:
         citations = message.get("citations")
         if author == "agent" and isinstance(citations, list) and citations:
             payload["citations"] = citations
+        citation_conflicts = message.get("citation_conflicts")
+        if author == "agent" and citation_conflicts:
+            payload["citation_conflicts"] = citation_conflicts
         if author == "agent":
             risk_result = structured_by_answer.get(answer_hash(content))
-            if risk_result is not None:
+            if risk_result is not None and not citation_conflicts:
                 payload["risk_result"] = risk_result
         messages.append(payload)
     return messages

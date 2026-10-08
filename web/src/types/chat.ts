@@ -138,6 +138,8 @@ export interface ChatMessage {
   comparison?: CompanyComparisonResult | null
   /** 金融风险审计 Agent 保存的结构化初筛结果 */
   riskResult?: RiskAuditResult | null
+  /** 历史 Agent 回答中与其他轮次复用且指向不同来源的编号。 */
+  citationConflicts?: number[]
   /** @deprecated 兼容旧缓存，请用 tokenCount */
   totalTokens?: number
 }

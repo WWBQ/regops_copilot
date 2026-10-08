@@ -40,6 +40,18 @@ test('one question groups progress and conclusion into one assistant reply', () 
   assert.deepEqual(grouped[3].stages, [])
 })
 
+test('historical citation collisions reach the report warning', () => {
+  const grouped = groupRiskAgentHistory([
+    { id: 'u1', author: 'user', chunks: [{ kind: 'text', text: '分析美的' }] },
+    {
+      id: 'a1', author: 'agent', chunks: [{ kind: 'text', text: '净利润 [1]' }],
+      citation_conflicts: [1],
+    },
+  ])
+  assert.deepEqual(grouped[1].citationConflicts, [1])
+  assert.equal(grouped[1].citations, undefined)
+})
+
 test('replace deltas update one stage rather than create repeated replies', () => {
   let parts = updateAgentTextPart([], 'stage-1', '检索', 'replace')
   parts = updateAgentTextPart(parts, 'stage-1', '检索完成', 'replace')

@@ -13,14 +13,15 @@ from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 
 @dataclass
 class ToolCitationIndexer:
-    """在一次 Agent 运行内为去重后的工具证据分配连续编号。"""
+    """为本轮工具证据分配编号；续聊时跳过会话历史已使用的编号。"""
 
+    start_after: int = 0
     _ids: dict[tuple[Any, ...], int] = field(default_factory=dict)
 
     def _id_for(self, key: tuple[Any, ...]) -> int:
         citation_id = self._ids.get(key)
         if citation_id is None:
-            citation_id = len(self._ids) + 1
+            citation_id = self.start_after + len(self._ids) + 1
             self._ids[key] = citation_id
         return citation_id
 
@@ -96,6 +97,24 @@ def _payload(message: Any) -> dict[str, Any] | None:
     except ValueError:
         return None
     return value if isinstance(value, dict) else None
+
+
+def max_citation_id_from_messages(messages: Iterable[Any]) -> int:
+    """读取历史工具输出中的最大编号，防止续聊把旧编号分配给另一条证据。"""
+
+    maximum = 0
+    for message in messages:
+        payload = _payload(message)
+        if payload is None:
+            continue
+        for key in ("facts", "citations", "results"):
+            for item in payload.get(key) or []:
+                if not isinstance(item, dict):
+                    continue
+                value = item.get("citation_id")
+                if type(value) is int and value > maximum:
+                    maximum = value
+    return maximum
 
 
 def _fact_citations(payload: dict[str, Any]) -> list[tuple[int, dict[str, Any]]]:

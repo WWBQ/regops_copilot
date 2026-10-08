@@ -46,7 +46,7 @@ from agent.core.repo_memory import (
 from agent.core.settings import WORKSPACE_ROOT
 from agent.core.task_intent import TaskKind
 from agent.prompt import get_system_prompt
-from agent.financial.citations import ToolCitationIndexer
+from agent.financial.citations import ToolCitationIndexer, max_citation_id_from_messages
 from agent.tools import (
     add_review_finding,
     create_external_risk_search_tool,
@@ -395,7 +395,11 @@ def get_agent(config: RunnableConfig):
         # 金融模式独立构图：两项白名单 MCP 工具负责内部事实和年报证据，
         # 外部风险搜索作为 Agent 进程内只读工具装配。三者共享引用编号；不注入
         # DeepAgents 的文件、命令、Gitee 工具或可写 backend。
-        citation_indexer = ToolCitationIndexer()
+        from agent.core.checkpoint_history import _delta_messages_from_checkpoint
+
+        citation_indexer = ToolCitationIndexer(
+            start_after=max_citation_id_from_messages(_delta_messages_from_checkpoint(thread_id))
+        )
         financial_tools = [
             *load_financial_tools(citation_indexer),
             create_external_risk_search_tool(citation_indexer),

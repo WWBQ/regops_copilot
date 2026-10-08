@@ -7,6 +7,7 @@ from agent.financial.citations import (
     ToolCitationIndexer,
     citations_from_latest_turn,
     citations_from_messages,
+    max_citation_id_from_messages,
 )
 from agent.financial.risk_result import parse_risk_audit_output
 
@@ -57,6 +58,26 @@ class FinancialCitationTest(unittest.TestCase):
         ]
         self.assertEqual(citations_from_messages(messages)[0]["doc_id"], "old-report")
         self.assertEqual(citations_from_latest_turn(messages)[0]["doc_id"], "new-report")
+
+    def test_followup_allocates_new_ids_after_prior_tool_results(self):
+        prior = [
+            _evidence_message(1, "old-fact"),
+            _evidence_message(34, "old-report"),
+        ]
+        indexer = ToolCitationIndexer(start_after=max_citation_id_from_messages(prior))
+        current = indexer.annotate("search_report_evidence", {
+            "citations": [{"doc_id": "new-report", "page": 241, "snippet": "股本"}],
+        })
+        self.assertEqual(current["citations"][0]["citation_id"], 35)
+        current_message = ToolMessage(content=json.dumps(current), tool_call_id="new-call")
+        available = {item["citation_id"] for item in citations_from_latest_turn([
+            HumanMessage(content="上一轮"), *prior,
+            HumanMessage(content="这一轮"), current_message,
+        ])}
+        _markdown, _result, error = parse_risk_audit_output(
+            "归母净利润 337.45 亿元 [1]", available_citation_ids=available,
+        )
+        self.assertEqual(error, "unknown_body_citation_ids: [1]")
 
     def test_parser_accepts_valid_sparse_id_and_rejects_unknown_id(self):
         payload = {
