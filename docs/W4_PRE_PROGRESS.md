@@ -92,7 +92,7 @@ flowchart LR
 **W2 附加已完成**：
 
 - 解析监控 UI：`/ops/ingest`（pdf_document、ingest_job、会话上传）
-- 日志监控：`/ops/logs`（ingest 失败、RAG 异常 trace 聚合）
+- 日志监控：原 `/ops/logs` 聚合页已下线；解析与 RAG 状态分别在专用监控页查看，服务端日志保留。
 - parse 缓存：`ParseArtifactStore` + object store
 - 文档查看器：citation → PDF 页跳转（`/documents/viewer`）
 - 批量 `POST /ingest` + ingest_job 全阶段
@@ -138,7 +138,7 @@ flowchart LR
 | 财务事实库 | `/quality/facts` | W2-4 | ❌ 占位 |
 | 解析监控 | `/ops/ingest` | W2-5 | ✅ |
 | RAG 监控 | `/ops/rag` | W3 | ✅ |
-| 日志监控 | `/ops/logs` | W2+ | ✅ |
+| 日志监控 | `/ops/logs` | W2+ | 已下线 |
 | 系统健康 | `/ops/health` | W1 | ✅ |
 | 评估报告 | `/ops/eval` | W1–W3 | ✅ |
 | 文档查看 | `/documents/viewer` | W3 | ✅ |

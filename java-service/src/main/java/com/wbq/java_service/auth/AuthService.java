@@ -6,6 +6,8 @@ import com.wbq.java_service.dto.auth.UserResponse;
 import com.wbq.java_service.exception.BusinessException;
 import com.wbq.java_service.identity.AppUser;
 import com.wbq.java_service.identity.AppUserRepository;
+import com.wbq.java_service.identity.Role;
+import com.wbq.java_service.dto.auth.RegisterRequest;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -43,6 +45,30 @@ public class AuthService {
                 properties.auth().ttlSeconds(),
                 toUser(user)
         );
+    }
+
+    public LoginResponse register(RegisterRequest request) {
+        String username = request.username().strip();
+        if (!username.matches("[A-Za-z0-9_]{3,64}")) {
+            throw BusinessException.badRequest("用户名只能包含字母、数字和下划线");
+        }
+        if (users.existsByUsername(username)) {
+            throw BusinessException.conflict("用户名已存在");
+        }
+        AppUser user = new AppUser();
+        user.setUsername(username);
+        user.setPasswordHash(passwordEncoder.encode(request.password()));
+        user.setDisplayName(request.displayName().strip());
+        user.setEmail(request.email() == null ? "" : request.email().strip());
+        // 注册请求不接受 role/dept；新用户仅拥有最低的投研分析师数据域。
+        user.setRole(Role.ANALYST);
+        user.setDept("research");
+        try {
+            user = users.saveAndFlush(user);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            throw BusinessException.conflict("用户名已存在");
+        }
+        return new LoginResponse(jwtService.issue(user), "Bearer", properties.auth().ttlSeconds(), toUser(user));
     }
 
     public static UserResponse toUser(AppUser user) {

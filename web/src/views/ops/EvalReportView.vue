@@ -727,7 +727,6 @@ onBeforeUnmount(stopPolling)
     <header class="head">
       <div>
         <h1>评估报告</h1>
-        <p>按题型、单题或失败项开跑，不必每次全量。两份报告仍可对照。</p>
       </div>
       <div class="head-actions">
         <button type="button" class="ghost-btn" :disabled="loading" @click="refreshAll">刷新</button>

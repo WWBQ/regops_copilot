@@ -19,6 +19,7 @@ RISK_RESULT_BLOCK = re.compile(
     r"(?:\n|^)```risk_audit_result\s*(\{.*?\})\s*```\s*$",
     re.DOTALL,
 )
+BODY_CITATION_MARKER = re.compile(r"\[(?:片段)?(\d+)\]")
 
 
 class RiskFinding(BaseModel):
@@ -77,15 +78,24 @@ def parse_risk_audit_output(
 ) -> tuple[str, RiskAuditResult | None, str | None]:
     """解析并校验一次 Agent 最终输出。
 
-    结构化块缺失或不合法时不伪造结果：保留 Markdown，返回错误原因，由调用方记录
-    日志并继续向用户交付自然语言回答。
+    结构化块缺失或不合法时不伪造结果：返回错误原因并保留可读 Markdown。
+    正文或结构化结果含无来源的引用编号时，改为安全提示，不交付风险结论。
     """
 
     raw_text = text or ""
     match = RISK_RESULT_BLOCK.search(raw_text)
+    markdown = (raw_text[: match.start()] if match else raw_text).strip()
+    if available_citation_ids is not None:
+        body_ids = {int(value) for value in BODY_CITATION_MARKER.findall(markdown)}
+        unknown_body_ids = sorted(body_ids - available_citation_ids)
+        if unknown_body_ids:
+            return (
+                "本次回答包含无法核验的引用编号，风险结论已拦截，请重新发起初筛。",
+                None,
+                f"unknown_body_citation_ids: {unknown_body_ids}",
+            )
     if match is None:
-        return raw_text.strip(), None, "missing_structured_result"
-    markdown = raw_text[: match.start()].strip()
+        return markdown, None, "missing_structured_result"
     try:
         payload: Any = json.loads(match.group(1))
         result = RiskAuditResult.model_validate(payload)
@@ -100,6 +110,10 @@ def parse_risk_audit_output(
         }
         unknown = sorted(referenced - available_citation_ids)
         if unknown:
-            return markdown, None, f"unknown_citation_ids: {unknown}"
+            return (
+                "本次回答包含无法核验的引用编号，风险结论已拦截，请重新发起初筛。",
+                None,
+                f"unknown_citation_ids: {unknown}",
+            )
 
     return markdown, result, None

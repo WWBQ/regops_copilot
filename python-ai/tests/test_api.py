@@ -95,7 +95,7 @@ async def test_health(client: AsyncClient):
 
 @pytest.mark.anyio
 async def test_agent_endpoints_are_not_registered(client: AsyncClient):
-    for method, path in (("GET", "/tools"), ("POST", "/tools/invoke"), ("POST", "/mcp")):
+    for method, path in (("GET", "/tools"), ("POST", "/tools/invoke")):
         response = await client.request(method, path)
         assert response.status_code == 404
 

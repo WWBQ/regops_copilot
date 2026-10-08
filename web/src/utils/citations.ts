@@ -1,10 +1,10 @@
 import type { Citation } from '../types/chat'
 import { renderMarkdown } from './markdown'
 
-const CITE_FOOTER_RE = /\n*出处：(?:\[(?:片段)?\d{1,2}\])+\s*$/u
+const CITE_FOOTER_RE = /\n*出处：(?:\[(?:片段)?\d+\])+\s*$/u
 
 function citeMarkerRe(): RegExp {
-  return /\[(?:片段)?(\d{1,2})\]/g
+  return /\[(?:片段)?(\d+)\]/g
 }
 
 function escapeAttr(text: string): string {
@@ -83,7 +83,7 @@ function citeNeedles(cite: Citation): string[] {
 }
 
 function alreadyMarked(text: string, at: number): boolean {
-  return /^\s*\[(?:片段)?\d{1,2}\]/u.test(text.slice(at, at + 12))
+  return /^\s*\[(?:片段)?\d+\]/u.test(text.slice(at, at + 20))
 }
 
 function insertAfter(text: string, needle: string, mark: string): string | null {
@@ -149,6 +149,11 @@ export function attachCitationMarks(
   if (!citations.length) {
     return { content: text, citations: [] }
   }
+  // Agent 的 citation_id 是工具分配的证据身份，不是数组位置；允许不连续编号。
+  // 不为未引用的候选证据猜测插入角标，也不能改写模型给出的原始编号。
+  if (citations.some((citation) => citation.citation_id != null)) {
+    return { content: text, citations }
+  }
   const used = new Set<number>()
   for (const match of text.matchAll(citeMarkerRe())) {
     const index = Number.parseInt(match[1], 10) - 1
@@ -175,17 +180,21 @@ export function injectInlineCitationMarkers(html: string, citations: Citation[])
   if (!citations.length) {
     return html
   }
+  const explicitIds = citations.some((citation) => citation.citation_id != null)
   return html.replace(citeMarkerRe(), (match, rawIndex: string) => {
-    const index = Number.parseInt(rawIndex, 10) - 1
+    const markerId = Number.parseInt(rawIndex, 10)
+    const index = explicitIds
+      ? citations.findIndex((citation) => citation.citation_id === markerId)
+      : markerId - 1
     if (Number.isNaN(index) || index < 0 || index >= citations.length) {
       return match
     }
     const citation = citations[index]
-    const label = rawIndex
+    const label = String(markerId)
     const hover = escapeAttr(citationHoverLabel(citation))
     return (
       `<button type="button" class="cite-mark" data-cite-index="${index}" ` +
-      `aria-label="引用 ${label}，${citationHoverLabel(citation)}" title="${hover}">${label}</button>`
+      `aria-label="引用 ${label}，${hover}" title="${hover}">${label}</button>`
     )
   })
 }

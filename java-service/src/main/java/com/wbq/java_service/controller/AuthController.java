@@ -4,6 +4,7 @@ import com.wbq.java_service.auth.AuthService;
 import com.wbq.java_service.auth.AuthSupport;
 import com.wbq.java_service.dto.auth.LoginRequest;
 import com.wbq.java_service.dto.auth.LoginResponse;
+import com.wbq.java_service.dto.auth.RegisterRequest;
 import com.wbq.java_service.dto.auth.UserResponse;
 import com.wbq.java_service.identity.DataSeeder;
 
@@ -28,6 +29,11 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request.username(), request.password());
+    }
+
+    @PostMapping("/register")
+    public LoginResponse register(@Valid @RequestBody RegisterRequest request) {
+        return authService.register(request);
     }
 
     @GetMapping("/me")

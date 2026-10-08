@@ -553,6 +553,9 @@ def save_rag_trace(trace: RagTrace) -> int | None:
     settings = get_settings()
     if not settings.rag_trace_enabled:
         return None
+    from app.request_id import current_regops_user_id
+
+    trace.user_id = current_regops_user_id()
     try:
         with get_connection() as conn:
             row_id = insert_rag_trace(conn, trace)

@@ -6,20 +6,21 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from app.core.dependencies import get_document_service
 from app.db.connection import get_connection
-from app.db.ingest_job_repository import create_job
+from app.db.ingest_job_repository import create_job, update_job_status
 from app.db.session_repository import (
     attach_document,
     create_session,
     get_document_row,
     list_session_documents,
     session_exists,
+    update_document_status,
 )
 from app.documents.service import DocumentService
-from app.ingest.session_pipeline import ingest_session_pdf
+from app.ingest.tasks import enqueue_session_document
 from app.sessions.schemas import (
     SessionCreateResponse,
     SessionDocumentListResponse,
@@ -104,28 +105,9 @@ def get_document_status(session_id: str, doc_id: str) -> SessionDocumentResponse
     )
 
 
-def _run_session_ingest(
-    *,
-    session_id: str,
-    job_id: str,
-    body: bytes,
-    source_filename: str,
-) -> None:
-    try:
-        ingest_session_pdf(
-            session_id=session_id,
-            job_id=job_id,
-            body=body,
-            source_filename=source_filename,
-        )
-    except Exception:
-        logger.exception("background session ingest failed session_id=%s job_id=%s", session_id, job_id)
-
-
 @router.post("/{session_id}/documents", response_model=SessionDocumentUploadResponse)
 async def upload_session_document(
     session_id: str,
-    background_tasks: BackgroundTasks,
     service: DocSvcDep,
     file: UploadFile = File(...),
 ) -> SessionDocumentUploadResponse:
@@ -159,13 +141,20 @@ async def upload_session_document(
         )
         conn.commit()
 
-    background_tasks.add_task(
-        _run_session_ingest,
-        session_id=session_id,
-        job_id=job_id,
-        body=body,
-        source_filename=source_filename,
-    )
+    try:
+        enqueue_session_document(session_id, upload.doc_id, job_id, source_filename)
+    except Exception as exc:
+        logger.exception("failed to publish session ingest job_id=%s", job_id)
+        with get_connection() as conn:
+            update_job_status(
+                conn, job_id=job_id, status="FAILED", error_message="RabbitMQ 投递失败"
+            )
+            update_document_status(
+                conn, session_id=session_id, doc_id=upload.doc_id,
+                status="FAILED", error_message="RabbitMQ 投递失败",
+            )
+            conn.commit()
+        raise HTTPException(status_code=503, detail="解析队列不可用，上传文档已标记失败") from exc
     logger.info(
         "queued session ingest session_id=%s doc_id=%s job_id=%s filename=%s",
         session_id,

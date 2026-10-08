@@ -18,20 +18,10 @@ export const PAGE_MENUS: Record<string, PageMenuItem[]> = {
   '/quality/facts': [
     { id: 'quality-gates', label: '质量门', path: '/quality/gates', icon: 'list' },
   ],
-  '/ops/rag': [
-    { id: 'asknum-monitor', label: '问数监控', path: '/ops/asknum', icon: 'list' },
-  ],
-  '/ops/asknum': [
-    { id: 'rag-monitor', label: 'RAG 检索监控', path: '/ops/rag', icon: 'list' },
-    { id: 'llm-trace', label: 'LLM Trace', path: '/ops/traces', icon: 'list' },
-    { id: 'eval', label: '评估报告', path: '/ops/eval', icon: 'list' },
-  ],
-  '/ops/traces': [
-    { id: 'asknum-monitor', label: '问数监控', path: '/ops/asknum', icon: 'list' },
-    { id: 'eval', label: '评估报告', path: '/ops/eval', icon: 'list' },
-  ],
-  '/compliance/audit': [
-    { id: 'users', label: '用户与权限', path: '/settings/users', icon: 'list' },
+  '/ops/monitor': [
+    { id: 'rag-monitor', label: 'RAG 检索监控', path: '/ops/monitor/rag', icon: 'list' },
+    { id: 'asknum-monitor', label: '问数监控', path: '/ops/monitor/asknum', icon: 'list' },
+    { id: 'agent-monitor', label: 'Agent 监控', path: '/ops/monitor/agent', icon: 'list' },
   ],
 }
 
@@ -48,17 +38,8 @@ export function pageMenuForPath(path: string): PageMenuItem[] {
   if (path.startsWith('/quality/facts')) {
     return PAGE_MENUS['/quality/facts'] ?? []
   }
-  if (path.startsWith('/ops/rag')) {
-    return PAGE_MENUS['/ops/rag'] ?? []
-  }
-  if (path.startsWith('/ops/asknum')) {
-    return PAGE_MENUS['/ops/asknum'] ?? []
-  }
-  if (path.startsWith('/ops/traces')) {
-    return PAGE_MENUS['/ops/traces'] ?? []
-  }
-  if (path.startsWith('/compliance/audit')) {
-    return PAGE_MENUS['/compliance/audit'] ?? []
+  if (path.startsWith('/ops/monitor')) {
+    return PAGE_MENUS['/ops/monitor'] ?? []
   }
   return []
 }

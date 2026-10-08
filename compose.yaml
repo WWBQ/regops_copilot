@@ -20,6 +20,9 @@ services:
       - ./docs/sql/w4_asknum_pending.sql:/docker-entrypoint-initdb.d/06b_asknum_pending.sql:ro
       - ./docs/sql/w7_identity.sql:/docker-entrypoint-initdb.d/08_w7_identity.sql:ro
       - ./docs/sql/w10_storage_unification.sql:/docker-entrypoint-initdb.d/09_storage_unification.sql:ro
+      - ./docs/sql/w11_chat_history.sql:/docker-entrypoint-initdb.d/10_chat_history.sql:ro
+      - ./docs/sql/w12_trace_ownership.sql:/docker-entrypoint-initdb.d/11_trace_ownership.sql:ro
+      - ./docs/sql/w13_ingest_batches.sql:/docker-entrypoint-initdb.d/12_ingest_batches.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U regops -d regops_db"]
       interval: 5s
@@ -42,12 +45,18 @@ services:
       LABELING_DATA_DIR: /app/data/labeling
       HF_HOME: /app/data/hf
       API_PUBLIC_BASE_URL: http://localhost:8000
+      INGEST_BROKER_URL: amqp://regops:${RABBITMQ_PASSWORD:-regops}@rabbitmq:5672//
+      INGEST_RESULT_BACKEND: redis://redis:6379/1
     ports:
       - "8000:8000"
     volumes:
       - python_data:/app/data
     depends_on:
       db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test:
@@ -61,6 +70,67 @@ services:
       timeout: 5s
       retries: 8
       start_period: 90s
+
+  redis:
+    image: redis:7-alpine
+    container_name: regops-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: regops-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: regops
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-regops}
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
+  ingest-worker:
+    build:
+      context: .
+      dockerfile: python-ai/Dockerfile
+    container_name: regops-ingest-worker
+    restart: unless-stopped
+    command: ["celery", "-A", "app.ingest.tasks:celery_app", "worker", "--loglevel=INFO", "--pool=solo", "--concurrency=1", "--queues=ingest"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://regops:${POSTGRES_PASSWORD:-regops123}@db:5432/regops_db
+      INGEST_BROKER_URL: amqp://regops:${RABBITMQ_PASSWORD:-regops}@rabbitmq:5672//
+      INGEST_RESULT_BACKEND: redis://redis:6379/1
+      OBJECT_STORE_ROOT: /app/data/objects
+      LABELING_DATA_DIR: /app/data/labeling
+      HF_HOME: /app/data/hf
+      HF_HUB_OFFLINE: "1"
+    volumes:
+      - python_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   searxng:
     image: docker.io/searxng/searxng:latest
@@ -86,6 +156,7 @@ services:
         required: false
     environment:
       REGOPS_SERVICE_TOKEN: ${REGOPS_SERVICE_TOKEN:-dev-service-token}
+      AGENT_DATABASE_URL: postgresql://regops:${POSTGRES_PASSWORD:-regops123}@db:5432/regops_db
       FIN_RISK_AUDIT_DATA_DIR: /app/data
       REGOPS_MCP_URL: http://python-ai:8000/mcp/
       FIN_RISK_AUDIT_LOG_DIR: /app/data/logs
@@ -156,3 +227,5 @@ volumes:
   python_data:
   risk_agent_data:
   risk_agent_workspace:
+  redis_data:
+  rabbitmq_data:

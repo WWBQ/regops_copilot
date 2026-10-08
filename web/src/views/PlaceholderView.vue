@@ -13,8 +13,8 @@ const links = computed(() => {
   if (route.meta.group === 'ops') {
     items.push(
       { label: '解析监控', path: '/ops/ingest' },
-      { label: 'RAG 检索监控', path: '/ops/rag' },
-      { label: '问数监控', path: '/ops/asknum' },
+      { label: 'RAG 检索监控', path: '/ops/monitor/rag' },
+      { label: '问数监控', path: '/ops/monitor/asknum' },
       { label: '评估报告', path: '/ops/eval' },
       { label: '系统健康', path: '/ops/health' },
     )

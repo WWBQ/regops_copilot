@@ -199,6 +199,56 @@ export interface IngestJobItem {
   finished_at: string | null
 }
 
+export interface IngestBatchEvent {
+  id: number
+  job_id: string | null
+  stage: string
+  pending: number
+  active: number
+  done: number
+  failed: number
+  at: string
+}
+
+export interface IngestBatchItem {
+  batch_id: string
+  title: string
+  parser_backend: string
+  use_parse_cache: boolean
+  total_files: number
+  status: string
+  created_at: string
+  started_at: string | null
+  updated_at: string
+  finished_at: string | null
+  counts: { pending: number; active: number; done: number; failed: number }
+  files: Array<{
+    job_id: string
+    doc_id: string
+    status: string
+    error_message: string | null
+    retry_count: number
+    updated_at: string | null
+  }>
+  events: IngestBatchEvent[]
+}
+
+export function listIngestBatches(params?: {
+  limit?: number
+  offset?: number
+  status?: string
+  parser_backend?: string
+  keyword?: string
+}): Promise<PaginatedResponse<IngestBatchItem>> {
+  const search = new URLSearchParams()
+  search.set('limit', String(params?.limit ?? 20))
+  if (params?.offset) search.set('offset', String(params.offset))
+  if (params?.status) search.set('status', params.status)
+  if (params?.parser_backend) search.set('parser_backend', params.parser_backend)
+  if (params?.keyword) search.set('keyword', params.keyword)
+  return apiFetch<PaginatedResponse<IngestBatchItem>>(`/ops/ingest/batches?${search}`)
+}
+
 export interface SessionIngestDocument {
   session_id: string
   doc_id: string
@@ -217,22 +267,6 @@ export interface PaginatedResponse<T> {
   limit: number
   offset: number
   items: T[]
-}
-
-export interface LogEventItem {
-  id: string
-  source: string
-  level: string
-  message: string
-  detail: Record<string, unknown>
-  occurred_at: string | null
-}
-
-export interface LogEventsResponse extends PaginatedResponse<LogEventItem> {
-  summary: {
-    by_level: Record<string, number>
-    by_source: Record<string, number>
-  }
 }
 
 export function getIngestOverview(): Promise<IngestOverview> {
@@ -269,21 +303,6 @@ export function listSessionIngestDocuments(params?: {
   )
 }
 
-export function listLogEvents(params?: {
-  limit?: number
-  offset?: number
-  source?: string
-  level?: string
-}): Promise<LogEventsResponse> {
-  const search = new URLSearchParams()
-  if (params?.limit != null) search.set('limit', String(params.limit))
-  if (params?.offset != null) search.set('offset', String(params.offset))
-  if (params?.source) search.set('source', params.source)
-  if (params?.level) search.set('level', params.level)
-  const qs = search.toString()
-  return apiFetch<LogEventsResponse>(`/ops/logs/events${qs ? `?${qs}` : ''}`)
-}
-
 export const INGEST_STATUS_LABELS: Record<string, string> = {
   uploaded: '已上传',
   processing: '处理中',
@@ -291,6 +310,9 @@ export const INGEST_STATUS_LABELS: Record<string, string> = {
   failed: '失败',
   archived: '已归档',
   PENDING: '待处理',
+  QUEUED: '排队中',
+  RUNNING: '执行中',
+  PARTIAL: '部分失败',
   PARSING: '解析中',
   CLEANING: '清洗中',
   EXTRACTING: '抽取中',
@@ -300,76 +322,4 @@ export const INGEST_STATUS_LABELS: Record<string, string> = {
   FAILED: '失败',
   PROCESSING: '处理中',
   READY: '就绪',
-}
-
-export const LOG_SOURCE_LABELS: Record<string, string> = {
-  ingest: '入库任务',
-  session: '会话上传',
-  rag: 'RAG 检索',
-}
-
-export const LOG_LEVEL_LABELS: Record<string, string> = {
-  error: '错误',
-  warn: '警告',
-  info: '信息',
-}
-
-export interface LlmTraceItem {
-  id: string
-  created_at: string
-  request_id: string
-  trace_id: string
-  traceparent?: string
-  route: string
-  model: string
-  prompt_name: string | null
-  prompt_version: string | null
-  prompt_tokens: number
-  completion_tokens: number
-  total_tokens: number
-  latency_ms: number
-  ttft_ms: number | null
-  tokens_per_s: number | null
-  cost_usd: number
-  stream?: boolean
-  input?: string
-  output?: string
-}
-
-export interface LlmObsOverview {
-  count: number
-  p95_latency_ms: number | null
-  p50_latency_ms: number | null
-  ttft_p95_ms: number | null
-  avg_tokens_per_s: number | null
-  tokens_sum: number
-  cost_usd_sum: number
-  prompt_version_rate: number
-  langfuse_enabled: boolean
-  langfuse_host: string | null
-  store: string
-  note?: string
-}
-
-export interface LlmTraceListResponse {
-  total: number
-  limit: number
-  offset: number
-  items: LlmTraceItem[]
-  summary?: LlmObsOverview
-}
-
-export function fetchObsOverview(): Promise<LlmObsOverview> {
-  return apiFetch<LlmObsOverview>('/ops/obs/overview')
-}
-
-export function listObsTraces(params?: {
-  limit?: number
-  offset?: number
-}): Promise<LlmTraceListResponse> {
-  const search = new URLSearchParams()
-  if (params?.limit != null) search.set('limit', String(params.limit))
-  if (params?.offset != null) search.set('offset', String(params.offset))
-  const qs = search.toString()
-  return apiFetch<LlmTraceListResponse>(`/ops/obs/traces${qs ? `?${qs}` : ''}`)
 }

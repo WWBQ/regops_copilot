@@ -1,7 +1,7 @@
 export type ChatRole = 'user' | 'assistant'
 
 export interface Citation {
-  /** Agent 工具证据的原始连续编号；结构化风险卡片通过它绑定来源。 */
+  /** Agent 工具证据的原始编号（返回数组中可能不连续）；结构化风险卡片通过它绑定来源。 */
   citation_id?: number | null
   doc_id: string
   page: number

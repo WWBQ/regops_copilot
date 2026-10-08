@@ -16,8 +16,10 @@ flowchart LR
     AGENT[Financial Risk Agent / FastAPI<br/>模型选择 · Agent 循环 · 会话 · 结构化线索]
     SEARCH[Web Search Provider<br/>SearXNG / 智谱 / Brave]
     PG[(PostgreSQL + pgvector)]
-    SQLITE[(Agent SQLite)]
     OBJ[(本地对象存储)]
+    MQ[(RabbitMQ)]
+    WORKER[Celery 解析 Worker]
+    REDIS[(Redis · Celery 任务结果)]
     LLM[DeepSeek / Qwen]
 
     USER --> WEB
@@ -29,7 +31,12 @@ flowchart LR
     PY --> PG
     MCP --> PG
     PY --> OBJ
-    AGENT --> SQLITE
+    PY -->|解析批次消息| MQ
+    MQ --> WORKER
+    WORKER --> OBJ
+    WORKER --> PG
+    WORKER --> REDIS
+    AGENT --> PG
     PY --> LLM
     AGENT --> LLM
 ```
@@ -43,11 +50,16 @@ flowchart LR
 | `web` | 页面、模型选择、POST SSE 消费、引用跳转、结构化风险卡片 | 不直连模型、MCP 或数据库 |
 | `java-service` | 用户认证、RBAC、同源 API、错误映射、风险 Agent SSE 透传 | 不执行向量检索，不运行 Agent |
 | `python-ai` | 文档解析入库、混合检索、重排、AskNum、财务事实质量门、FastMCP 服务 | 不保存风险 Agent 对话状态 |
-| `risk-agent` | 金融初筛 Agent、工具选择、模型切换、引用编号、结构化结果、会话恢复 | 不直接访问 Postgres，不执行写操作 |
-| PostgreSQL + pgvector | 文档元数据、chunk、向量、财务事实和平台业务数据 | 不保存 LangGraph checkpoint |
-| Agent SQLite | checkpoint、运行摘要、结构化风险结果 | 不作为 RAG 向量库 |
+| `ingest-worker` | 消费 RabbitMQ 解析批次；逐文件解析、清洗、分块、向量化并记录阶段快照 | 不响应用户 HTTP 请求 |
+| RabbitMQ / Redis | 前者持久排队解析消息；后者保存 Celery 任务结果与状态 | 不作为财务事实或监控历史的权威库 |
+| `risk-agent` | 金融初筛 Agent、工具选择、模型切换、引用编号、结构化结果、会话恢复；直连 PostgreSQL 保存状态 | 不写财务事实或年报原文 |
+| PostgreSQL + pgvector | 文档、向量、财务事实、合规会话、Agent checkpoint 与业务 Store | 不替 Agent 判断风险 |
 
 ## 3. 两条主业务链路
+
+### 解析任务链路
+
+一次批量上传或重解析请求生成一个 `ingest_batch`，包含 1–50 个 `ingest_job`；API 提交数据库后投递一个 RabbitMQ 消息。Worker 从共享对象存储读取 PDF，逐份完成 Docling/MinerU 解析、清洗、分块、向量化，阶段更新和 `ingest_batch_event` 快照在 PostgreSQL 同一事务提交。监控页每 3 秒读取快照，按批次绘制待处理、处理中、完成、失败文件数的时间曲线。Redis 存 Celery 的执行结果，不替代 PostgreSQL 的持久监控历史。Worker 重取任务时跳过已完成或失败文件。
 
 ### 3.1 合规问答、问数与 RAG
 
@@ -82,7 +94,7 @@ sequenceDiagram
     participant D as 财务事实 / RAG
     participant E as Web Search Provider
     participant L as DeepSeek / Qwen
-    participant S as Agent SQLite
+    participant S as PostgreSQL Agent Store / checkpoint
 
     U->>W: 公司 + 年份 + 初筛目标
     W->>J: POST SSE + model_id
@@ -154,10 +166,10 @@ F10 事实和 PDF 原文是两种不同来源：F10 使用内容哈希溯源，�
 
 | 数据 | 存储 | 用途 |
 | --- | --- | --- |
-| 完整 LangGraph messages、工具调用和图状态 | `financial-risk-audit-assistant/data/checkpoints.sqlite` | 多轮上下文、刷新恢复 |
-| thread、run、过程事件 | `financial-risk-audit-assistant/data/store.sqlite` | 会话列表、状态与排障 |
-| `risk_audit_results`、`risk_audit_findings` | `store.sqlite` | 结构化结果和后续人工审核 |
-| 长期 StoreBackend 数据 | `langgraph_store.sqlite` | 保留的通用 Harness 记忆能力；金融初筛不依赖它取事实 |
+| 完整 LangGraph messages、工具调用和图状态 | PostgreSQL `checkpoints` 等原生表 | 多轮上下文、刷新恢复 |
+| thread、run、过程事件 | PostgreSQL `agent` schema | 会话列表、状态与排障 |
+| `risk_audit_results`、`risk_audit_findings` | PostgreSQL `agent` schema | 结构化结果和后续人工审核 |
+| 长期 StoreBackend 数据 | PostgreSQL LangGraph `store` 表 | 保留的通用 Harness 记忆能力；金融初筛不依赖它取事实 |
 | 年报、chunk、向量、财务事实 | PostgreSQL + pgvector | RAG、AskNum、MCP 工具数据源 |
 
 聊天正文以 checkpoint 为唯一权威来源。结构化风险结果通过回答哈希重新关联到对应历史回答，避免刷新后丢失；删除会话时同时清理业务 Store 与 checkpoint。

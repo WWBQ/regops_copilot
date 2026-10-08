@@ -8,6 +8,7 @@ import { deptLabel, GUEST_USER, roleLabel, userInitials } from '../../config/use
 
 const router = useRouter()
 const { user, loggedIn, logout } = useAuth()
+function signOut() { logout(); void router.replace('/login') }
 
 const display = computed(() => {
   if (!user.value) return GUEST_USER
@@ -77,7 +78,7 @@ const initials = computed(() => userInitials(display.value.displayName))
       <button type="button" class="ghost-btn" @click="router.push('/settings/users')">
         用户与权限
       </button>
-      <button v-if="loggedIn" type="button" class="ghost-btn" @click="logout">退出</button>
+      <button v-if="loggedIn" type="button" class="ghost-btn" @click="signOut">退出</button>
       <button type="button" class="ghost-btn" @click="router.push('/')">返回问答</button>
     </div>
   </section>

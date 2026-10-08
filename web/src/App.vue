@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, provide } from 'vue'
+import { useRoute } from 'vue-router'
 
 import AppShell from './components/layout/AppShell.vue'
 import { SERVICE_HEALTH_KEY, createServiceHealth } from './composables/useServiceHealth'
 
 const health = createServiceHealth()
 provide(SERVICE_HEALTH_KEY, health)
+const route = useRoute()
 
 const backendOk = computed(() => health.javaOk.value)
 
@@ -35,7 +37,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <AppShell>
+  <AppShell v-if="route.path !== '/login'">
     <router-view v-slot="{ Component }">
       <component
         :is="Component"
@@ -47,4 +49,5 @@ onBeforeUnmount(() => {
       />
     </router-view>
   </AppShell>
+  <router-view v-else />
 </template>

@@ -12,6 +12,13 @@ from agent.env_utils import get_env
 # 避免 LangGraph dev 或第三方工具把文件散落到隐藏目录中。
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+# Agent 与 RegOps 共用 PostgreSQL 实例。Compose 中单独覆盖为 db 主机名。
+# 旧 SQLite 路径仅供一次性迁移脚本读取，不再作为运行时写入目标。
+AGENT_DATABASE_URL = get_env(
+    "AGENT_DATABASE_URL",
+    get_env("DATABASE_URL", "postgresql://regops:regops123@localhost:5432/regops_db"),
+)
+
 # SQLite 数据目录：默认使用项目内 data/。
 # 用户仍然可以通过 .env 覆盖，但默认推荐显式落在项目目录中，
 # 方便直接打开 SQLite 文件观察 checkpoint 和业务 Store 的区别。

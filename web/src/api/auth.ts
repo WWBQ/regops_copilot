@@ -24,6 +24,14 @@ export function login(username: string, password: string): Promise<LoginResponse
   })
 }
 
+export function register(username: string, password: string, displayName: string, email: string): Promise<LoginResponse> {
+  return apiFetch('/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password, displayName, email }),
+  })
+}
+
 export function fetchMe(): Promise<AuthUser> {
   return apiFetch('/auth/me')
 }

@@ -32,6 +32,6 @@ def test_fetch_rag_overview_empty_when_no_table(monkeypatch):
     monkeypatch.setattr("app.ops.rag_service.get_connection", fake_get_connection)
     monkeypatch.setattr("app.ops.rag_service._table_exists", lambda *_: False)
 
-    overview = fetch_rag_overview()
+    overview = fetch_rag_overview(user_id="00000000-0000-0000-0000-000000000001")
     assert overview["total"] == 0
     assert overview["refusal_rate"] == 0.0

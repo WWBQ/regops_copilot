@@ -36,12 +36,12 @@ def insert_asknum_trace(conn: psycopg.Connection, trace: Any) -> int:
         cur.execute(
             """
             INSERT INTO asknum_query_log (
-                request_id, session_id, question, route,
+                request_id, session_id, user_id, question, route,
                 company_codes, concepts, year, year_defaulted, scope,
                 narrative, lookups, total_ms
             )
             VALUES (
-                %s, %s::uuid, %s, %s,
+                %s, %s::uuid, %s::uuid, %s, %s,
                 %s::jsonb, %s::jsonb, %s, %s, %s,
                 %s, %s::jsonb, %s
             )
@@ -50,6 +50,7 @@ def insert_asknum_trace(conn: psycopg.Connection, trace: Any) -> int:
             (
                 trace.request_id,
                 trace.session_id,
+                trace.user_id,
                 trace.question,
                 trace.route,
                 json.dumps(trace.company_codes, ensure_ascii=False),
@@ -108,12 +109,13 @@ _SELECT = """
 def list_asknum_traces(
     conn: psycopg.Connection,
     *,
+    user_id: str,
     limit: int = 50,
     offset: int = 0,
     route: str | None = None,
 ) -> list[AsknumQueryLogRow]:
-    clauses = ["1=1"]
-    params: list[Any] = []
+    clauses = ["user_id = %s::uuid"]
+    params: list[Any] = [user_id]
     if route:
         clauses.append("route = %s")
         params.append(route)
@@ -132,23 +134,25 @@ def list_asknum_traces(
     return [_row_from_db(row) for row in rows]
 
 
-def get_asknum_trace(conn: psycopg.Connection, trace_id: int) -> AsknumQueryLogRow | None:
+def get_asknum_trace(conn: psycopg.Connection, trace_id: int, *, user_id: str) -> AsknumQueryLogRow | None:
     with conn.cursor() as cur:
-        cur.execute(f"{_SELECT} WHERE id = %s", (trace_id,))
+        cur.execute(f"{_SELECT} WHERE id = %s AND user_id = %s::uuid", (trace_id, user_id))
         row = cur.fetchone()
     if not row:
         return None
     return _row_from_db(row)
 
 
-def summarize_asknum_traces(conn: psycopg.Connection) -> dict[str, Any]:
+def summarize_asknum_traces(conn: psycopg.Connection, *, user_id: str) -> dict[str, Any]:
     with conn.cursor() as cur:
         cur.execute(
             """
             SELECT route, COUNT(*), COALESCE(AVG(total_ms), 0)
             FROM asknum_query_log
+            WHERE user_id = %s::uuid
             GROUP BY route
-            """
+            """,
+            (user_id,),
         )
         rows = cur.fetchall()
     by_route: dict[str, int] = {}
@@ -170,9 +174,9 @@ def summarize_asknum_traces(conn: psycopg.Connection) -> dict[str, Any]:
     }
 
 
-def count_asknum_traces(conn: psycopg.Connection, *, route: str | None = None) -> int:
-    clauses = ["1=1"]
-    params: list[Any] = []
+def count_asknum_traces(conn: psycopg.Connection, *, user_id: str, route: str | None = None) -> int:
+    clauses = ["user_id = %s::uuid"]
+    params: list[Any] = [user_id]
     if route:
         clauses.append("route = %s")
         params.append(route)

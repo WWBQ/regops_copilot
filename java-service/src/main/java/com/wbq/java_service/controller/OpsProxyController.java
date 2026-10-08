@@ -1,8 +1,10 @@
 package com.wbq.java_service.controller;
 
 import java.util.Map;
+import java.util.List;
 
 import com.wbq.java_service.client.PythonAiClient;
+import com.wbq.java_service.auth.AuthSupport;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,6 +28,7 @@ public class OpsProxyController {
 
     @GetMapping("/rag/overview")
     public Map<String, Object> ragOverview() {
+        AuthSupport.requireUser();
         return pythonAiClient.getRagOverview();
     }
 
@@ -35,11 +38,13 @@ public class OpsProxyController {
             @RequestParam(defaultValue = "0") int offset,
             @RequestParam(required = false) String outcome
     ) {
+        AuthSupport.requireUser();
         return pythonAiClient.listRagTraces(limit, offset, outcome);
     }
 
     @GetMapping("/rag-traces/{traceId}")
     public Map<String, Object> getRagTrace(@PathVariable int traceId) {
+        AuthSupport.requireUser();
         return pythonAiClient.getRagTrace(traceId);
     }
 
@@ -49,11 +54,13 @@ public class OpsProxyController {
             @RequestParam(defaultValue = "0") int offset,
             @RequestParam(required = false) String route
     ) {
+        AuthSupport.requireUser();
         return pythonAiClient.listAsknumTraces(limit, offset, route);
     }
 
     @GetMapping("/asknum-traces/{traceId}")
     public Map<String, Object> getAsknumTrace(@PathVariable int traceId) {
+        AuthSupport.requireUser();
         return pythonAiClient.getAsknumTrace(traceId);
     }
 
@@ -103,6 +110,32 @@ public class OpsProxyController {
         return pythonAiClient.listIngestJobs(limit, offset, status, targetType);
     }
 
+    @GetMapping("/ingest/batches")
+    public Map<String, Object> listIngestBatches(
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(defaultValue = "0") int offset,
+            @RequestParam(required = false) String status,
+            @RequestParam(value = "parser_backend", required = false) String parserBackend,
+            @RequestParam(required = false) String keyword
+    ) {
+        return pythonAiClient.listIngestBatches(limit, offset, status, parserBackend, keyword);
+    }
+
+    @PostMapping("/ingest/batches")
+    public Map<String, Object> startIngestBatch(@RequestBody Map<String, Object> body) {
+        return pythonAiClient.startIngestBatch(body);
+    }
+
+    @PostMapping(value = "/ingest/batches/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, Object> uploadIngestBatch(
+            @RequestParam("files") List<MultipartFile> files,
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "parser_backend", required = false) String parserBackend,
+            @RequestParam(value = "use_parse_cache", required = false) Boolean useParseCache
+    ) {
+        return pythonAiClient.uploadIngestBatch(files, title, parserBackend, useParseCache);
+    }
+
     @GetMapping("/ingest/jobs/{jobId}")
     public Map<String, Object> getIngestJob(@PathVariable String jobId) {
         return pythonAiClient.getIngestJob(jobId);
@@ -124,16 +157,6 @@ public class OpsProxyController {
             @RequestParam(required = false) String status
     ) {
         return pythonAiClient.listSessionIngestDocuments(limit, offset, status);
-    }
-
-    @GetMapping("/logs/events")
-    public Map<String, Object> listLogEvents(
-            @RequestParam(defaultValue = "50") int limit,
-            @RequestParam(defaultValue = "0") int offset,
-            @RequestParam(required = false) String source,
-            @RequestParam(required = false) String level
-    ) {
-        return pythonAiClient.listLogEvents(limit, offset, source, level);
     }
 
     @GetMapping("/quality/gates")

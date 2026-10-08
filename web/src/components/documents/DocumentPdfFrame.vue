@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
-import { documentContentUrl } from '../../api/documents'
+import { documentViewerPage } from '../../api/documents'
+import { fetchDocumentPdf } from '../../api/documentPdf'
 
 const props = defineProps<{
   docId: string
@@ -11,40 +12,57 @@ const props = defineProps<{
 const loadError = ref<string | null>(null)
 const checking = ref(true)
 let abortController: AbortController | null = null
+let requestId = 0
+const objectUrl = ref<string | null>(null)
 
-const pdfSrc = computed(() => documentContentUrl(props.docId, props.page))
+const pdfSrc = computed(() => {
+  if (!objectUrl.value) return ''
+  return props.page && props.page > 0 ? `${objectUrl.value}#page=${props.page}` : objectUrl.value
+})
+const viewerHref = computed(() => documentViewerPage(props.docId, props.page))
 
-async function checkDocument() {
-  abortController?.abort()
-  abortController = new AbortController()
-  checking.value = true
-  loadError.value = null
-  try {
-    const response = await fetch(pdfSrc.value, {
-      method: 'HEAD',
-      signal: abortController.signal,
-    })
-    if (!response.ok) {
-      loadError.value = `文档加载失败（HTTP ${response.status}）`
-    }
-  } catch (cause) {
-    if (cause instanceof DOMException && cause.name === 'AbortError') return
-    loadError.value = '无法连接文档服务，请确认 Java BFF (8080) 已启动'
-  } finally {
-    checking.value = false
+function releaseObjectUrl() {
+  if (objectUrl.value) {
+    URL.revokeObjectURL(objectUrl.value)
+    objectUrl.value = null
   }
 }
 
-watch(pdfSrc, () => { void checkDocument() }, { immediate: true })
+async function checkDocument() {
+  const currentRequest = ++requestId
+  abortController?.abort()
+  abortController = new AbortController()
+  releaseObjectUrl()
+  checking.value = true
+  loadError.value = null
+  try {
+    const blob = await fetchDocumentPdf(props.docId, abortController.signal)
+    if (currentRequest !== requestId) return
+    objectUrl.value = URL.createObjectURL(blob)
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === 'AbortError') return
+    if (currentRequest === requestId) {
+      loadError.value = cause instanceof Error ? cause.message : '无法加载年报 PDF'
+    }
+  } finally {
+    if (currentRequest === requestId) checking.value = false
+  }
+}
 
-onBeforeUnmount(() => abortController?.abort())
+watch(() => props.docId, () => { void checkDocument() }, { immediate: true })
+
+onBeforeUnmount(() => {
+  requestId += 1
+  abortController?.abort()
+  releaseObjectUrl()
+})
 </script>
 
 <template>
   <div v-if="checking" class="document-frame-status">正在加载 PDF…</div>
   <div v-else-if="loadError" class="document-frame-status error">
     <p>{{ loadError }}</p>
-    <a :href="pdfSrc" target="_blank" rel="noopener noreferrer">在新标签页尝试打开</a>
+    <a :href="viewerHref" target="_blank" rel="noopener noreferrer">在新标签页尝试打开</a>
   </div>
   <object
     v-else
@@ -55,7 +73,7 @@ onBeforeUnmount(() => abortController?.abort())
   >
     <p class="embed-fallback">
       当前浏览器无法内嵌预览，
-      <a :href="pdfSrc" target="_blank" rel="noopener noreferrer">点击在新标签页打开 PDF</a>
+      <a :href="viewerHref" target="_blank" rel="noopener noreferrer">点击在新标签页打开 PDF</a>
     </p>
   </object>
 </template>

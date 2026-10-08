@@ -91,6 +91,8 @@ async function onDelete(sessionId: string, event: Event) {
         :key="item.id"
         type="button"
         class="page-action primary"
+        :class="{ active: item.path === route.path }"
+        :aria-current="item.path === route.path ? 'page' : undefined"
         :disabled="item.action === 'new-chat' && chatBridge?.busy"
         @click="onItemClick(item)"
       >
@@ -204,6 +206,12 @@ async function onDelete(sessionId: string, event: Event) {
 .page-action.primary:hover:not(:disabled) {
   background: #ecfeff;
   border-color: #99f6e4;
+}
+
+.page-action.active {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+  color: #075985;
 }
 
 .page-action:disabled {

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable
 from urllib.parse import urlencode
 
-from langchain_core.messages import BaseMessage, ToolMessage
+from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 
 
 @dataclass
@@ -217,6 +217,21 @@ def citations_from_messages(messages: Iterable[Any]) -> list[dict[str, Any]]:
         for citation_id, citation in pairs:
             indexed.setdefault(citation_id, citation)
     return [indexed[citation_id] for citation_id in sorted(indexed)]
+
+
+def citations_from_latest_turn(messages: Iterable[Any]) -> list[dict[str, Any]]:
+    """只汇总最后一条用户输入之后的工具证据，避免 checkpoint 旧轮次同号引用串用。"""
+
+    current: list[Any] = []
+    for message in messages:
+        if isinstance(message, HumanMessage) or (
+            isinstance(message, dict)
+            and str(message.get("type") or message.get("role") or "").lower() in {"human", "user"}
+        ):
+            current = []
+        else:
+            current.append(message)
+    return citations_from_messages(current)
 
 
 def citations_from_tool_message(message: Any) -> list[dict[str, Any]]:

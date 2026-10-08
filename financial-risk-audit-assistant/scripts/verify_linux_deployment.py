@@ -51,11 +51,9 @@ def main() -> None:
 
     from agent.backends.local_shell import LocalShellBackend
     from agent.core.settings import (
-        CHECKPOINT_DB_PATH,
-        LANGGRAPH_STORE_DB_PATH,
+        AGENT_DATABASE_URL,
         LOG_DIR,
         PROJECTS_DIR,
-        STORE_DB_PATH,
         WORKSPACE_ROOT,
     )
 
@@ -63,12 +61,11 @@ def main() -> None:
     require_writable_dir("workspace root", WORKSPACE_ROOT)
     for name in ("projects", "skills", "policies", "reviews", "tmp", "logs", "runtimes"):
         require_writable_dir(f"workspace/{name}", WORKSPACE_ROOT / name)
-    require_writable_dir("data dir", STORE_DB_PATH.parent)
     require_writable_dir("log dir", LOG_DIR)
 
-    ok("checkpoint db path", CHECKPOINT_DB_PATH)
-    ok("store db path", STORE_DB_PATH)
-    ok("langgraph store db path", LANGGRAPH_STORE_DB_PATH)
+    if not AGENT_DATABASE_URL.startswith(("postgresql://", "postgres://")):
+        fail("agent database", "AGENT_DATABASE_URL must be a PostgreSQL URL")
+    ok("agent database", "PostgreSQL URL configured (credentials hidden)")
     ok("projects dir", PROJECTS_DIR)
 
     require_command("git", "git")
@@ -78,7 +75,7 @@ def main() -> None:
     else:
         print("[WARN] node not found on PATH; 仅后端部署可忽略，前端构建需要安装 Node.js。")
 
-    for module in ("fastapi", "uvicorn", "deepagents", "langgraph"):
+    for module in ("fastapi", "uvicorn", "deepagents", "langgraph", "psycopg"):
         require_import(module)
 
     backend = LocalShellBackend()

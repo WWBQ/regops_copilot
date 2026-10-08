@@ -52,6 +52,7 @@ public class AiProxyController {
         response.setHeader("X-Accel-Buffering", "no");
         response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
         String resolvedDept = AuthSupport.resolveDept(dept);
-        return output -> pythonAiClient.copyChatStream(request, output, resolvedDept);
+        String userId = AuthSupport.requireUser().publicId().toString();
+        return output -> pythonAiClient.copyChatStream(request, output, resolvedDept, userId);
     }
 }

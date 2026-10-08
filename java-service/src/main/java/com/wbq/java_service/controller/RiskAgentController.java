@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
@@ -48,6 +49,26 @@ public class RiskAgentController {
     @GetMapping("/options")
     public Object options() {
         return client.get("/regops/agent/options", userId());
+    }
+
+    @GetMapping("/monitor/runs")
+    public Object monitorRuns(
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "0") int offset,
+            @RequestParam(required = false, name = "thread_id") String threadId) {
+        if (limit < 1 || limit > 100 || offset < 0) {
+            throw new com.wbq.java_service.exception.PythonAiException(400, "分页参数无效", "bad_request");
+        }
+        String path = "/regops/agent/monitor/runs?limit=" + limit + "&offset=" + offset;
+        if (threadId != null) {
+            path += "&thread_id=" + checkedThreadId(threadId);
+        }
+        return client.get(path, userId());
+    }
+
+    @GetMapping("/monitor/runs/{runId}/trace")
+    public Object monitorRunTrace(@PathVariable UUID runId) {
+        return client.get("/regops/agent/monitor/runs/" + runId + "/trace", userId());
     }
 
     @GetMapping("/threads/{threadId}")

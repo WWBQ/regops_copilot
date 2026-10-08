@@ -22,7 +22,37 @@ defineEmits<{
 const factItems = ref<FinMetricItem[]>([])
 const factLoading = ref(false)
 const factError = ref('')
+const panelWidth = ref(760)
+const resizing = ref(false)
 let factRequestId = 0
+const MIN_PANEL_WIDTH = 380
+
+function startResize(event: PointerEvent) {
+  if (event.button !== 0) return
+  event.preventDefault()
+  const startX = event.clientX
+  const startWidth = panelWidth.value
+  resizing.value = true
+  const previousCursor = document.body.style.cursor
+  const previousUserSelect = document.body.style.userSelect
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+
+  const onMove = (moveEvent: PointerEvent) => {
+    const maxWidth = Math.max(MIN_PANEL_WIDTH, window.innerWidth - 360)
+    const nextWidth = startWidth - (moveEvent.clientX - startX)
+    panelWidth.value = Math.min(maxWidth, Math.max(MIN_PANEL_WIDTH, nextWidth))
+  }
+  const onUp = () => {
+    resizing.value = false
+    document.body.style.cursor = previousCursor
+    document.body.style.userSelect = previousUserSelect
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', onUp)
+  }
+  window.addEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', onUp)
+}
 
 // 兼容合规问答保存的旧 Citation：旧记录没有 kind，只通过 doc_id / href 区分来源。
 const isFacts = computed(() => (
@@ -102,7 +132,19 @@ watch(() => props.citation, () => { void loadFacts() }, { immediate: true })
 </script>
 
 <template>
-  <aside class="risk-evidence-panel" aria-label="引用证据">
+  <aside
+    class="risk-evidence-panel"
+    :class="{ resizing }"
+    :style="{ width: `${panelWidth}px`, flexBasis: `${panelWidth}px` }"
+    aria-label="引用证据"
+  >
+    <button
+      type="button"
+      class="evidence-resize"
+      aria-label="拖动调整预览宽度"
+      title="拖动调整预览宽度"
+      @pointerdown="startResize"
+    />
     <header class="evidence-header">
       <div class="evidence-heading">
         <span class="evidence-kind">{{ isDocument ? '年报证据' : isFacts ? '财务事实' : '引用来源' }}</span>
@@ -163,8 +205,10 @@ watch(() => props.citation, () => { void loadFacts() }, { immediate: true })
 
 <style scoped>
 .risk-evidence-panel {
-  flex: 0 0 min(48%, 760px);
-  min-width: 440px;
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 380px;
+  max-width: none;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -173,6 +217,38 @@ watch(() => props.citation, () => { void loadFacts() }, { immediate: true })
   border-radius: var(--radius);
   background: #fff;
   box-shadow: var(--shadow);
+}
+
+.evidence-resize {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  width: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+}
+
+.evidence-resize::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5px;
+  width: 2px;
+  background: transparent;
+}
+
+.evidence-resize:hover::after,
+.risk-evidence-panel.resizing .evidence-resize::after {
+  background: #14b8a6;
+}
+
+.risk-evidence-panel.resizing :deep(.document-pdf-frame) {
+  pointer-events: none;
 }
 
 .evidence-header {
@@ -263,7 +339,7 @@ watch(() => props.citation, () => { void loadFacts() }, { immediate: true })
 .fact-review { margin: 9px 0 0; padding-top: 8px; border-top: 1px dashed var(--border); color: #92400e; font-size: 12px; }
 .mono { font-family: var(--mono); }
 
-@media (max-width: 1050px) {
-  .risk-evidence-panel { min-width: 380px; flex-basis: 48%; }
+@media (max-width: 800px) {
+  .risk-evidence-panel { min-width: 0; }
 }
 </style>

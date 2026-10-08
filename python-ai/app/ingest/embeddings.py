@@ -33,11 +33,13 @@ class EmbeddingModel:
         device: str = "auto",
         batch_size: int = 16,
         expected_dim: int = EMBEDDING_DIM,
+        local_files_only: bool = True,
     ) -> None:
         self.model_name = model_name
         self.device = device
         self.batch_size = batch_size
         self.expected_dim = expected_dim
+        self.local_files_only = local_files_only
         self._model: SentenceTransformer | None = None
         self._lock = threading.Lock()
 
@@ -66,7 +68,9 @@ class EmbeddingModel:
                 ) from exc
             resolved = self._resolve_device()
             logger.info("loading embedding model=%s device=%s", self.model_name, resolved)
-            self._model = SentenceTransformer(self.model_name, device=resolved)
+            self._model = SentenceTransformer(
+                self.model_name, device=resolved, local_files_only=self.local_files_only,
+            )
             return self._model
 
     def encode(self, texts: list[str]) -> list[list[float]]:
@@ -106,6 +110,7 @@ def get_embedding_model() -> EmbeddingModel:
         device=settings.embedding_device,
         batch_size=settings.embedding_batch_size,
         expected_dim=settings.embedding_dim,
+        local_files_only=settings.embedding_local_files_only,
     )
 
 
@@ -129,4 +134,5 @@ def build_embedder_from_settings(settings: Settings) -> EmbeddingModel:
         device=settings.embedding_device,
         batch_size=settings.embedding_batch_size,
         expected_dim=settings.embedding_dim,
+        local_files_only=settings.embedding_local_files_only,
     )

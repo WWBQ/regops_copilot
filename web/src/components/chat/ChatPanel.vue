@@ -6,7 +6,17 @@ import { SERVICE_HEALTH_KEY } from '../../composables/useServiceHealth'
 import { getModels, streamChat } from '../../api/chat'
 import { ApiRequestError, formatUserFacingError } from '../../api/client'
 import {
-  ensureSessionId,
+  deleteStoredChat,
+  getStoredChat,
+  importLocalChats,
+  listStoredChats,
+  renameStoredChat,
+  saveStoredChat,
+  toSessionMeta,
+  type ChatSnapshot,
+} from '../../api/chatHistory'
+import { useAuth } from '../../composables/useAuth'
+import {
   getStoredSessionId,
   listSessionDocuments,
   startNewSession,
@@ -17,21 +27,16 @@ import {
 } from '../../api/sessions'
 import {
   createWelcomeMessage,
-  clearChatMessages,
   loadChatMessages,
-  saveChatMessages,
   loadPendingAsknum,
   savePendingAsknum,
 } from '../../utils/chatStorage'
 import {
   defaultNewChatTitle,
   deriveSessionTitle,
-  listChatSessions,
   rebuildChatSessionsFromStorage,
-  removeChatSession,
-  renameChatSession,
-  upsertChatSession,
 } from '../../utils/chatSessions'
+import type { ChatSessionMeta } from '../../composables/chatBridge'
 import { loadStoredModel, storeModel } from '../../utils/models'
 import { estimateTokens, resolveCompletionTokens } from '../../utils/tokens'
 import ChatInput from './ChatInput.vue'
@@ -51,6 +56,7 @@ const emit = defineEmits<{
 }>()
 
 const chatBridge = inject(CHAT_BRIDGE_KEY, null)
+const { user } = useAuth()
 const health = inject(SERVICE_HEALTH_KEY, null)
 const javaOk = computed(() => health?.javaOk.value ?? props.backendOk)
 const pythonOk = computed(() => health?.pythonOk.value ?? props.backendOk)
@@ -68,6 +74,11 @@ const availableModels = ref<string[]>([])
 const selectedModel = ref('')
 const connectionAlert = ref<string | null>(null)
 const activeEvidence = ref<Citation | null>(null)
+const storedSessions = ref<ChatSessionMeta[]>([])
+const historyReady = ref(false)
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+let pendingSnapshot: ChatSnapshot | null = null
+let saveQueue: Promise<void> = Promise.resolve()
 
 const pendingRequest = ref<PendingAsknum | null>(null)
 
@@ -130,15 +141,12 @@ async function scrollToBottom() {
   }
 }
 
-function touchSessionMeta(options?: { touchUpdatedAt?: boolean; moveToFront?: boolean }) {
-  if (!sessionId.value) {
+function touchSessionMeta() {
+  if (!sessionId.value || !historyReady.value) {
     return
   }
-  const existing = listChatSessions().find((item) => item.sessionId === sessionId.value)
-  const touchUpdatedAt = options?.touchUpdatedAt ?? true
-  const updatedAt = touchUpdatedAt
-    ? new Date().toISOString()
-    : (existing?.updatedAt ?? new Date().toISOString())
+  const existing = storedSessions.value.find((item) => item.sessionId === sessionId.value)
+  const updatedAt = new Date().toISOString()
   const userSent = messages.value.some((item) => item.role === 'user' && item.content.trim())
   const title = existing?.customTitle
     ? existing.title
@@ -146,16 +154,50 @@ function touchSessionMeta(options?: { touchUpdatedAt?: boolean; moveToFront?: bo
       ? deriveSessionTitle(messages.value)
       : (existing?.title ?? defaultNewChatTitle(updatedAt))
 
-  upsertChatSession(
-    {
-      sessionId: sessionId.value,
-      title,
-      updatedAt,
-      customTitle: existing?.customTitle,
-    },
-    { moveToFront: options?.moveToFront ?? false },
-  )
+  const meta = { sessionId: sessionId.value, title, updatedAt, customTitle: existing?.customTitle }
+  storedSessions.value = [meta, ...storedSessions.value.filter((item) => item.sessionId !== meta.sessionId)]
   syncChatBridge()
+}
+
+function currentSnapshot(): ChatSnapshot | null {
+  if (!historyReady.value || !sessionId.value) return null
+  const meta = storedSessions.value.find((item) => item.sessionId === sessionId.value)
+  if (!meta) return null
+  return {
+    sessionId: sessionId.value,
+    title: meta.title,
+    customTitle: Boolean(meta.customTitle),
+    messages: messages.value.slice(-200).map(({ streaming: _streaming, statusText: _status, ...message }) => message),
+  }
+}
+
+function enqueueSave(snapshot: ChatSnapshot): Promise<void> {
+  saveQueue = saveQueue.catch(() => undefined).then(async () => {
+    await saveStoredChat(snapshot)
+    if (connectionAlert.value?.startsWith('对话保存失败：')) connectionAlert.value = null
+  }).catch((error) => {
+    connectionAlert.value = `对话保存失败：${formatUserFacingError(error)}`
+  })
+  return saveQueue
+}
+
+function scheduleSave() {
+  pendingSnapshot = currentSnapshot()
+  if (!pendingSnapshot) return
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => { void flushSave() }, 350)
+}
+
+async function flushSave() {
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = null
+  if (pendingSnapshot) {
+    const snapshot = pendingSnapshot
+    pendingSnapshot = null
+    await enqueueSave(snapshot)
+  } else {
+    await saveQueue
+  }
 }
 
 function syncChatBridge() {
@@ -166,7 +208,7 @@ function syncChatBridge() {
     ready: true,
     busy: loading.value || uploading.value,
     activeSessionId: sessionId.value ?? '',
-    sessions: listChatSessions(),
+    sessions: storedSessions.value,
     newChat: handleNewChat,
     switchSession: handleSwitchSession,
     deleteSession: handleDeleteSession,
@@ -208,27 +250,45 @@ function onModelChange(model: string) {
 
 async function initSession() {
   try {
-    rebuildChatSessionsFromStorage()
-    sessionId.value = await ensureSessionId()
-    pendingRequest.value = loadPendingAsknum(sessionId.value)
-    const restored = loadChatMessages(sessionId.value)
-    if (restored) {
-      messages.value = restored.map((item) => ({ ...item, streaming: false, statusText: undefined }))
+    const currentUserId = user.value?.id
+    if (!currentUserId) throw new Error('请先登录')
+    // 每个浏览器只把它自己的旧缓存导入一次，且绝不覆盖数据库中已有的会话。
+    const ownerKey = 'regops_chat_legacy_import_owner'
+    const migratedKey = `regops_chat_legacy_migrated:${currentUserId}`
+    if (localStorage.getItem(ownerKey) === null || localStorage.getItem(ownerKey) === currentUserId) {
+      if (localStorage.getItem(migratedKey) !== '1') {
+        const legacy = rebuildChatSessionsFromStorage().map((item) => ({
+          sessionId: item.sessionId,
+          title: item.title,
+          customTitle: Boolean(item.customTitle),
+          updatedAt: item.updatedAt,
+          messages: loadChatMessages(item.sessionId) ?? [],
+        })).filter((item) => item.messages.some((message) => message.role === 'user'))
+        if (legacy.length) await importLocalChats(legacy)
+        localStorage.setItem(ownerKey, currentUserId)
+        localStorage.setItem(migratedKey, '1')
+      }
     }
-    touchSessionMeta({ touchUpdatedAt: false })
+    storedSessions.value = (await listStoredChats()).map(toSessionMeta)
+    historyReady.value = true
+    const preferred = getStoredSessionId()
+    const chosen = storedSessions.value.find((item) => item.sessionId === preferred) ?? storedSessions.value[0]
+    if (!chosen) {
+      await handleNewChat()
+      return
+    }
+    suppressSessionMeta.value = true
+    const restored = await getStoredChat(chosen.sessionId)
+    sessionId.value = chosen.sessionId
+    storeSessionId(chosen.sessionId)
+    messages.value = restored.messages.map((item) => ({ ...item, streaming: false, statusText: undefined }))
+    if (!messages.value.length) messages.value = [createWelcomeMessage()]
+    suppressSessionMeta.value = false
+    pendingRequest.value = loadPendingAsknum(chosen.sessionId)
     await refreshSessionDocs()
     syncChatBridge()
   } catch (error) {
-    if (error instanceof ApiRequestError && (error.status === 502 || error.status === 504)) {
-      sessionId.value = getStoredSessionId()
-      if (sessionId.value) {
-        const restored = loadChatMessages(sessionId.value)
-        if (restored) {
-          messages.value = restored.map((item) => ({ ...item, streaming: false, statusText: undefined }))
-        }
-      }
-      return
-    }
+    suppressSessionMeta.value = false
     const detail = formatUserFacingError(error)
     messages.value.push({
       id: uid(),
@@ -243,14 +303,19 @@ async function handleNewChat() {
   if (loading.value || uploading.value) {
     return
   }
-  touchSessionMeta({ touchUpdatedAt: true })
   try {
-    sessionId.value = await startNewSession()
+    await flushSave()
+    const newId = await startNewSession()
+    const at = new Date().toISOString()
+    await saveStoredChat({ sessionId: newId, title: defaultNewChatTitle(at), customTitle: false, messages: [createWelcomeMessage()] })
+    suppressSessionMeta.value = true
+    sessionId.value = newId
     activeEvidence.value = null
     rememberPending(sessionId.value, null)
     messages.value = [createWelcomeMessage()]
+    suppressSessionMeta.value = false
     sessionDocs.value = []
-    touchSessionMeta({ touchUpdatedAt: true, moveToFront: true })
+    storedSessions.value = [{ sessionId: newId, title: defaultNewChatTitle(at), updatedAt: at }, ...storedSessions.value]
     await scrollToBottom()
     syncChatBridge()
   } catch (error) {
@@ -274,32 +339,45 @@ async function handleSwitchSession(targetSessionId: string) {
   ) {
     return
   }
-  storeSessionId(targetSessionId)
-  activeEvidence.value = null
-  sessionId.value = targetSessionId
-  pendingRequest.value = loadPendingAsknum(targetSessionId)
-  suppressSessionMeta.value = true
-  messages.value = (loadChatMessages(targetSessionId) ?? [createWelcomeMessage()]).map((item) => ({
-    ...item,
-    streaming: false,
-    statusText: undefined,
-  }))
-  suppressSessionMeta.value = false
-  await refreshSessionDocs()
-  await scrollToBottom()
-  syncChatBridge()
+  try {
+    await flushSave()
+    const stored = await getStoredChat(targetSessionId)
+    storeSessionId(targetSessionId)
+    activeEvidence.value = null
+    suppressSessionMeta.value = true
+    sessionId.value = targetSessionId
+    pendingRequest.value = loadPendingAsknum(targetSessionId)
+    messages.value = (stored.messages.length ? stored.messages : [createWelcomeMessage()]).map((item) => ({
+      ...item,
+      streaming: false,
+      statusText: undefined,
+    }))
+    suppressSessionMeta.value = false
+    await refreshSessionDocs()
+    await scrollToBottom()
+    syncChatBridge()
+  } catch (error) {
+    suppressSessionMeta.value = false
+    connectionAlert.value = `加载对话失败：${formatUserFacingError(error)}`
+  }
 }
 
 async function handleDeleteSession(targetSessionId: string) {
   if (loading.value || uploading.value) {
     return
   }
-  removeChatSession(targetSessionId)
-  clearChatMessages(targetSessionId)
+  if (targetSessionId === sessionId.value) await flushSave()
+  try {
+    await deleteStoredChat(targetSessionId)
+  } catch (error) {
+    connectionAlert.value = `删除对话失败：${formatUserFacingError(error)}`
+    return
+  }
+  storedSessions.value = storedSessions.value.filter((item) => item.sessionId !== targetSessionId)
 
   if (sessionId.value === targetSessionId) {
     sessionId.value = null
-    const remaining = listChatSessions()
+    const remaining = storedSessions.value
     if (remaining.length > 0) {
       await handleSwitchSession(remaining[0].sessionId)
     } else {
@@ -310,9 +388,15 @@ async function handleDeleteSession(targetSessionId: string) {
   syncChatBridge()
 }
 
-function handleRenameSession(targetSessionId: string, title: string) {
-  renameChatSession(targetSessionId, title)
-  syncChatBridge()
+async function handleRenameSession(targetSessionId: string, title: string) {
+  try {
+    if (targetSessionId === sessionId.value) await flushSave()
+    const saved = await renameStoredChat(targetSessionId, title)
+    storedSessions.value = storedSessions.value.map((item) => item.sessionId === targetSessionId ? toSessionMeta(saved) : item)
+    syncChatBridge()
+  } catch (error) {
+    connectionAlert.value = `重命名失败：${formatUserFacingError(error)}`
+  }
 }
 
 function statusLabel(status: SessionDocument['status']): string {
@@ -340,6 +424,14 @@ async function handleAttach(file: File) {
     await initSession()
   }
   if (!sessionId.value) {
+    connectionAlert.value = '无法创建会话，请恢复连接后重试。'
+    return
+  }
+  if (!sessionId.value) {
+    connectionAlert.value = '会话数据库不可用，请稍后重试。'
+    return
+  }
+  if (!sessionId.value) {
     return
   }
 
@@ -353,6 +445,9 @@ async function handleAttach(file: File) {
     tokenCount: estimateTokens(file.name),
   })
   await scrollToBottom()
+
+  await nextTick()
+  await flushSave()
 
   const progressMsgId = uid()
   messages.value.push({
@@ -437,6 +532,7 @@ async function handleSend(text: string) {
     statusText: '正在回复…',
   })
   await scrollToBottom()
+  await flushSave()
 
   const patchAssistant = (partial: Partial<ChatMessageType>) => {
     const index = messages.value.findIndex((item) => item.id === assistantId)
@@ -534,6 +630,8 @@ async function handleSend(text: string) {
       abortRef.value = null
     }
     loading.value = false
+    await nextTick()
+    await flushSave()
     await scrollToBottom()
   }
 }
@@ -549,6 +647,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   abortRef.value?.abort()
+  void flushSave()
   if (chatBridge) {
     chatBridge.value.ready = false
   }
@@ -556,10 +655,10 @@ onUnmounted(() => {
 
 watch(
   messages,
-  (value) => {
+  () => {
     if (sessionId.value && !suppressSessionMeta.value) {
-      saveChatMessages(sessionId.value, value)
-      touchSessionMeta({ touchUpdatedAt: true })
+      touchSessionMeta()
+      scheduleSave()
     }
     void scrollToBottom()
   },
@@ -574,7 +673,7 @@ watch(
     const blocked = connectionBlockedMessage()
     if (javaOk.value === false || pythonOk.value === false) {
       connectionAlert.value = blocked
-    } else if (javaOk.value === true) {
+    } else if (javaOk.value === true && !connectionAlert.value?.startsWith('对话保存失败：')) {
       connectionAlert.value = null
     }
   },
@@ -625,7 +724,7 @@ watch(
         <div v-if="connectionAlert" class="connection-alert" :class="{ warn: pythonDown && javaOk }" role="alert">
           <p>{{ connectionAlert }}</p>
           <p v-if="pythonDown && javaOk" class="alert-links">
-            <router-link to="/compliance/audit">审计追踪</router-link>
+            <router-link to="/ops/health">查看系统健康</router-link>
           </p>
           <button type="button" class="alert-close" aria-label="关闭" @click="connectionAlert = null">×</button>
         </div>
@@ -691,9 +790,9 @@ watch(
   gap: 16px;
   margin: 0 auto;
 }
-.compliance-workspace.with-evidence { max-width: 1680px; }
+.compliance-workspace.with-evidence { max-width: none; }
 .compliance-chat-panel { min-height: 0; }
-.with-evidence .compliance-chat-panel { max-width: none; margin: 0; }
+.with-evidence .compliance-chat-panel { flex: 1; min-width: 320px; max-width: none; margin: 0; }
 
 .session-tag {
   margin-left: 8px;

@@ -89,6 +89,7 @@ class LocalSqliteStore:
               started_at TEXT NOT NULL,
               finished_at TEXT,
               error TEXT,
+              user_question TEXT,
               FOREIGN KEY(thread_id) REFERENCES threads(thread_id)
             );
 
@@ -103,6 +104,19 @@ class LocalSqliteStore:
               updated_at TEXT NOT NULL,
               FOREIGN KEY(thread_id) REFERENCES threads(thread_id)
             );
+
+            CREATE TABLE IF NOT EXISTS agent_trace_events (
+              id TEXT PRIMARY KEY,
+              run_id TEXT NOT NULL,
+              thread_id TEXT NOT NULL,
+              phase TEXT NOT NULL,
+              label TEXT NOT NULL,
+              status TEXT NOT NULL,
+              started_at TEXT NOT NULL,
+              finished_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_agent_trace_run_time
+              ON agent_trace_events(run_id, started_at);
 
             CREATE TABLE IF NOT EXISTS thread_messages (
               message_id TEXT PRIMARY KEY,
@@ -192,6 +206,7 @@ class LocalSqliteStore:
             """
             )
             self._ensure_column("threads", "user_prompt", "TEXT")
+            self._ensure_column("runs", "user_question", "TEXT")
             self._conn.commit()
 
     @staticmethod
@@ -311,19 +326,22 @@ class LocalSqliteStore:
         status: str,
         error: str | None = None,
         finished: bool = False,
+        user_question: str | None = None,
     ) -> None:
         with self._lock:
             now = utc_now()
+            question = user_question.strip()[:2000] if user_question and user_question.strip() else None
             self._conn.execute(
                 """
-                INSERT INTO runs (run_id, thread_id, status, started_at, finished_at, error)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO runs (run_id, thread_id, status, started_at, finished_at, error, user_question)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(run_id) DO UPDATE SET
                   status=excluded.status,
                   finished_at=excluded.finished_at,
-                  error=excluded.error
+                  error=excluded.error,
+                  user_question=COALESCE(excluded.user_question, runs.user_question)
                 """,
-                (run_id, thread_id, status, now, now if finished else None, error),
+                (run_id, thread_id, status, now, now if finished else None, error, question),
             )
             self._conn.commit()
 
@@ -375,6 +393,72 @@ class LocalSqliteStore:
                 (thread_id,),
             ).fetchall()
             return [dict(row) for row in rows]
+
+    def upsert_agent_trace_event(
+        self, *, event_id: str, run_id: str, thread_id: str,
+        phase: str, label: str, status: str,
+    ) -> None:
+        """持久化 run 级别轨迹；只存简短标签，不存原始工具参数或输出。"""
+
+        if phase not in {"user", "model", "tool", "subagent"}:
+            raise ValueError("invalid trace phase")
+        if status not in {"running", "completed", "failed"}:
+            raise ValueError("invalid trace status")
+        with self._lock:
+            now = utc_now()
+            self._conn.execute(
+                """
+                INSERT INTO agent_trace_events
+                  (id, run_id, thread_id, phase, label, status, started_at, finished_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  status=excluded.status, finished_at=excluded.finished_at
+                """,
+                (event_id, run_id, thread_id, phase, label[:200], status, now,
+                 now if status != "running" else None),
+            )
+            self._conn.commit()
+
+    def get_agent_run_trace(self, *, run_id: str, owner_prefix: str) -> dict[str, Any] | None:
+        """只允许会话所有者读取轨迹。旧 run 没有轨迹时返回空列表。"""
+
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT r.run_id, r.thread_id, r.status, r.started_at, r.finished_at, r.error,
+                       t.title AS session_title,
+                       COALESCE(NULLIF(TRIM(r.user_question), ''),
+                         (SELECT e.label FROM agent_trace_events e
+                          WHERE e.run_id = r.run_id AND e.phase = 'user'
+                          ORDER BY e.started_at, e.id LIMIT 1),
+                         '历史运行（未记录问题）') AS title
+                FROM runs r JOIN threads t ON t.thread_id = r.thread_id
+                WHERE r.run_id = ? AND substr(r.thread_id, 1, ?) = ?
+                """, (run_id, len(owner_prefix), owner_prefix),
+            ).fetchone()
+            if row is None:
+                return None
+            events = self._conn.execute(
+                """
+                SELECT id, phase, label, status, started_at, finished_at
+                FROM agent_trace_events
+                WHERE run_id = ? AND thread_id = ?
+                ORDER BY started_at, id LIMIT 500
+                """, (run_id, row["thread_id"]),
+            ).fetchall()
+        return {**dict(row), "events": [dict(event) for event in events]}
+
+    def fail_open_agent_trace_events(self, *, run_id: str) -> None:
+        """运行异常退出时关闭仍在进行的阶段，避免界面永久显示运行中。"""
+
+        with self._lock:
+            self._conn.execute(
+                """
+                UPDATE agent_trace_events SET status = 'failed', finished_at = ?
+                WHERE run_id = ? AND status = 'running'
+                """, (utc_now(), run_id),
+            )
+            self._conn.commit()
 
     def clear_run_events(self, thread_id: str) -> None:
         """清空某个 thread 的临时过程事件。
@@ -596,6 +680,90 @@ class LocalSqliteStore:
             ).fetchone()
             return self._row_to_dict(row)
 
+    def list_run_monitor(
+        self, *, owner_prefix: str, limit: int = 50, offset: int = 0,
+        thread_id: str | None = None,
+    ) -> dict[str, Any]:
+        """只返回当前用户的运行摘要，可按会话筛选；逐轮标题不复用会话标题。"""
+
+        with self._lock:
+            run_filter = "substr(r.thread_id, 1, ?) = ?"
+            run_params: tuple[Any, ...] = (len(owner_prefix), owner_prefix)
+            if thread_id is not None:
+                run_filter += " AND r.thread_id = ?"
+                run_params += (thread_id,)
+            sessions = self._conn.execute(
+                """
+                SELECT t.thread_id, t.title, COUNT(r.run_id) AS run_count,
+                       MAX(r.started_at) AS latest_run_at
+                FROM threads t JOIN runs r ON r.thread_id = t.thread_id
+                WHERE substr(t.thread_id, 1, ?) = ?
+                GROUP BY t.thread_id, t.title
+                ORDER BY latest_run_at DESC
+                """, (len(owner_prefix), owner_prefix),
+            ).fetchall()
+            summary = self._conn.execute(
+                f"""
+                SELECT COUNT(*) AS total,
+                       SUM(CASE WHEN r.status = 'completed' THEN 1 ELSE 0 END) AS completed,
+                       SUM(CASE WHEN r.status = 'failed' THEN 1 ELSE 0 END) AS failed,
+                       SUM(CASE WHEN r.status = 'running' THEN 1 ELSE 0 END) AS running,
+                       AVG(CASE WHEN r.finished_at IS NOT NULL THEN
+                           {self._duration_ms_sql()}
+                       END) AS avg_duration_ms
+                FROM runs r
+                WHERE {run_filter}
+                """,
+                run_params,
+            ).fetchone()
+            rows = self._conn.execute(
+                f"""
+                SELECT r.run_id, r.thread_id, r.status, r.started_at,
+                       r.finished_at, r.error, t.title AS session_title,
+                       COALESCE(NULLIF(TRIM(r.user_question), ''),
+                         (SELECT e.label FROM agent_trace_events e
+                          WHERE e.run_id = r.run_id AND e.phase = 'user'
+                          ORDER BY e.started_at, e.id LIMIT 1),
+                         '历史运行（未记录问题）') AS title
+                FROM runs r
+                JOIN threads t ON t.thread_id = r.thread_id
+                WHERE {run_filter}
+                ORDER BY r.started_at DESC, r.run_id DESC
+                LIMIT ? OFFSET ?
+                """,
+                (*run_params, limit, offset),
+            ).fetchall()
+
+        items = []
+        for row in rows:
+            item = dict(row)
+            item["duration_ms"] = None
+            if item["finished_at"]:
+                try:
+                    started = datetime.fromisoformat(item["started_at"])
+                    finished = datetime.fromisoformat(item["finished_at"])
+                    item["duration_ms"] = max(0, round((finished - started).total_seconds() * 1000))
+                except ValueError:
+                    pass
+            items.append(item)
+        return {
+            "total": int(summary["total"]),
+            "limit": limit,
+            "offset": offset,
+            "sessions": [dict(session) for session in sessions],
+            "summary": {
+                "completed": int(summary["completed"] or 0),
+                "failed": int(summary["failed"] or 0),
+                "running": int(summary["running"] or 0),
+                "avg_duration_ms": round(summary["avg_duration_ms"] or 0),
+            },
+            "items": items,
+        }
+
+    @staticmethod
+    def _duration_ms_sql() -> str:
+        return "(julianday(r.finished_at) - julianday(r.started_at)) * 86400000"
+
     def delete_thread(self, thread_id: str) -> bool:
         """删除一个 dashboard 会话及其业务附属记录。
 
@@ -614,6 +782,7 @@ class LocalSqliteStore:
             self._conn.execute("DELETE FROM thread_plans WHERE thread_id = ?", (thread_id,))
             self._conn.execute("DELETE FROM thread_messages WHERE thread_id = ?", (thread_id,))
             self._conn.execute("DELETE FROM run_events WHERE thread_id = ?", (thread_id,))
+            self._conn.execute("DELETE FROM agent_trace_events WHERE thread_id = ?", (thread_id,))
             self._conn.execute("DELETE FROM runs WHERE thread_id = ?", (thread_id,))
             self._conn.execute("DELETE FROM threads WHERE thread_id = ?", (thread_id,))
             self._conn.commit()

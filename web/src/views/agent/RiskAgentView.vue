@@ -384,9 +384,9 @@ onBeforeUnmount(() => {
   gap: 16px;
   margin: 0 auto;
 }
-.risk-agent-workspace.with-evidence { max-width: 1680px; }
+.risk-agent-workspace.with-evidence { max-width: none; }
 .risk-agent-panel { min-height: 0; }
-.with-evidence .risk-agent-panel { max-width: none; margin: 0; }
+.with-evidence .risk-agent-panel { flex: 1; min-width: 320px; max-width: none; margin: 0; }
 .risk-welcome { margin: auto; text-align: center; color: var(--muted); max-width: 500px; }
 .risk-welcome h2 { color: var(--text-strong); font-size: 18px; margin-bottom: 8px; }
 .risk-error { margin: 0 0 10px; padding: 10px 14px; border: 1px solid #fecaca; border-radius: 10px; background: #fef2f2; color: #991b1b; }

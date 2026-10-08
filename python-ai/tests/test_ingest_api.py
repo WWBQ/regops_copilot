@@ -102,3 +102,68 @@ async def test_get_ingest_job_not_found(monkeypatch):
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/ops/ingest/jobs/11111111-1111-1111-1111-111111111111")
     assert response.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_batch_upload_creates_one_queue_message(ingest_client: AsyncClient, monkeypatch):
+    from app.ingest import router
+
+    published = []
+    created = []
+
+    @contextmanager
+    def fake_conn():
+        yield MagicMock()
+
+    def fake_create_batch(_conn, **values):
+        created.append(values)
+        return "11111111-1111-1111-1111-111111111111", ["job-1", "job-2"]
+
+    monkeypatch.setattr(router, "get_connection", fake_conn)
+    monkeypatch.setattr(router, "create_batch", fake_create_batch)
+    monkeypatch.setattr(router, "enqueue_batch", published.append)
+    response = await ingest_client.post(
+        "/ingest/batches/upload",
+        files=[
+            ("files", ("a.pdf", b"%PDF-1.4 one", "application/pdf")),
+            ("files", ("b.pdf", b"%PDF-1.4 two", "application/pdf")),
+        ],
+        data={"title": "年度批量解析", "parser_backend": "docling"},
+    )
+    assert response.status_code == 202, response.text
+    assert response.json()["total_files"] == 2
+    assert len(created) == 1
+    assert len(created[0]["doc_ids"]) == 2
+    assert published == ["11111111-1111-1111-1111-111111111111"]
+
+
+@pytest.mark.anyio
+async def test_batch_publish_failure_marks_files_failed(ingest_client: AsyncClient, monkeypatch):
+    from app.ingest import router
+
+    failed = []
+
+    @contextmanager
+    def fake_conn():
+        yield MagicMock()
+
+    def unavailable(_batch_id):
+        raise ConnectionError("broker down")
+
+    monkeypatch.setattr(router, "get_connection", fake_conn)
+    monkeypatch.setattr(
+        router, "create_batch",
+        lambda *_a, **_k: ("11111111-1111-1111-1111-111111111111", ["job-1", "job-2"]),
+    )
+    monkeypatch.setattr(router, "enqueue_batch", unavailable)
+    monkeypatch.setattr(router, "update_job_status", lambda *_a, **values: failed.append(values))
+    response = await ingest_client.post(
+        "/ingest/batches/upload",
+        files=[
+            ("files", ("a.pdf", b"%PDF-1.4 one", "application/pdf")),
+            ("files", ("b.pdf", b"%PDF-1.4 two", "application/pdf")),
+        ],
+    )
+    assert response.status_code == 503
+    assert [item["job_id"] for item in failed] == ["job-1", "job-2"]
+    assert all(item["status"] == "FAILED" for item in failed)

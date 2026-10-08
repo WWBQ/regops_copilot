@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.db.chunk_repository import delete_chunks, insert_chunks
 from app.db.connection import get_connection
 from app.db.ingest_job_repository import create_job, update_job_status
-from app.db.pdf_document_repository import infer_doc_id, upsert_pdf_document
+from app.db.pdf_document_repository import DocumentRecord, get_pdf_document, infer_doc_id, upsert_pdf_document
 from app.documents.service import DocumentService
 from app.ingest.chunker import TextChunk, chunk_page_blocks
 from app.ingest.cleaner import clean_page_blocks
@@ -65,6 +65,15 @@ def _ensure_job(job_id: str | None, doc_id: str) -> str:
         created = create_job(conn, target_type="pdf", target_doc_id=doc_id, status="PENDING")
         conn.commit()
     return created
+
+
+def _source_filename(pdf_path: Path, doc_id: str, existing: DocumentRecord | None) -> str:
+    filename = pdf_path.name
+    if existing is not None and filename == Path(existing.object_key).name:
+        filename = existing.source_filename
+    if not filename or filename.startswith("sha256:"):
+        return f"{doc_id}.pdf"
+    return filename
 
 
 def _parse_or_load(
@@ -135,8 +144,11 @@ def ingest_pdf_to_vectors(
     doc_service = _build_document_service()
 
     try:
+        with get_connection() as conn:
+            existing = get_pdf_document(conn, resolved_doc_id)
+        source_filename = _source_filename(pdf_path, resolved_doc_id, existing)
         body = pdf_path.read_bytes()
-        upload = doc_service.upload_pdf(body, pdf_path.name, doc_id=resolved_doc_id)
+        upload = doc_service.upload_pdf(body, source_filename, doc_id=resolved_doc_id)
 
         _set_job_status(job_id, "PARSING")
         blocks, parse_cached = _parse_or_load(
@@ -160,7 +172,7 @@ def ingest_pdf_to_vectors(
         chunks: list[TextChunk] = chunk_page_blocks(
             blocks,
             doc_id=resolved_doc_id,
-            source_file=pdf_path.name,
+            source_file=source_filename,
             content_hash=upload.content_hash,
             parser_backend=selected_parser,
             chunk_size=chunk_size,
@@ -182,6 +194,7 @@ def ingest_pdf_to_vectors(
                 conn,
                 doc_id=resolved_doc_id,
                 pdf_path=pdf_path,
+                source_filename=source_filename,
                 content_hash=upload.content_hash,
                 bucket=upload.bucket,
                 object_key=upload.object_key,

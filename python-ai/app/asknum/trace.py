@@ -8,6 +8,7 @@ from typing import Any
 
 from app.db.asknum_trace_repository import insert_asknum_trace
 from app.db.connection import get_connection
+from app.request_id import current_regops_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,11 @@ class AsknumTrace:
     total_ms: float = 0.0
     request_id: str | None = None
     session_id: str | None = None
+    user_id: str | None = None
 
 
 def save_asknum_trace(trace: AsknumTrace) -> int | None:
+    trace.user_id = current_regops_user_id()
     try:
         with get_connection() as conn:
             row_id = insert_asknum_trace(conn, trace)

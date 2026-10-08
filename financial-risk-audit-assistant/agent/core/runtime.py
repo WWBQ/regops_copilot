@@ -33,7 +33,7 @@ from agent.core.repo_memory import ensure_repo_memory_initialized, repo_project_
 from agent.core.repo_memory_update import RepoMemoryUpdate, update_repo_memory_from_text
 from agent.core.settings import PROJECTS_DIR, WORKSPACE_ROOT
 from agent.core.streaming_runtime import run_agent_with_event_stream
-from agent.financial.citations import citations_from_messages
+from agent.financial.citations import citations_from_latest_turn
 from agent.financial.risk_result import answer_hash, parse_risk_audit_output
 from agent.core.task_intent import classify_task_kind, is_pull_only_task, is_workspace_listing_task
 from agent.server import get_agent
@@ -608,7 +608,7 @@ def run_workspace_listing_task(*, repo_url: str, prompt: str, thread_id: str | N
     store.clear_run_events(thread_id)
     # run_id 区分同一个 thread 内的多轮运行，前端实时事件依赖它避免跨轮覆盖。
     run_id = str(uuid.uuid4())
-    store.record_run(run_id=run_id, thread_id=thread_id, status="running")
+    store.record_run(run_id=run_id, thread_id=thread_id, status="running", user_question=prompt)
     workspace = Workspace(WORKSPACE_ROOT)
     backend = LocalShellBackend(workspace)
     try:
@@ -700,7 +700,7 @@ def run_pull_only_task(*, repo_url: str | None, prompt: str, thread_id: str | No
     store = get_store()
     store.clear_run_events(thread_id)
     run_id = str(uuid.uuid4())
-    store.record_run(run_id=run_id, thread_id=thread_id, status="running")
+    store.record_run(run_id=run_id, thread_id=thread_id, status="running", user_question=prompt)
     repo = parse_gitee_repo_url(repo_url)
     workspace = Workspace(WORKSPACE_ROOT)
     backend = LocalShellBackend(workspace)
@@ -822,7 +822,9 @@ def run_plan_response_task(
         latest_run_status="running",
     )
     run_id = str(uuid.uuid4())
-    store.record_run(run_id=run_id, thread_id=thread_id, status="running")
+    store.record_run(
+        run_id=run_id, thread_id=thread_id, status="running", user_question=revision_prompt or prompt
+    )
     record_event(thread_id, "agent", "构建方案生成 Agent", status="in_progress")
     # 方案任务也使用 DeepAgent，是因为它需要读取仓库结构、测试方式、关键文件等上下文。
     # 但 task_kind 固定为 planning，中间件和工具权限会保持只读。
@@ -836,6 +838,7 @@ def run_plan_response_task(
             agent=agent,
             thread_id=thread_id,
             run_id=run_id,
+            user_preview=revision_prompt or prompt,
             content=_build_plan_user_content(
                 repo_url=repo.clone_url if repo else None,
                 prompt=_plan_source_prompt(previous_plan_message, prompt)
@@ -993,7 +996,7 @@ def run_agent_task(
     )
     # 每轮 Agent 执行都有独立 run_id。前端事件列表按 run_id 追加，不能复用上一轮 id。
     run_id = str(uuid.uuid4())
-    store.record_run(run_id=run_id, thread_id=thread_id, status="running")
+    store.record_run(run_id=run_id, thread_id=thread_id, status="running", user_question=display_prompt)
     logger.info("业务 Store 已记录运行：thread_id=%s run_id=%s", thread_id, run_id)
     record_event(thread_id, "agent", "构建 Agent 运行图", status="in_progress")
     # get_agent 会根据 config 注入 backend、tools、skills、middleware 和系统提示词。
@@ -1013,6 +1016,8 @@ def run_agent_task(
             agent=agent,
             thread_id=thread_id,
             run_id=run_id,
+            model_id=model_id,
+            user_preview=display_prompt,
             content=_build_agent_user_content(
                 repo_url=repo.clone_url if repo else None,
                 task_kind=task_kind,
@@ -1030,7 +1035,7 @@ def run_agent_task(
         final_answer = _extract_final_assistant_text(messages)
         if task_kind == "financial_audit" and final_answer:
             final_answer = _localize_financial_stop_message(final_answer)
-        citations = citations_from_messages(messages) if task_kind == "financial_audit" else []
+        citations = citations_from_latest_turn(messages) if task_kind == "financial_audit" else []
         risk_result = None
         if task_kind == "financial_audit" and final_answer:
             final_answer, parsed_result, structure_error = parse_risk_audit_output(

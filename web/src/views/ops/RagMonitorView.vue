@@ -95,15 +95,6 @@ onMounted(refresh)
     <header class="head">
       <div>
         <h1>RAG 检索监控</h1>
-        <p>
-          记录<strong>合规问答</strong>每次真实提问的检索 trace（你在首页问了几次，这里就有几条）。
-          与<strong>评估报告</strong>的 100 题黄金集批量评测不是同一回事。
-        </p>
-        <p class="head-link">
-          <router-link to="/ops/eval">→ 跑 100 题 RAG 检索评测、查看完整报告</router-link>
-          ·
-          <router-link to="/ops/asknum">问数监控</router-link>
-        </p>
       </div>
       <div class="head-actions">
         <select v-model="outcomeFilter" class="select" @change="refresh">
@@ -231,19 +222,6 @@ onMounted(refresh)
   color: var(--text-muted);
   font-size: 14px;
   line-height: 1.5;
-}
-
-.head-link {
-  margin-top: 8px !important;
-}
-
-.head-link a {
-  color: #2563eb;
-  text-decoration: none;
-}
-
-.head-link a:hover {
-  text-decoration: underline;
 }
 
 .head-actions {

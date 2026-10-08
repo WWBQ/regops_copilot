@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.wbq.java_service.config.AppProperties;
+import com.wbq.java_service.auth.AuthSupport;
 import com.wbq.java_service.dto.chat.ChatRequest;
 import com.wbq.java_service.dto.chat.ChatResponse;
 import com.wbq.java_service.dto.documents.ViewerUrlResponse;
@@ -124,6 +125,11 @@ public class PythonAiClient {
     }
 
     public void copyChatStream(ChatRequest request, OutputStream output, String dept) {
+        var user = AuthSupport.currentOrNull();
+        copyChatStream(request, output, dept, user == null ? null : user.publicId().toString());
+    }
+
+    public void copyChatStream(ChatRequest request, OutputStream output, String dept, String userId) {
         try {
             String json = objectMapper.writeValueAsString(request);
             String base = properties.pythonAi().baseUrl();
@@ -139,6 +145,9 @@ public class PythonAiClient {
             applyCorrelation(builder);
             if (dept != null && !dept.isBlank()) {
                 builder.header("X-Regops-Dept", dept);
+            }
+            if (userId != null && !userId.isBlank()) {
+                builder.header("X-Regops-User", userId);
             }
             var python = properties.pythonAi();
             if (python.serviceName() != null && !python.serviceName().isBlank()) {
@@ -488,6 +497,59 @@ public class PythonAiClient {
                 .body(MAP_TYPE));
     }
 
+    public Map<String, Object> listIngestBatches(
+            int limit, int offset, String status, String parserBackend, String keyword
+    ) {
+        return exchange(() -> restClient.get()
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/ops/ingest/batches")
+                            .queryParam("limit", limit).queryParam("offset", offset);
+                    if (status != null && !status.isBlank()) builder.queryParam("status", status);
+                    if (parserBackend != null && !parserBackend.isBlank()) builder.queryParam("parser_backend", parserBackend);
+                    if (keyword != null && !keyword.isBlank()) builder.queryParam("keyword", keyword);
+                    return builder.build();
+                })
+                .headers(this::forwardRequestId)
+                .retrieve().body(MAP_TYPE));
+    }
+
+    public Map<String, Object> startIngestBatch(Map<String, Object> body) {
+        return exchange(() -> restClient.post()
+                .uri("/ingest/batches")
+                .headers(this::forwardRequestId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body).retrieve().body(MAP_TYPE));
+    }
+
+    public Map<String, Object> uploadIngestBatch(
+            List<MultipartFile> files, String title, String parserBackend, Boolean useParseCache
+    ) {
+        try {
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            for (MultipartFile file : files) {
+                String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "upload.pdf";
+                body.add("files", new ByteArrayResource(file.getBytes()) {
+                    @Override
+                    public String getFilename() {
+                        return filename;
+                    }
+                });
+            }
+            if (title != null && !title.isBlank()) body.add("title", title);
+            if (parserBackend != null && !parserBackend.isBlank()) body.add("parser_backend", parserBackend);
+            if (useParseCache != null) body.add("use_parse_cache", String.valueOf(useParseCache));
+            return exchange(() -> restClient.post()
+                    .uri("/ingest/batches/upload")
+                    .headers(this::forwardRequestId)
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(body).retrieve().body(MAP_TYPE));
+        } catch (PythonAiException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw PythonErrorMapper.fromTransport(ex);
+        }
+    }
+
     public Map<String, Object> getIngestJob(String jobId) {
         return exchange(() -> restClient.get()
                 .uri("/ops/ingest/jobs/{jobId}", jobId)
@@ -690,29 +752,6 @@ public class PythonAiClient {
         return proxyGetBytes("/labeling/tasks/{taskId}/html/{idx}", taskId, idx);
     }
 
-    public Map<String, Object> listLogEvents(Integer limit, Integer offset, String source, String level) {
-        return exchange(() -> restClient.get()
-                .uri(uriBuilder -> {
-                    var builder = uriBuilder.path("/ops/logs/events");
-                    if (limit != null) {
-                        builder.queryParam("limit", limit);
-                    }
-                    if (offset != null) {
-                        builder.queryParam("offset", offset);
-                    }
-                    if (source != null && !source.isBlank()) {
-                        builder.queryParam("source", source);
-                    }
-                    if (level != null && !level.isBlank()) {
-                        builder.queryParam("level", level);
-                    }
-                    return builder.build();
-                })
-                .headers(this::forwardRequestId)
-                .retrieve()
-                .body(MAP_TYPE));
-    }
-
     private ResponseEntity<byte[]> proxyGetBytes(String path, Object... uriVars) {
         ResponseEntity<byte[]> downstream = exchange(() -> restClient.get()
                 .uri(path, uriVars)
@@ -780,6 +819,10 @@ public class PythonAiClient {
         }
         if (dept != null && !dept.isBlank()) {
             headers.set("X-Regops-Dept", dept);
+        }
+        var user = AuthSupport.currentOrNull();
+        if (user != null) {
+            headers.set("X-Regops-User", user.publicId().toString());
         }
         headers.remove(HttpHeaders.AUTHORIZATION);
     }

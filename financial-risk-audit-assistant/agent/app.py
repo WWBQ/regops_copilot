@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from agent.core.logging_config import configure_logging
@@ -27,6 +29,15 @@ configure_logging()
 # 使用 # noqa: E402 忽略 flake8 关于导入顺序的警告，
 # 因为此处必须等环境变量和日志配置初始化完成后才能导入路由模块。
 from agent.api import health_router, risk_agent_router  # noqa: E402
+from agent.core.graph import close_persistence  # noqa: E402
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    try:
+        yield
+    finally:
+        close_persistence()
 
 # ---------------------------------------------------------------
 # 创建 FastAPI 应用实例
@@ -34,6 +45,7 @@ from agent.api import health_router, risk_agent_router  # noqa: E402
 app = FastAPI(
     title="金融风险审计助手 API",  # 应用名称
     version="0.1.0",                     # 应用版本号
+    lifespan=lifespan,
 )
 
 # ---------------------------------------------------------------

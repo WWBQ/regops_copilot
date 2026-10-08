@@ -22,6 +22,7 @@ from typing import Any
 from langchain_core.messages import BaseMessage
 
 from agent.core.events import record_event
+from agent.core.graph import get_store
 from agent.core.middleware.run_limits import AgentRunLimitExceeded, AgentRunLimitTracker
 from agent.tools.gitee_api import mask_token
 
@@ -30,6 +31,25 @@ logger = logging.getLogger("agent.run.streaming")
 # 由 FastAPI SSE 层传入的事件回调。
 # streaming_runtime 不直接依赖 Response/EventSource，只把解析出的业务事件往外抛。
 StreamEventSink = Callable[[str, dict[str, Any]], None]
+
+
+def _trace(run_id: str, thread_id: str, key: str, phase: str, label: str, status: str) -> None:
+    """监控写入不能影响 Agent 主流程；原始参数与模型正文绝不写入轨迹。"""
+
+    try:
+        get_store().upsert_agent_trace_event(
+            event_id=f"{run_id}:{key}", run_id=run_id, thread_id=thread_id,
+            phase=phase, label=label, status=status,
+        )
+    except Exception:
+        logger.exception("Agent 轨迹写入失败：run_id=%s phase=%s", run_id, phase)
+
+
+def _trace_tool_name(value: Any) -> str:
+    """工具名称只允许普通标识符，防止把参数/令牌误写进监控表。"""
+
+    name = str(value or "unknown")
+    return name[:80] if re.fullmatch(r"[\w.:-]{1,80}", name) else "unknown"
 
 
 def _safe_attr(value: Any, name: str, default: Any = None) -> Any:
@@ -514,6 +534,8 @@ def _record_subagent(thread_id: str, run_id: str, subagent: Any, index: int) -> 
         status=event_status,
         detail=_stringify(path, limit=500) or None,
     )
+    _trace(run_id, thread_id, f"subagent:{index}", "subagent", _trace_tool_name(name),
+           "completed" if event_status == "completed" else "failed" if event_status == "error" else "running")
 
 
 def _consume_raw_event_stream(
@@ -521,6 +543,7 @@ def _consume_raw_event_stream(
     stream: Any,
     thread_id: str,
     run_id: str,
+    model_id: str | None = None,
     task_kind: str | None = None,
     event_sink: StreamEventSink | None = None,
 ) -> tuple[int, int]:
@@ -558,6 +581,9 @@ def _consume_raw_event_stream(
     write_todo_last_payload_by_call: dict[str, str] = {}
     saw_write_todos = False
     limit_tracker = AgentRunLimitTracker(task_kind=task_kind)
+    active_tools: dict[str, str] = {}
+    tool_trace_index = 0
+    model_label = f"模型输出 · {model_id or '默认模型'}"
 
     for event in stream:
         # 每个 raw event 都先交给保护器计数。它可以识别模型调用过多、工具循环等异常。
@@ -577,6 +603,7 @@ def _consume_raw_event_stream(
                     )
                 assistant_message_index += 1
                 current_assistant_index = assistant_message_index
+                _trace(run_id, thread_id, f"model:{current_assistant_index}", "model", model_label, "running")
                 current_assistant_text = ""
                 last_flushed_length = 0
                 continue
@@ -591,6 +618,8 @@ def _consume_raw_event_stream(
                         event_sink=event_sink,
                     )
                 current_assistant_index = 0
+                if assistant_message_index:
+                    _trace(run_id, thread_id, f"model:{assistant_message_index}", "model", model_label, "completed")
                 current_assistant_text = ""
                 last_flushed_length = 0
                 continue
@@ -601,6 +630,7 @@ def _consume_raw_event_stream(
                 # 有些模型流不会显式给 content-block-start，这里按第一个 delta 自动开块。
                 assistant_message_index += 1
                 current_assistant_index = assistant_message_index
+                _trace(run_id, thread_id, f"model:{current_assistant_index}", "model", model_label, "running")
                 current_assistant_text = ""
                 last_flushed_length = 0
             current_assistant_text += delta
@@ -662,6 +692,9 @@ def _consume_raw_event_stream(
         if tool_call is not None:
             # 老版本/其它事件流形态可能把工具调用放在 method=tool_calls。
             tool_call_index += 1
+            proposed_tool_name = _trace_tool_name(_safe_field(tool_call, "tool_name") or _safe_field(tool_call, "name"))
+            _trace(run_id, thread_id, f"model:tool-request:{tool_call_index}", "model",
+                   f"模型请求工具 · {proposed_tool_name}", "completed")
             if _record_write_todos(thread_id, run_id, tool_call, tool_call_index):
                 saw_write_todos = True
                 continue
@@ -677,6 +710,19 @@ def _consume_raw_event_stream(
         if tool_event is not None:
             # method=tools 是另一种工具生命周期事件。这里主要用于补充 write_todos 状态。
             tool_name = str(tool_event.get("tool_name") or "")
+            lifecycle = str(tool_event.get("event") or "")
+            call_id = str(tool_event.get("tool_call_id") or tool_event.get("id") or "")
+            safe_name = _trace_tool_name(tool_name)
+            if lifecycle == "tool-started":
+                tool_trace_index += 1
+                trace_key = f"tool:{tool_trace_index}"
+                active_tools[call_id or safe_name] = trace_key
+                _trace(run_id, thread_id, trace_key, "tool", safe_name, "running")
+            elif lifecycle in {"tool-finished", "tool-failed", "tool-error"}:
+                trace_key = active_tools.pop(call_id or safe_name, None)
+                if trace_key:
+                    _trace(run_id, thread_id, trace_key, "tool", safe_name,
+                           "completed" if lifecycle == "tool-finished" else "failed")
             if tool_name == "write_todos":
                 saw_write_todos = True
                 call_id = str(tool_event.get("tool_call_id") or "write_todos")
@@ -712,6 +758,10 @@ def _consume_raw_event_stream(
             current_assistant_text,
             event_sink=event_sink,
         )
+    if current_assistant_index:
+        _trace(run_id, thread_id, f"model:{current_assistant_index}", "model", model_label, "completed")
+    for trace_key in active_tools.values():
+        _trace(run_id, thread_id, trace_key, "tool", "工具调用", "failed")
     return tool_call_index if saw_write_todos else 0, subagent_index
 
 
@@ -721,6 +771,8 @@ def run_agent_with_event_stream(
     thread_id: str,
     run_id: str,
     content: str,
+    model_id: str | None = None,
+    user_preview: str | None = None,
     task_kind: str | None = None,
     event_sink: StreamEventSink | None = None,
 ) -> dict[str, Any]:
@@ -739,7 +791,10 @@ def run_agent_with_event_stream(
         version="v3",
         config={"configurable": {"thread_id": thread_id}},
     )
-    record_event(thread_id, "model", "调用 deepseek-v4-pro", kind="other", status="in_progress")
+    model_label = f"调用 {model_id or '默认模型'}"
+    if user_preview:
+        _trace(run_id, thread_id, "user", "user", user_preview[:160], "completed")
+    record_event(thread_id, "model", model_label, kind="other", status="in_progress")
     # raw protocol events 是当前版本里唯一能拿到 token/chunk 的通道。
     # 这里同时解析 text-delta 和 write_todos 的 tool_call_chunk，保证正文和任务计划都能流式更新。
     try:
@@ -747,23 +802,29 @@ def run_agent_with_event_stream(
             stream=stream,
             thread_id=thread_id,
             run_id=run_id,
+            model_id=model_id,
             task_kind=task_kind,
             event_sink=event_sink,
         )
-    except AgentRunLimitExceeded as exc:
-        record_event(
-            thread_id,
-            "agent:run-limit",
-            "达到运行保护上限",
-            kind="other",
-            status="error",
-            detail=str(exc),
-        )
-        record_event(thread_id, "model", "调用 deepseek-v4-pro", kind="other", status="error", detail=str(exc))
+    except Exception as exc:
+        if isinstance(exc, AgentRunLimitExceeded):
+            record_event(
+                thread_id,
+                "agent:run-limit",
+                "达到运行保护上限",
+                kind="other",
+                status="error",
+                detail=str(exc),
+            )
+        try:
+            get_store().fail_open_agent_trace_events(run_id=run_id)
+        except Exception:
+            logger.exception("关闭 Agent 轨迹失败：run_id=%s", run_id)
+        record_event(thread_id, "model", model_label, kind="other", status="error", detail=str(exc))
         raise
 
     output = stream.output
-    record_event(thread_id, "model", "调用 deepseek-v4-pro", kind="other", status="completed")
+    record_event(thread_id, "model", model_label, kind="other", status="completed")
     logger.info(
         "官方事件流消费完成：thread_id=%s tool_calls=%s subagents=%s",
         thread_id,

@@ -70,6 +70,54 @@ class RiskAgentControllerTest {
     }
 
     @Test
+    void agentMonitorRequiresLoginAndForwardsCurrentUser() throws Exception {
+        mvc.perform(get("/api/risk-agent/monitor/runs"))
+                .andExpect(status().isUnauthorized());
+
+        authenticate();
+        String path = "/regops/agent/monitor/runs?limit=20&offset=0";
+        when(client.get(path, USER_ID)).thenReturn(Map.of("total", 0, "items", List.of()));
+        mvc.perform(get("/api/risk-agent/monitor/runs?limit=20")
+                        .header("Authorization", "Bearer valid"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0));
+        verify(client).get(path, USER_ID);
+    }
+
+    @Test
+    void agentMonitorFiltersByValidatedThreadId() throws Exception {
+        authenticate();
+        String threadId = USER_ID + "_11111111-1111-1111-1111-111111111111";
+        String path = "/regops/agent/monitor/runs?limit=50&offset=0&thread_id=" + threadId;
+        when(client.get(path, USER_ID)).thenReturn(Map.of("total", 1, "items", List.of()));
+        mvc.perform(get("/api/risk-agent/monitor/runs")
+                        .param("thread_id", threadId)
+                        .header("Authorization", "Bearer valid"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1));
+        verify(client).get(path, USER_ID);
+        mvc.perform(get("/api/risk-agent/monitor/runs")
+                        .param("thread_id", "bad&offset=0")
+                        .header("Authorization", "Bearer valid"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void agentTraceRequiresLoginAndForwardsCurrentUser() throws Exception {
+        String runId = "11111111-1111-1111-1111-111111111111";
+        String path = "/regops/agent/monitor/runs/" + runId + "/trace";
+        mvc.perform(get("/api/risk-agent/monitor/runs/" + runId + "/trace"))
+                .andExpect(status().isUnauthorized());
+        authenticate();
+        when(client.get(path, USER_ID)).thenReturn(Map.of("run_id", runId, "events", List.of()));
+        mvc.perform(get("/api/risk-agent/monitor/runs/" + runId + "/trace")
+                        .header("Authorization", "Bearer valid"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.run_id").value(runId));
+        verify(client).get(path, USER_ID);
+    }
+
+    @Test
     void healthDoesNotExposeAgentFilesystemPaths() throws Exception {
         authenticate();
         when(client.get("/health", USER_ID)).thenReturn(Map.of("ok", true, "project_root", "/private/app"));

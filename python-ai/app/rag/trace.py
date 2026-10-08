@@ -36,6 +36,7 @@ class RagTrace:
     rag_used: bool = False
     request_id: str | None = None
     session_id: str | None = None
+    user_id: str | None = None
     keyword_terms: list[str] = field(default_factory=list)
     scoped_doc_ids: list[str] = field(default_factory=list)
     vector_hit_count: int = 0

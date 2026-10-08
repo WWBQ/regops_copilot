@@ -23,6 +23,62 @@ export function getRiskAgentHealth(): Promise<{ ok: boolean }> {
   return apiFetch('/risk-agent/health')
 }
 
+export interface AgentRunItem {
+  run_id: string
+  thread_id: string
+  title: string
+  session_title: string
+  status: string
+  started_at: string
+  finished_at: string | null
+  duration_ms: number | null
+  error: string | null
+}
+
+export interface AgentRunListResponse {
+  total: number
+  limit: number
+  offset: number
+  sessions: Array<{ thread_id: string; title: string; run_count: number; latest_run_at: string }>
+  summary: {
+    completed: number
+    failed: number
+    running: number
+    avg_duration_ms: number
+  }
+  items: AgentRunItem[]
+}
+
+export function listAgentRuns(limit = 50, offset = 0, threadId: string | null = null): Promise<AgentRunListResponse> {
+  const filter = threadId ? `&thread_id=${encodeURIComponent(threadId)}` : ''
+  return apiFetch(`/risk-agent/monitor/runs?limit=${limit}&offset=${offset}${filter}`)
+}
+
+export interface AgentTraceEvent {
+  id: string
+  phase: 'user' | 'model' | 'tool' | 'subagent'
+  label: string
+  status: 'running' | 'completed' | 'failed'
+  started_at: string
+  finished_at: string | null
+}
+
+export interface AgentRunTrace {
+  run_id: string
+  thread_id: string
+  title: string
+  session_title: string
+  status: string
+  started_at: string
+  finished_at: string | null
+  error: string | null
+  events: AgentTraceEvent[]
+}
+
+export function getAgentRunTrace(runId: string): Promise<AgentRunTrace> {
+  return apiFetch(`/risk-agent/monitor/runs/${encodeURIComponent(runId)}/trace`)
+}
+
 export interface RiskAgentOptions {
   models: Array<{ id: string; label: string }>
   default_agent_model: string | null

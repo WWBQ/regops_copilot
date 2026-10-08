@@ -1,17 +1,49 @@
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
+
+import pytest
 
 from app.documents.service import UploadResult
 from app.ingest.chunker import TextChunk
 from app.ingest.models import PageBlock
-from app.ingest.pipeline import IngestResult, ingest_pdf_to_vectors
+from app.ingest.pipeline import IngestResult, _source_filename, ingest_pdf_to_vectors
 
 
-def test_ingest_pdf_to_vectors_writes_job_stages(tmp_path: Path, monkeypatch):
-    pdf = tmp_path / "002594_2024.pdf"
+def test_reingest_uses_original_filename_not_storage_hash():
+    stored_path = Path("/objects/reports/000333_2024/sha256:abc.pdf")
+    original = SimpleNamespace(object_key="reports/000333_2024/sha256:abc.pdf", source_filename="000333_2024_annual.pdf")
+    corrupted = SimpleNamespace(object_key=original.object_key, source_filename="sha256:abc.pdf")
+
+    assert _source_filename(stored_path, "000333_2024", original) == "000333_2024_annual.pdf"
+    assert _source_filename(stored_path, "000333_2024", corrupted) == "000333_2024.pdf"
+    assert _source_filename(Path("/uploads/000333_2024.pdf"), "000333_2024", original) == "000333_2024.pdf"
+
+
+@pytest.mark.parametrize(
+    ("pdf_name", "existing", "expected_filename"),
+    [
+        ("002594_2024.pdf", None, "002594_2024.pdf"),
+        (
+            "sha256:abc.pdf",
+            SimpleNamespace(
+                object_key="reports/002594_2024/sha256:abc.pdf",
+                source_filename="002594_2024_annual.pdf",
+            ),
+            "002594_2024_annual.pdf",
+        ),
+    ],
+)
+def test_ingest_pdf_to_vectors_writes_job_stages(
+    tmp_path: Path, monkeypatch, pdf_name, existing, expected_filename,
+):
+    pdf = tmp_path / pdf_name
     pdf.write_bytes(b"%PDF-1.4 demo")
     statuses: list[str] = []
+    uploaded_names: list[str] = []
+    chunk_names: list[str] = []
+    saved_names: list[str] = []
     block = PageBlock(
         page_no=1,
         text="本集团研发投入约为542亿元。",
@@ -30,7 +62,8 @@ def test_ingest_pdf_to_vectors_writes_job_stages(tmp_path: Path, monkeypatch):
     )
 
     class FakeService:
-        def upload_pdf(self, *_a, **_k):
+        def upload_pdf(self, _body, source_filename, **_k):
+            uploaded_names.append(source_filename)
             return upload
 
         def save_parse_artifact(self, *_a, **_k):
@@ -69,19 +102,22 @@ def test_ingest_pdf_to_vectors_writes_job_stages(tmp_path: Path, monkeypatch):
         lambda *_a, **kwargs: statuses.append(kwargs["status"]),
     )
     monkeypatch.setattr("app.ingest.pipeline.get_connection", fake_conn)
+    monkeypatch.setattr("app.ingest.pipeline.get_pdf_document", lambda *_a: existing)
     monkeypatch.setattr("app.ingest.pipeline.parse_pdf", lambda _p, **_k: [block])
     monkeypatch.setattr("app.ingest.pipeline.clean_page_blocks", lambda blocks: (blocks, None))
-    monkeypatch.setattr(
-        "app.ingest.pipeline.chunk_page_blocks",
-        lambda *_a, **_k: [
-            TextChunk(doc_id="002594_2024", chunk_index=0, content="本集团研发投入", metadata={"page": 1})
-        ],
-    )
+    def fake_chunks(*_a, **kwargs):
+        chunk_names.append(kwargs["source_file"])
+        return [TextChunk(doc_id="002594_2024", chunk_index=0, content="本集团研发投入", metadata={"page": 1})]
+
+    monkeypatch.setattr("app.ingest.pipeline.chunk_page_blocks", fake_chunks)
     monkeypatch.setattr("app.ingest.pipeline.get_embedding_model", lambda: object())
     monkeypatch.setattr("app.ingest.pipeline.embed_texts", lambda *_a, **_k: [[0.1] * 8])
     monkeypatch.setattr("app.ingest.pipeline.delete_chunks", lambda *_a, **_k: 0)
     monkeypatch.setattr("app.ingest.pipeline.insert_chunks", lambda *_a, **_k: 1)
-    monkeypatch.setattr("app.ingest.pipeline.upsert_pdf_document", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        "app.ingest.pipeline.upsert_pdf_document",
+        lambda *_a, **kwargs: saved_names.append(kwargs["source_filename"]),
+    )
     monkeypatch.setattr("app.ingest.pipeline.content_hash", lambda _p: "sha256:abc")
 
     result = ingest_pdf_to_vectors(pdf, doc_id="002594_2024")
@@ -90,6 +126,7 @@ def test_ingest_pdf_to_vectors_writes_job_stages(tmp_path: Path, monkeypatch):
     assert result.chunks == 1
     assert result.parser_backend == "docling"
     assert statuses == ["PARSING", "CLEANING", "CHUNKING", "EMBEDDING", "DONE"]
+    assert uploaded_names == chunk_names == saved_names == [expected_filename]
 
 
 def test_ingest_pdf_to_vectors_marks_failed(tmp_path: Path, monkeypatch):
@@ -115,6 +152,7 @@ def test_ingest_pdf_to_vectors_marks_failed(tmp_path: Path, monkeypatch):
         yield MagicMock()
 
     monkeypatch.setattr("app.ingest.pipeline.get_connection", fake_conn)
+    monkeypatch.setattr("app.ingest.pipeline.get_pdf_document", lambda *_a: None)
 
     try:
         ingest_pdf_to_vectors(pdf, doc_id="002594_2024")

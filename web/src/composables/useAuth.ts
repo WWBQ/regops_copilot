@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 
-import { fetchMe, login as loginApi, type AuthUser } from '../api/auth'
-import { setAuthToken } from '../api/client'
+import { fetchMe, login as loginApi, register as registerApi, type AuthUser } from '../api/auth'
+import { ApiRequestError, setAuthToken } from '../api/client'
 
 const USER_KEY = 'regops_user'
 
@@ -42,6 +42,12 @@ export function useAuth() {
     return result.user
   }
 
+  async function register(username: string, password: string, displayName: string, email: string): Promise<AuthUser> {
+    const result = await registerApi(username, password, displayName, email)
+    persist(result.user, result.token)
+    return result.user
+  }
+
   function logout() {
     persist(null, null)
   }
@@ -51,11 +57,14 @@ export function useAuth() {
       const me = await fetchMe()
       persist(me)
       return me
-    } catch {
-      persist(null, null)
-      return null
+    } catch (error) {
+      if (error instanceof ApiRequestError && [401, 403].includes(error.status)) {
+        persist(null, null)
+        return null
+      }
+      throw error
     }
   }
 
-  return { user, loggedIn, login, logout, refreshMe }
+  return { user, loggedIn, login, register, logout, refreshMe }
 }

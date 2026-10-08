@@ -46,7 +46,7 @@ function openPermissions() {
 function onLogout() {
   logout()
   closeProfile()
-  void router.push('/settings/users')
+  void router.push('/login')
 }
 
 function onDocumentClick(event: MouseEvent) {

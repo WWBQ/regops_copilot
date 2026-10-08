@@ -18,14 +18,6 @@ const lastRequestId = ref<string | null>(null)
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
-const quickLinks = [
-  { label: 'RAG 检索监控', path: '/ops/rag' },
-  { label: '问数监控', path: '/ops/asknum' },
-  { label: '评估报告', path: '/ops/eval' },
-  { label: '解析监控', path: '/ops/ingest' },
-  { label: '日志监控', path: '/ops/logs' },
-]
-
 function statusClass(status: string) {
   if (status === 'ok') return 'tag ok'
   if (status === 'missing' || status === 'down') return 'tag fail'
@@ -141,7 +133,6 @@ onBeforeUnmount(() => {
     <header class="head">
       <div>
         <h1>系统健康</h1>
-        <p>服务探活、语料库、入库任务与 RAG 运行概况；每 30 秒可自动刷新。python-ai 挂了时本页仍显示 Java 探活；复核和审计不依赖问答。</p>
         <p v-if="overview" class="checked-at">上次检查：{{ formatTime(overview.checked_at) }}</p>
         <p v-if="lastRequestId" class="checked-at">最近关联 ID：<code>{{ lastRequestId }}</code></p>
       </div>
@@ -154,21 +145,13 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <nav class="quick-links">
-      <router-link v-for="link in quickLinks" :key="link.path" :to="link.path" class="quick-link">
-        {{ link.label }}
-      </router-link>
-    </nav>
-
     <p v-if="loading && !overview && !bffHealth" class="hint">加载中…</p>
     <p v-if="error" class="error">{{ error }}</p>
     <p
       v-if="bffHealth?.status === 'ok' && bffHealth.pythonAi?.status === 'down'"
       class="degrade-note"
     >
-      python-ai 不可用：问答 / 问数 / 标注会失败。
-      <router-link to="/compliance/audit">审计</router-link>
-      仍走 Java。
+      python-ai 不可用：问答 / 问数 / 标注会失败；此页仍可查看 Java 服务状态。
     </p>
 
     <template v-if="bffHealth || overview">
@@ -224,10 +207,6 @@ onBeforeUnmount(() => {
           <p class="panel-summary">
             累计 trace {{ overview.rag_traces.total }} 条 · 近 24h {{ overview.rag_traces.last_24h }} 条
           </p>
-          <p class="hint rag-note">
-            此处为<strong>真实问答</strong> trace 统计；100 题黄金集批量评测请见
-            <router-link to="/ops/eval">评估报告</router-link>。
-          </p>
           <ul v-if="ragOutcomeRows.length" class="outcome-list">
             <li v-for="row in ragOutcomeRows" :key="row.outcome">
               <span>{{ row.outcome }}</span>
@@ -235,8 +214,6 @@ onBeforeUnmount(() => {
             </li>
           </ul>
           <p v-else class="hint">暂无 RAG trace，去首页提问后会自动记录。</p>
-          <router-link to="/ops/rag" class="panel-link">查看 RAG 检索监控 →</router-link>
-
           <h3 class="sub-title">会话</h3>
           <p class="panel-summary">
             会话 {{ overview.sessions.session_count }} · 待解析上传 {{ overview.sessions.pending_documents }}
@@ -244,7 +221,6 @@ onBeforeUnmount(() => {
 
           <h3 class="sub-title">评测任务</h3>
           <p class="panel-summary">已配置 {{ overview.eval.task_count }} 个任务</p>
-          <router-link to="/ops/eval" class="panel-link">评估报告 →</router-link>
         </section>
       </div>
 
@@ -336,27 +312,6 @@ onBeforeUnmount(() => {
   color: var(--text-muted);
 }
 
-.quick-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.quick-link {
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 13px;
-  color: #2563eb;
-  text-decoration: none;
-  background: var(--surface);
-}
-
-.quick-link:hover {
-  background: #eff6ff;
-}
-
 .stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -424,18 +379,6 @@ onBeforeUnmount(() => {
   margin: 0 0 12px;
   font-size: 13px;
   color: var(--text-muted);
-}
-
-.rag-note {
-  margin-bottom: 12px !important;
-}
-
-.panel-link {
-  display: inline-block;
-  margin-top: 8px;
-  font-size: 13px;
-  color: #2563eb;
-  text-decoration: none;
 }
 
 .outcome-list {

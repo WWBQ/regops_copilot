@@ -28,7 +28,7 @@ CORS 暴露 `X-Request-ID` 和 `traceparent`。Java 日志 `logging.pattern.leve
 
 成本按公开标价估算（DeepSeek / Qwen 量级 USD / 1M tokens），**不是账单**。问数 0 token 也会留一条，Prompt 版本为空。
 
-前端：运维监控 → **LLM Trace**（`GET /api/ops/obs/overview` · `/api/ops/obs/traces`）。
+`/api/ops/obs/overview` 和 `/api/ops/obs/traces` 仍提供合规问答进程内的诊断数据，但不再作为前端监控页。前端 **Agent 监控** 读取 `/api/risk-agent/monitor/runs`，显示金融风险审计助手 Store 中的运行状态、耗时和失败记录；不展示未采集的 Token 或成本。
 
 指标：P95 延迟、流式才有的 TTFT、tokens/s、带 Prompt 版本的占比、估算成本合计。
 

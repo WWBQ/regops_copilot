@@ -124,7 +124,10 @@ def upsert_uploaded_pdf_document(
     meta: dict[str, Any] | None = None,
 ) -> None:
     path = Path(source_filename)
-    company_code, report_year = infer_company_year(path)
+    # 重解析使用对象存储里的哈希文件名；年报身份以稳定的 doc_id 为准。
+    company_code, report_year = infer_company_year(Path(doc_id))
+    if company_code is None:
+        company_code, report_year = infer_company_year(path)
     resolved_type = doc_type or ("annual_report" if company_code and report_year else "uploaded_pdf")
     disclosure_date = disclosure_date_for(doc_id)
     from app.rag.dept_scope import depts_for_company
@@ -221,6 +224,7 @@ def upsert_pdf_document(
     *,
     doc_id: str,
     pdf_path: Path,
+    source_filename: str,
     content_hash: str,
     bucket: str,
     object_key: str,
@@ -231,7 +235,7 @@ def upsert_pdf_document(
     upsert_uploaded_pdf_document(
         conn,
         doc_id=doc_id,
-        source_filename=pdf_path.name,
+        source_filename=source_filename,
         content_type="application/pdf",
         content_hash=content_hash,
         bucket=bucket,

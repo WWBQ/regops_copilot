@@ -8,6 +8,7 @@ import pytest
 from app.ingest.embeddings import (
     EMBEDDING_DIM,
     EmbeddingModel,
+    build_embedder_from_settings,
     embed_text,
     vector_to_pg_literal,
 )
@@ -53,3 +54,27 @@ def test_vector_to_pg_literal():
 
 def test_default_dim_constant():
     assert EMBEDDING_DIM == 1024
+
+
+@pytest.mark.parametrize("local_files_only", [True, False])
+def test_embedding_load_respects_local_files_only(monkeypatch, local_files_only):
+    from types import SimpleNamespace
+    import sentence_transformers
+
+    calls = []
+    fake_model = MagicMock()
+
+    def fake_constructor(model_name, **kwargs):
+        calls.append((model_name, kwargs))
+        return fake_model
+
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", fake_constructor)
+    settings = SimpleNamespace(
+        embedding_model="BAAI/bge-m3", embedding_device="cpu",
+        embedding_batch_size=16, embedding_dim=1024,
+        embedding_local_files_only=local_files_only,
+    )
+    model = build_embedder_from_settings(settings)
+
+    assert model._load() is fake_model
+    assert calls == [("BAAI/bge-m3", {"device": "cpu", "local_files_only": local_files_only})]

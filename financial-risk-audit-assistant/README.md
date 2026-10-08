@@ -45,8 +45,8 @@ flowchart LR
     MCP --> FACTS[财务事实质量门]
     MCP --> RAG[指定 PDF 年报检索]
     GRAPH --> RESULT[引用编号 + RiskAuditResult]
-    RUNTIME --> CP[(checkpoints.sqlite)]
-    RESULT --> STORE[(store.sqlite)]
+    RUNTIME --> CP[(PostgreSQL<br/>LangGraph checkpoint)]
+    RESULT --> STORE[(PostgreSQL agent schema<br/>业务 Store)]
     RESULT --> API
 ```
 
@@ -83,13 +83,14 @@ financial-risk-audit-assistant/
 │   │   ├── runtime.py                 任务、run、最终结果编排
 │   │   ├── streaming_runtime.py       LangGraph V3 事件流适配
 │   │   ├── checkpoint_history.py      历史恢复与机器 JSON 隐藏
-│   │   ├── graph.py · persistence.py  SQLite checkpoint / Store
+│   │   ├── graph.py · persistence.py  PostgreSQL checkpoint / Store
 │   │   └── model.py                   模型目录与 LangChain 初始化
-│   ├── store/sqlite_store.py          运行记录和结构化风险结果
+│   ├── store/postgres_store.py        运行记录和结构化风险结果
+│   ├── store/sqlite_store.py          旧数据迁移及本地测试兼容
 │   ├── prompt.py                      金融边界与结构化输出规则
 │   ├── server.py                      金融 Agent / 通用 Harness 装配
 │   └── skills/                        金融初筛及保留的工程 Skills
-├── data/                               本地 SQLite，Git 忽略
+├── data/                               旧 SQLite 数据；迁移后不再写入
 ├── logs/                               Agent 日志，Git 忽略
 ├── scripts/                            启动、同步 Skills 和验证脚本
 ├── requirements.txt
@@ -98,15 +99,15 @@ financial-risk-audit-assistant/
 
 ## 数据存储
 
-| 文件 / 表 | 内容 |
+| PostgreSQL 表 | 内容 |
 | --- | --- |
-| `data/checkpoints.sqlite` | LangGraph messages、工具调用和图状态；历史正文的权威来源 |
-| `data/store.sqlite` / `threads`、`runs` | 会话摘要和每次运行状态 |
-| `data/store.sqlite` / `risk_audit_results` | 公司、年份、状态、摘要、证据缺口和报告哈希 |
-| `data/store.sqlite` / `risk_audit_findings` | 逐条风险线索及 `pending_review` 状态 |
-| `data/langgraph_store.sqlite` | 通用 Harness 的 StoreBackend；金融事实不从这里读取 |
+| LangGraph `checkpoints` / `checkpoint_blobs` / `checkpoint_writes` | messages、工具调用和图状态；历史正文的权威来源 |
+| `agent.threads`、`agent.runs` | 会话摘要和每次运行状态 |
+| `agent.risk_audit_results` | 公司、年份、状态、摘要、证据缺口和报告哈希 |
+| `agent.risk_audit_findings` | 逐条风险线索及 `pending_review` 状态 |
+| LangGraph `store` | 通用 Harness 的 StoreBackend；金融事实不从这里读取 |
 
-刷新页面时，聊天正文从 checkpoint 恢复，结构化结果按回答哈希关联回对应消息。删除会话时，两套 SQLite 数据会一起清理。
+刷新页面时，聊天正文从 checkpoint 恢复，结构化结果按回答哈希关联回对应消息。删除会话时同步清理业务 Store 和 checkpoint。旧 SQLite 保留为迁移备份，可用 `PYTHONPATH=. .venv/bin/python scripts/migrate_sqlite_to_postgres.py` 重跑幂等导入。
 
 ## 配置
 
@@ -129,6 +130,7 @@ FIN_RISK_WEB_MAX_CALLS_PER_RUN=2
 AGENT_FINANCIAL_AUDIT_MAX_TOOL_CALLS=20
 AGENT_FINANCIAL_AUDIT_MAX_SECONDS=300
 MAIN_MODEL=deepseek-v4-pro
+AGENT_DATABASE_URL=postgresql://regops:password@localhost:5432/regops_db
 ```
 
 - `REGOPS_SERVICE_TOKEN` 必须与 Java BFF、`python-ai` 一致，不能提交到 Git。
@@ -138,7 +140,7 @@ MAIN_MODEL=deepseek-v4-pro
 - `AGENT_FINANCIAL_AUDIT_MAX_TOOL_CALLS` 是整轮 Agent 的工具总预算，默认 20 次；财务事实、年报证据和外部搜索都计入。该值同时用于 Agent 图和运行保护，避免两套阈值互相冲突。
 - Compose 中 MCP 地址使用 `http://python-ai:8000/mcp/`。
 - 模型列表只返回已经配置对应 API Key 的具体型号。
-- `CHECKPOINT_DB_PATH`、`STORE_DB_PATH`、`LANGGRAPH_STORE_DB_PATH` 可覆盖默认 SQLite 路径。
+- `AGENT_DATABASE_URL` 默认继承根目录 `DATABASE_URL`；Compose 会覆盖为容器内 `db:5432`。三个旧 SQLite 路径只供迁移脚本读取。
 
 完整示例见根目录 [`.env.example`](../.env.example)。
 

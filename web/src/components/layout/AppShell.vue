@@ -48,6 +48,9 @@ function onMenuHoverLeave() {
 }
 
 function isActive(item: NavItem): boolean {
+  if (item.id === 'runtime-monitor') {
+    return route.path.startsWith('/ops/monitor')
+  }
   if (item.path === '/') {
     return route.path === '/'
   }
@@ -163,12 +166,10 @@ onUnmounted(() => {
     </header>
 
     <div v-if="javaDown" class="degrade-banner bad" role="status">
-      Java BFF 连不上。登录和审计也会失败。
+      Java BFF 连不上，依赖它的功能暂不可用。
     </div>
     <div v-else-if="pythonDegraded" class="degrade-banner warn" role="status">
-      问答 / 问数暂不可用。
-      <router-link to="/compliance/audit">审计追踪</router-link>
-      仍可用。
+      问答 / 问数暂不可用。请在系统健康页查看服务状态。
     </div>
 
     <div class="shell-body">

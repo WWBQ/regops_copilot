@@ -46,6 +46,7 @@ def load_environment() -> None:
             "FIN_RISK_WEB_TIMEOUT_SECONDS", "FIN_RISK_WEB_CACHE_TTL_SECONDS",
             "FIN_RISK_WEB_MAX_CALLS_PER_RUN",
             "MAIN_MODEL", "REGOPS_SERVICE_TOKEN", "REGOPS_MCP_URL",
+            "DATABASE_URL", "AGENT_DATABASE_URL",
         },
     )
     _load_non_empty_env(LOCAL_ENV, override=True)

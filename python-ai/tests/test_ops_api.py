@@ -7,6 +7,9 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 
+USER_ID = "00000000-0000-0000-0000-000000000001"
+USER_HEADERS = {"X-Regops-User": USER_ID}
+
 
 def _rag_log_ready() -> bool:
     try:
@@ -32,7 +35,7 @@ def anyio_backend():
 @pytest.mark.anyio
 async def test_rag_overview_ok():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.get("/ops/rag/overview")
+        response = await client.get("/ops/rag/overview", headers=USER_HEADERS)
     assert response.status_code == 200
     body = response.json()
     assert "refusal_rate" in body
@@ -62,7 +65,7 @@ requires_asknum_log = pytest.mark.skipif(
 @pytest.mark.anyio
 async def test_list_rag_traces_empty_ok():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.get("/ops/rag-traces?limit=5")
+        response = await client.get("/ops/rag-traces?limit=5", headers=USER_HEADERS)
     assert response.status_code == 200
     body = response.json()
     assert "items" in body
@@ -76,7 +79,8 @@ async def test_list_rag_traces_empty_ok():
 @pytest.mark.anyio
 async def test_list_asknum_traces_ok():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.get("/ops/asknum-traces?limit=5")
+        response = await client.get("/ops/asknum-traces?limit=5", headers=USER_HEADERS)
+
     assert response.status_code == 200
     body = response.json()
     assert "items" in body
@@ -84,3 +88,14 @@ async def test_list_asknum_traces_ok():
     assert "summary" in body
     assert "by_route" in body["summary"]
     assert isinstance(body["items"], list)
+
+
+@pytest.mark.anyio
+async def test_monitor_requires_user_identity():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        for path in (
+            "/ops/rag/overview", "/ops/rag-traces", "/ops/rag-traces/1",
+            "/ops/asknum-traces", "/ops/asknum-traces/1",
+        ):
+            response = await client.get(path)
+            assert response.status_code == 401, path

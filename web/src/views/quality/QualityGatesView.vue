@@ -61,10 +61,6 @@ onMounted(refresh)
     <header class="head">
       <div>
         <h1>质量门 G1 / G2 / G3</h1>
-        <p>
-          F10 结构化三表写入 <code>fin_metric</code> 前过三道门：金额一致性、财务勾稽（R01–R03）、证据溯源。
-          冲突进人工复核，不静默挑数。当前数字源是东方财富 F10 JSON，G3 用 content_hash 而非 PDF bbox。
-        </p>
       </div>
       <div class="actions">
         <button type="button" class="ghost-btn" @click="refresh">刷新</button>
@@ -73,11 +69,6 @@ onMounted(refresh)
         </button>
       </div>
     </header>
-
-    <nav class="quick-links">
-      <router-link to="/quality/facts" class="quick-link">财务事实库</router-link>
-      <router-link to="/ops/ingest" class="quick-link">解析监控</router-link>
-    </nav>
 
     <p v-if="loading && !data" class="hint">加载中…</p>
     <p v-if="error" class="error">{{ error }}</p>
@@ -201,21 +192,6 @@ onMounted(refresh)
   border: 0;
   background: #0f766e;
   color: #fff;
-}
-.quick-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.quick-link {
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 13px;
-  color: #2563eb;
-  text-decoration: none;
-  background: var(--surface);
 }
 .stats {
   display: grid;

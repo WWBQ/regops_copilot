@@ -28,6 +28,7 @@ def test_upsert_pdf_document_writes_disclosure_date(tmp_path: Path):
         conn,
         doc_id="002594_2024",
         pdf_path=pdf,
+        source_filename=pdf.name,
         content_hash="abc",
         bucket="docs",
         object_key="002594_2024.pdf",

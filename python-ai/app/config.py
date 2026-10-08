@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     deepseek_model_ids: str = "deepseek-flash,deepseek-v4-pro"
     qwen_model_ids: str = "qwen3.8-max,qwen3.8-flash,qwen3.7-plus"
     database_url: str = "postgresql://regops:regops123@localhost:5432/regops_db"
+    ingest_broker_url: str = "amqp://regops:regops@localhost:5672//"
+    ingest_result_backend: str = "redis://localhost:6379/1"
     llm_timeout_seconds: float = 120.0
     llm_max_output_tokens: int = Field(default=1400, ge=64, le=32768)
     startup_warmup_enabled: bool = True
@@ -35,6 +37,7 @@ class Settings(BaseSettings):
     embedding_dim: int = 1024
     embedding_batch_size: int = 16
     embedding_device: str = "auto"
+    embedding_local_files_only: bool = True
     rag_min_score: float = 0.42
     rag_top_k: int = 12
     rag_vector_fetch_k: int = 80

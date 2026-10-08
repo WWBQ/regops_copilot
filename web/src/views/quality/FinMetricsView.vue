@@ -69,17 +69,9 @@ function statusClass(value: string) {
     <header class="head">
       <div>
         <h1>财务事实库</h1>
-        <p>
-          <code>fin_metric</code> 直读字段（营业收入、净利润、资产/负债/权益、经营现金流等），单位已归一化到元。
-          不手算 ROE / 毛利率 / EPS。
-        </p>
       </div>
         <button type="button" class="ghost-btn" @click="refresh">刷新</button>
     </header>
-
-    <nav class="quick-links">
-      <router-link to="/quality/gates" class="quick-link">质量门 G1/G2/G3</router-link>
-    </nav>
 
     <div class="filters">
       <select v-model="companyCode" class="filter-select">
@@ -186,20 +178,6 @@ function statusClass(value: string) {
   font-size: 14px;
   cursor: pointer;
   border: 1px solid var(--border);
-  background: var(--surface);
-}
-.quick-links {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.quick-link {
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 13px;
-  color: #2563eb;
-  text-decoration: none;
   background: var(--surface);
 }
 .filters {

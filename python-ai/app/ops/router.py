@@ -17,8 +17,16 @@ from app.db.asknum_trace_repository import (
 )
 from app.db.connection import get_connection
 from app.db.rag_trace_repository import count_rag_traces, get_rag_trace, list_rag_traces
+from app.request_id import current_regops_user_id
 
 router = APIRouter(prefix="/ops", tags=["ops"])
+
+
+def _require_trace_user_id() -> str:
+    user_id = current_regops_user_id()
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="user identity required")
+    return user_id
 
 
 def _serialize_row(row: Any) -> dict[str, Any]:
@@ -47,7 +55,7 @@ def _serialize_row(row: Any) -> dict[str, Any]:
 def rag_overview_api() -> dict[str, Any]:
     from app.ops.rag_service import fetch_rag_overview
 
-    return fetch_rag_overview()
+    return fetch_rag_overview(user_id=_require_trace_user_id())
 
 
 @router.get("/rag-traces")
@@ -58,22 +66,24 @@ def list_rag_trace_api(
 ) -> dict[str, Any]:
     from app.ops.rag_service import fetch_rag_overview
 
+    user_id = _require_trace_user_id()
     with get_connection() as conn:
-        rows = list_rag_traces(conn, limit=limit, offset=offset, outcome=outcome)
-        total = count_rag_traces(conn, outcome=outcome)
+        rows = list_rag_traces(conn, user_id=user_id, limit=limit, offset=offset, outcome=outcome)
+        total = count_rag_traces(conn, user_id=user_id, outcome=outcome)
     return {
         "total": total,
         "limit": limit,
         "offset": offset,
         "items": [_serialize_row(row) for row in rows],
-        "summary": fetch_rag_overview(),
+        "summary": fetch_rag_overview(user_id=user_id),
     }
 
 
 @router.get("/rag-traces/{trace_id}")
 def get_rag_trace_api(trace_id: int) -> dict[str, Any]:
+    user_id = _require_trace_user_id()
     with get_connection() as conn:
-        row = get_rag_trace(conn, trace_id)
+        row = get_rag_trace(conn, trace_id, user_id=user_id)
     if row is None:
         raise HTTPException(status_code=404, detail="rag trace not found")
     return _serialize_row(row)
@@ -104,10 +114,11 @@ def list_asknum_trace_api(
     offset: int = Query(0, ge=0),
     route: str | None = Query(None),
 ) -> dict[str, Any]:
+    user_id = _require_trace_user_id()
     with get_connection() as conn:
-        rows = list_asknum_traces(conn, limit=limit, offset=offset, route=route)
-        total = count_asknum_traces(conn, route=route)
-        summary = summarize_asknum_traces(conn)
+        rows = list_asknum_traces(conn, user_id=user_id, limit=limit, offset=offset, route=route)
+        total = count_asknum_traces(conn, user_id=user_id, route=route)
+        summary = summarize_asknum_traces(conn, user_id=user_id)
     return {
         "total": total,
         "limit": limit,
@@ -119,8 +130,9 @@ def list_asknum_trace_api(
 
 @router.get("/asknum-traces/{trace_id}")
 def get_asknum_trace_api(trace_id: int) -> dict[str, Any]:
+    user_id = _require_trace_user_id()
     with get_connection() as conn:
-        row = get_asknum_trace(conn, trace_id)
+        row = get_asknum_trace(conn, trace_id, user_id=user_id)
     if row is None:
         raise HTTPException(status_code=404, detail="asknum trace not found")
     return _serialize_asknum_row(row)
@@ -138,6 +150,22 @@ def ingest_overview_api() -> dict[str, Any]:
     from app.ops.ingest_service import fetch_ingest_overview
 
     return fetch_ingest_overview()
+
+
+@router.get("/ingest/batches")
+def list_ingest_batches_api(
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    status: str | None = Query(None),
+    parser_backend: str | None = Query(None),
+    keyword: str | None = Query(None, max_length=160),
+) -> dict[str, Any]:
+    from app.ops.ingest_service import list_ingest_batches
+
+    return list_ingest_batches(
+        limit=limit, offset=offset, status=status,
+        parser_backend=parser_backend, keyword=keyword,
+    )
 
 
 @router.get("/ingest/jobs")
@@ -180,18 +208,6 @@ def list_session_ingest_documents_api(
     from app.ops.ingest_service import list_session_ingest_documents
 
     return list_session_ingest_documents(limit=limit, offset=offset, status=status)
-
-
-@router.get("/logs/events")
-def list_log_events_api(
-    limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
-    source: str | None = Query(None),
-    level: str | None = Query(None),
-) -> dict[str, Any]:
-    from app.ops.logs_service import list_log_events
-
-    return list_log_events(limit=limit, offset=offset, source=source, level=level)
 
 
 @router.get("/obs/overview")

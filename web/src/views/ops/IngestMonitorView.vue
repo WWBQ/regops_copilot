@@ -1,34 +1,40 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import {
   getIngestOverview,
   INGEST_STATUS_LABELS,
-  listIngestJobs,
   listSessionIngestDocuments,
-  type IngestJobItem,
+  listIngestBatches,
+  type IngestBatchItem,
   type IngestOverview,
   type SessionIngestDocument,
 } from '../../api/ops'
+import IngestBatchChart from '../../components/ops/IngestBatchChart.vue'
 
 const overview = ref<IngestOverview | null>(null)
-const jobs = ref<IngestJobItem[]>([])
-const jobsTotal = ref(0)
 const sessionDocs = ref<SessionIngestDocument[]>([])
 const sessionTotal = ref(0)
 const loading = ref(true)
 const error = ref('')
-const jobStatusFilter = ref('')
 const sessionStatusFilter = ref('')
+const batches = ref<IngestBatchItem[]>([])
+const batchesTotal = ref(0)
+const batchStatusFilter = ref('')
+const batchParserFilter = ref('')
+const keywordInput = ref('')
+const batchKeyword = ref('')
+const batchOffset = ref(0)
+const batchLimit = 20
+let pollTimer: ReturnType<typeof setInterval> | undefined
+let polling = false
 
-const jobStatusOptions = [
+const batchStatusOptions = [
   { value: '', label: '全部状态' },
-  { value: 'PENDING', label: '待处理' },
-  { value: 'PARSING', label: '解析中' },
-  { value: 'CLEANING', label: '清洗中' },
-  { value: 'CHUNKING', label: '分块中' },
-  { value: 'EMBEDDING', label: '向量化中' },
+  { value: 'QUEUED', label: '排队中' },
+  { value: 'RUNNING', label: '执行中' },
   { value: 'DONE', label: '完成' },
+  { value: 'PARTIAL', label: '部分失败' },
   { value: 'FAILED', label: '失败' },
 ]
 
@@ -62,7 +68,7 @@ function statusLabel(status: string) {
 function statusClass(status: string) {
   if (status === 'ready' || status === 'READY' || status === 'DONE') return 'tag ok'
   if (status === 'failed' || status === 'FAILED') return 'tag fail'
-  if (status === 'processing' || status === 'PROCESSING' || status === 'PENDING') return 'tag warn'
+  if (status === 'processing' || status === 'PROCESSING' || status === 'PENDING' || status === 'QUEUED' || status === 'RUNNING' || status === 'PARTIAL') return 'tag warn'
   if (status === 'PARSING' || status === 'CLEANING' || status === 'CHUNKING' || status === 'EMBEDDING' || status === 'EXTRACTING') {
     return 'tag warn'
   }
@@ -84,15 +90,6 @@ async function refreshOverview() {
   overview.value = await getIngestOverview()
 }
 
-async function refreshJobs() {
-  const response = await listIngestJobs({
-    limit: 50,
-    status: jobStatusFilter.value || undefined,
-  })
-  jobs.value = response.items
-  jobsTotal.value = response.total
-}
-
 async function refreshSessionDocs() {
   const response = await listSessionIngestDocuments({
     limit: 30,
@@ -102,11 +99,55 @@ async function refreshSessionDocs() {
   sessionTotal.value = response.total
 }
 
+async function refreshBatches() {
+  const response = await listIngestBatches({
+    limit: batchLimit, offset: batchOffset.value,
+    status: batchStatusFilter.value || undefined,
+    parser_backend: batchParserFilter.value || undefined,
+    keyword: batchKeyword.value || undefined,
+  })
+  batches.value = response.items
+  batchesTotal.value = response.total
+}
+
+async function pollBatches() {
+  if (polling) return
+  polling = true
+  try { await refreshBatches() }
+  catch (err) { error.value = err instanceof Error ? err.message : '批次状态刷新失败' }
+  finally { polling = false }
+}
+
+function elapsed(batch: IngestBatchItem) {
+  const end = batch.finished_at ? Date.parse(batch.finished_at) : Date.now()
+  const start = Date.parse(batch.started_at ?? batch.created_at)
+  if (!Number.isFinite(end - start)) return '—'
+  const seconds = Math.max(0, Math.round((end - start) / 1000))
+  return seconds >= 60 ? `${Math.floor(seconds / 60)}分${seconds % 60}秒` : `${seconds}秒`
+}
+
+function waitTime(batch: IngestBatchItem) {
+  if (!batch.started_at) return '排队中'
+  const seconds = Math.max(0, Math.round((Date.parse(batch.started_at) - Date.parse(batch.created_at)) / 1000))
+  return `${seconds}秒`
+}
+
+function applyKeyword() {
+  batchKeyword.value = keywordInput.value.trim()
+  batchOffset.value = 0
+  void pollBatches()
+}
+
+function changePage(direction: -1 | 1) {
+  batchOffset.value = Math.max(0, batchOffset.value + direction * batchLimit)
+  void pollBatches()
+}
+
 async function refresh() {
   loading.value = true
   error.value = ''
   try {
-    await Promise.all([refreshOverview(), refreshJobs(), refreshSessionDocs()])
+    await Promise.all([refreshOverview(), refreshSessionDocs(), refreshBatches()])
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载失败'
   } finally {
@@ -114,10 +155,14 @@ async function refresh() {
   }
 }
 
-watch(jobStatusFilter, refreshJobs)
 watch(sessionStatusFilter, refreshSessionDocs)
+watch([batchStatusFilter, batchParserFilter], () => {
+  batchOffset.value = 0
+  void pollBatches()
+})
 
-onMounted(refresh)
+onMounted(() => { void refresh(); pollTimer = setInterval(() => { void pollBatches() }, 3000) })
+onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
 </script>
 
 <template>
@@ -125,23 +170,53 @@ onMounted(refresh)
     <header class="head">
       <div>
         <h1>解析监控</h1>
-        <p>
-          批量年报入库（pdf_document）与会话 PDF 上传（session_document / ingest_job）进度。
-          批量入库走 CLI；合规问答页可上传会话附件。
-        </p>
       </div>
       <button type="button" class="ghost-btn" :disabled="loading" @click="refresh">刷新</button>
     </header>
 
-    <nav class="quick-links">
-      <router-link to="/ops/health" class="quick-link">系统健康</router-link>
-      <router-link to="/ops/rag" class="quick-link">RAG 检索监控</router-link>
-      <router-link to="/ops/asknum" class="quick-link">问数监控</router-link>
-      <router-link to="/ops/logs" class="quick-link">日志监控</router-link>
-    </nav>
-
     <p v-if="loading && !overview" class="hint">加载中…</p>
     <p v-if="error" class="error">{{ error }}</p>
+
+    <section class="panel">
+      <div class="panel-head"><h2>解析任务（{{ batchesTotal }}）</h2><span class="hint">每 3 秒刷新</span></div>
+      <div class="batch-filters">
+        <select v-model="batchStatusFilter" class="filter-select" aria-label="按任务状态筛选">
+          <option v-for="option in batchStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+        <select v-model="batchParserFilter" class="filter-select" aria-label="按解析器筛选">
+          <option value="">全部解析器</option><option value="docling">Docling</option><option value="mineru">MinerU</option>
+        </select>
+        <input v-model="keywordInput" class="filter-input" aria-label="搜索任务或文档" placeholder="任务名、任务 ID 或文档 ID" @keyup.enter="applyKeyword" />
+        <button type="button" class="filter-btn" @click="applyKeyword">搜索</button>
+      </div>
+      <p v-if="!batches.length" class="hint">暂无批量解析任务。</p>
+      <article v-for="batch in batches" :key="batch.batch_id" class="batch-card">
+        <div class="batch-head">
+          <div><h3>{{ batch.title }}</h3><span class="mono">{{ batch.batch_id }}</span></div>
+          <span :class="statusClass(batch.status)">{{ statusLabel(batch.status) }}</span>
+        </div>
+        <p class="batch-meta">{{ batch.total_files }} 份 · {{ batch.parser_backend }} · 创建 {{ formatTime(batch.created_at) }} · 排队 {{ waitTime(batch) }} · 总耗时 {{ elapsed(batch) }}</p>
+        <div class="batch-counts">
+          <span>待处理 {{ batch.counts.pending }}</span><span>处理中 {{ batch.counts.active }}</span>
+          <span>完成 {{ batch.counts.done }}</span><span>失败 {{ batch.counts.failed }}</span>
+        </div>
+        <progress :value="batch.counts.done + batch.counts.failed" :max="batch.total_files" />
+        <span class="hint">{{ Math.round((batch.counts.done + batch.counts.failed) * 100 / batch.total_files) }}% 已处理</span>
+        <IngestBatchChart :events="batch.events" :total="batch.total_files" :live="batch.status === 'QUEUED' || batch.status === 'RUNNING'" />
+        <details><summary>文件阶段与错误明细（{{ batch.files.length }}）</summary>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>文档</th><th>阶段</th><th>更新时间</th><th>失败原因</th></tr></thead>
+            <tbody><tr v-for="file in batch.files" :key="file.job_id">
+              <td class="mono">{{ file.doc_id }}</td><td><span :class="statusClass(file.status)">{{ statusLabel(file.status) }}</span></td>
+              <td>{{ formatTime(file.updated_at) }}</td><td class="error">{{ file.error_message || '—' }}</td>
+            </tr></tbody></table></div>
+        </details>
+      </article>
+      <div v-if="batchesTotal > batchLimit" class="pagination">
+        <span class="hint">第 {{ batchOffset + 1 }}–{{ Math.min(batchOffset + batchLimit, batchesTotal) }} 条 / 共 {{ batchesTotal }} 条</span>
+        <button type="button" :disabled="batchOffset === 0" @click="changePage(-1)">上一页</button>
+        <button type="button" :disabled="batchOffset + batchLimit >= batchesTotal" @click="changePage(1)">下一页</button>
+      </div>
+    </section>
 
     <template v-if="overview">
       <div class="stats">
@@ -156,7 +231,7 @@ onMounted(refresh)
           <p class="stat-sub">含 parse.json 回溯</p>
         </article>
         <article class="stat-card">
-          <p class="stat-label">入库任务</p>
+          <p class="stat-label">文件处理记录</p>
           <p class="stat-value">{{ overview.jobs.total }}</p>
           <p class="stat-sub">进行中 {{ overview.jobs.pending }} · 24h 失败 {{ overview.jobs.failed_24h }}</p>
         </article>
@@ -203,43 +278,7 @@ onMounted(refresh)
         </div>
       </section>
 
-      <div class="grid-2">
-        <section class="panel">
-          <div class="panel-head">
-            <h2>ingest_job（{{ jobsTotal }}）</h2>
-            <select v-model="jobStatusFilter" class="filter-select">
-              <option v-for="opt in jobStatusOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div class="table-wrap">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>job_id</th>
-                  <th>类型</th>
-                  <th>doc_id</th>
-                  <th>状态</th>
-                  <th>重试</th>
-                  <th>更新时间</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="job in jobs" :key="job.job_id">
-                  <td class="mono">{{ job.job_id.slice(0, 8) }}…</td>
-                  <td>{{ job.target_type }}</td>
-                  <td class="mono">{{ job.target_doc_id }}</td>
-                  <td><span :class="statusClass(job.status)">{{ statusLabel(job.status) }}</span></td>
-                  <td>{{ job.retry_count }}</td>
-                  <td>{{ formatTime(job.updated_at) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p v-if="!jobs.length" class="hint">暂无入库任务。</p>
-        </section>
-
+      <div>
         <section class="panel">
           <div class="panel-head">
             <h2>会话上传（{{ sessionTotal }}）</h2>
@@ -305,23 +344,6 @@ onMounted(refresh)
   max-width: 720px;
 }
 
-.quick-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.quick-link {
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 13px;
-  color: #2563eb;
-  text-decoration: none;
-  background: var(--surface);
-}
-
 .stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -367,6 +389,19 @@ onMounted(refresh)
   font-size: 16px;
 }
 
+.batch-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0 16px; }
+.filter-input { min-width: 220px; flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.filter-btn, .pagination button { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer; }
+.pagination { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 14px; }
+.pagination button:disabled { opacity: .5; cursor: default; }
+.batch-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 14px; }
+.batch-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.batch-head h3 { margin: 0 0 4px; font-size: 16px; }
+.batch-meta { color: var(--text-muted); font-size: 12px; }
+.batch-counts { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; margin: 10px 0; }
+.batch-card progress { width: 100%; height: 8px; accent-color: #059669; }
+.batch-card details { margin-top: 12px; }
+
 .panel-head {
   display: flex;
   justify-content: space-between;
@@ -381,12 +416,6 @@ onMounted(refresh)
   border-radius: 8px;
   font-size: 13px;
   background: var(--surface);
-}
-
-.grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
 }
 
 .table-wrap {
@@ -457,8 +486,5 @@ onMounted(refresh)
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .grid-2 {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

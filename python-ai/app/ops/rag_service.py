@@ -16,8 +16,8 @@ def _table_exists(conn, table: str) -> bool:
         return cur.fetchone()[0] is not None
 
 
-def fetch_rag_overview() -> dict[str, Any]:
-    """全库 RAG trace 汇总；拒答率 = 拒答次数 / 有意图检索次数。"""
+def fetch_rag_overview(*, user_id: str) -> dict[str, Any]:
+    """当前用户 RAG trace 汇总；拒答率 = 拒答次数 / 有意图检索次数。"""
     overview: dict[str, Any] = {
         "total": 0,
         "ok_count": 0,
@@ -36,8 +36,10 @@ def fetch_rag_overview() -> dict[str, Any]:
                 """
                 SELECT outcome, COUNT(*)::int, COALESCE(AVG(total_rag_ms), 0)
                 FROM rag_query_log
+                WHERE user_id = %s::uuid
                 GROUP BY outcome
-                """
+                """,
+                (user_id,),
             )
             rows = cur.fetchall()
 

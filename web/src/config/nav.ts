@@ -33,21 +33,11 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: 'compliance',
-    label: '合规业务',
-    items: [
-      { id: 'audit', label: '审计追踪', path: '/compliance/audit', phase: 'W7', enabled: true },
-    ],
-  },
-  {
     id: 'ops',
     label: '运维监控',
     items: [
       { id: 'ingest-monitor', label: '解析监控', path: '/ops/ingest', phase: 'W2-5', enabled: true },
-      { id: 'rag-monitor', label: 'RAG 检索监控', path: '/ops/rag', phase: 'W3', enabled: true },
-      { id: 'asknum-monitor', label: '问数监控', path: '/ops/asknum', phase: 'W4', enabled: true },
-      { id: 'llm-trace', label: 'LLM Trace', path: '/ops/traces', phase: 'W9', enabled: true },
-      { id: 'logs', label: '日志监控', path: '/ops/logs', phase: 'W2+', enabled: true },
+      { id: 'runtime-monitor', label: '问答与 Agent 监控', path: '/ops/monitor/rag', enabled: true },
       { id: 'health', label: '系统健康', path: '/ops/health', phase: 'W1', enabled: true },
       { id: 'eval', label: '评估报告', path: '/ops/eval', phase: 'W1-4', enabled: true },
     ],
@@ -103,18 +93,6 @@ export const PLACEHOLDER_PAGES: Record<
     backend: 'GET /api/ops/quality/facts',
     phase: 'W2-2',
   },
-  audit: {
-    title: '审计追踪',
-    summary: '操作人、时间、前后快照、X-Request-ID。',
-    backend: 'GET /api/audit/events',
-    phase: 'W7',
-  },
-  logs: {
-    title: '日志监控',
-    summary: 'ingest 失败、会话上传异常、RAG 非成功 trace 的结构化事件聚合。',
-    backend: 'GET /api/ops/logs/events',
-    phase: 'W2+',
-  },
   health: {
     title: '系统健康',
     summary: 'Java / Python / PostgreSQL / pgvector 探活，语料库、入库任务、RAG trace 与配置概览。',
@@ -127,10 +105,10 @@ export const PLACEHOLDER_PAGES: Record<
     backend: 'POST /api/ops/eval/runs',
     phase: 'W1-4',
   },
-  'llm-trace': {
-    title: 'LLM Trace',
-    summary: 'Prompt 版本、Token、估算成本与 W3C Trace ID。未配 Langfuse 时使用进程内缓冲。',
-    backend: 'GET /api/ops/obs/traces',
+  'agent-monitor': {
+    title: 'Agent 监控',
+    summary: '金融风险审计助手的运行状态、耗时与失败记录。',
+    backend: 'GET /api/risk-agent/monitor/runs',
     phase: 'W9',
   },
   settings: {

@@ -34,6 +34,7 @@ from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from agent.core.checkpoint_history import visible_checkpoint_messages
+from agent.core.graph import get_store
 from agent.core.model import available_agent_models, default_agent_model_id, require_agent_model_id
 from agent.core.runtime import delete_task, get_task, initialize_task_record, list_tasks, run_agent_task
 from agent.env_utils import get_env
@@ -238,6 +239,37 @@ def risk_agent_options(user_id: str = Depends(_require_regops_user)) -> dict[str
         ],
         "default_agent_model": default_model,
     }
+
+
+@risk_agent_router.get("/monitor/runs")
+def risk_agent_monitor_runs(
+    limit: int = 50,
+    offset: int = 0,
+    thread_id: str | None = None,
+    user_id: str = Depends(_require_regops_user),
+) -> dict[str, Any]:
+    """当前登录用户的 Agent 运行状态、耗时与失败摘要。"""
+
+    if not 1 <= limit <= 100 or offset < 0:
+        raise HTTPException(status_code=422, detail="invalid pagination")
+    if thread_id is not None:
+        thread_id = _owned_thread_id(user_id, thread_id)
+    return get_store().list_run_monitor(
+        owner_prefix=f"{user_id}_", limit=limit, offset=offset, thread_id=thread_id
+    )
+
+
+@risk_agent_router.get("/monitor/runs/{run_id}/trace")
+def risk_agent_run_trace(
+    run_id: uuid.UUID,
+    user_id: str = Depends(_require_regops_user),
+) -> dict[str, Any]:
+    """获取当前用户一次运行的详细时间线，找不到或跨用户均返回 404。"""
+
+    trace = get_store().get_agent_run_trace(run_id=str(run_id), owner_prefix=f"{user_id}_")
+    if trace is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    return trace
 
 
 @risk_agent_router.get("/threads")

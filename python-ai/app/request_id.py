@@ -7,16 +7,18 @@ import re
 from collections.abc import Awaitable, Callable, MutableMapping
 from contextvars import ContextVar
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 REQUEST_ID_HEADER = b"x-request-id"
 TRACEPARENT_HEADER = b"traceparent"
+USER_HEADER = b"x-regops-user"
 _TRACEPARENT_RE = re.compile(r"^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")
 
 _request_id_ctx: ContextVar[str] = ContextVar("request_id", default="-")
 _trace_id_ctx: ContextVar[str] = ContextVar("trace_id", default="-")
 _span_id_ctx: ContextVar[str] = ContextVar("span_id", default="-")
 _traceparent_ctx: ContextVar[str] = ContextVar("traceparent", default="")
+_user_id_ctx: ContextVar[str | None] = ContextVar("regops_user_id", default=None)
 
 Scope = MutableMapping[str, Any]
 Receive = Callable[[], Awaitable[MutableMapping[str, Any]]]
@@ -37,6 +39,10 @@ def current_span_id() -> str:
 
 def current_traceparent() -> str:
     return _traceparent_ctx.get() or ""
+
+
+def current_regops_user_id() -> str | None:
+    return _user_id_ctx.get()
 
 
 def mint_traceparent() -> str:
@@ -92,6 +98,12 @@ class RequestIdMiddleware:
         tid_token = _trace_id_ctx.set(trace_id)
         sid_token = _span_id_ctx.set(span_id)
         tp_token = _traceparent_ctx.set(traceparent)
+        raw_user_id = _header(scope, USER_HEADER)
+        try:
+            user_id = str(UUID(raw_user_id)) if raw_user_id else None
+        except ValueError:
+            user_id = None
+        uid_token = _user_id_ctx.set(user_id)
 
         encoded_id = request_id.encode("utf-8")
         encoded_tp = traceparent.encode("utf-8")
@@ -121,6 +133,7 @@ class RequestIdMiddleware:
         try:
             await self.app(scope, receive, send_with_id)
         finally:
+            _user_id_ctx.reset(uid_token)
             _request_id_ctx.reset(rid_token)
             _trace_id_ctx.reset(tid_token)
             _span_id_ctx.reset(sid_token)

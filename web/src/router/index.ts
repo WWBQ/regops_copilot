@@ -1,18 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import ChatPanel from '../components/chat/ChatPanel.vue'
+import AuthGateView from '../views/account/AuthGateView.vue'
+import { getAuthToken } from '../api/client'
+import { useAuth } from '../composables/useAuth'
+import { ApiRequestError } from '../api/client'
 import RiskAgentView from '../views/agent/RiskAgentView.vue'
 import DocumentViewerView from '../views/documents/DocumentViewerView.vue'
 import SystemHealthView from '../views/ops/SystemHealthView.vue'
-import IngestMonitorView from '../views/ops/IngestMonitorView.vue'
-import LogsMonitorView from '../views/ops/LogsMonitorView.vue'
 import EvalReportView from '../views/ops/EvalReportView.vue'
-import RagMonitorView from '../views/ops/RagMonitorView.vue'
-import AsknumMonitorView from '../views/ops/AsknumMonitorView.vue'
-import LlmTraceView from '../views/ops/LlmTraceView.vue'
+import MonitorView from '../views/ops/MonitorView.vue'
 import ProfileView from '../views/account/ProfileView.vue'
 import UsersPermissionsView from '../views/account/UsersPermissionsView.vue'
-import AuditTrailView from '../views/compliance/AuditTrailView.vue'
 import PlaceholderView from '../views/PlaceholderView.vue'
 import QualityGatesView from '../views/quality/QualityGatesView.vue'
 import FinMetricsView from '../views/quality/FinMetricsView.vue'
@@ -23,6 +22,12 @@ import TaskItemsView from '../views/labeling/TaskItemsView.vue'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {
+      path: '/login',
+      name: 'login',
+      component: AuthGateView,
+      meta: { title: '登录 / 注册' },
+    },
     {
       path: '/',
       name: 'chat',
@@ -54,26 +59,42 @@ const router = createRouter({
     {
       path: '/ops/ingest',
       name: 'ingest-monitor',
-      component: IngestMonitorView,
+      component: () => import('../views/ops/IngestMonitorView.vue'),
       meta: { title: '解析监控', pageId: 'ingest-monitor', group: 'ops' },
     },
     {
       path: '/ops/rag',
-      name: 'rag-monitor',
-      component: RagMonitorView,
-      meta: { title: 'RAG 检索监控', pageId: 'rag-monitor', group: 'ops' },
+      redirect: '/ops/monitor/rag',
     },
     {
       path: '/ops/asknum',
+      redirect: '/ops/monitor/asknum',
+    },
+    {
+      path: '/ops/monitor',
+      redirect: '/ops/monitor/rag',
+    },
+    {
+      path: '/ops/monitor/rag',
+      name: 'rag-monitor',
+      component: MonitorView,
+      meta: { title: 'RAG 检索监控', pageId: 'rag-monitor', group: 'ops' },
+    },
+    {
+      path: '/ops/monitor/asknum',
       name: 'asknum-monitor',
-      component: AsknumMonitorView,
+      component: MonitorView,
       meta: { title: '问数监控', pageId: 'asknum-monitor', group: 'ops' },
     },
     {
+      path: '/ops/monitor/agent',
+      name: 'agent-monitor',
+      component: MonitorView,
+      meta: { title: 'Agent 监控', pageId: 'agent-monitor', group: 'ops' },
+    },
+    {
       path: '/ops/traces',
-      name: 'llm-trace',
-      component: LlmTraceView,
-      meta: { title: 'LLM Trace', pageId: 'llm-trace', group: 'ops' },
+      redirect: '/ops/monitor/agent',
     },
     {
       path: '/quality/gates',
@@ -113,15 +134,19 @@ const router = createRouter({
     },
     {
       path: '/compliance/audit',
-      name: 'audit',
-      component: AuditTrailView,
-      meta: { title: '审计追踪', pageId: 'audit' },
+      redirect: '/risk-agent',
+    },
+    {
+      path: '/compliance/audit/risks',
+      redirect: '/risk-agent',
+    },
+    {
+      path: '/compliance/audit/events',
+      redirect: '/risk-agent',
     },
     {
       path: '/ops/logs',
-      name: 'logs',
-      component: LogsMonitorView,
-      meta: { title: '日志监控', pageId: 'logs', group: 'ops' },
+      redirect: '/ops/monitor/rag',
     },
     {
       path: '/ops/health',
@@ -160,6 +185,28 @@ const router = createRouter({
       meta: { title: '用户与权限', pageId: 'users' },
     },
   ],
+})
+
+let validatedToken = ''
+router.beforeEach(async (to) => {
+  const auth = useAuth()
+  const token = getAuthToken()
+  if (to.path === '/login') return token && auth.loggedIn.value ? '/' : true
+  if (!token || !auth.loggedIn.value) return { path: '/login', query: { redirect: to.fullPath } }
+  if (validatedToken !== token) {
+    try {
+      await auth.refreshMe()
+      validatedToken = token
+    } catch (error) {
+      if (error instanceof ApiRequestError && [401, 403].includes(error.status)) {
+        auth.logout()
+        return { path: '/login', query: { redirect: to.fullPath } }
+      }
+      // 网络暂时不可用时保留现有凭据；后端仍会验证每个业务请求。
+    }
+    if (!auth.loggedIn.value) return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  return true
 })
 
 router.afterEach((to) => {

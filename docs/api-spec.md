@@ -243,11 +243,13 @@ GET /api/sessions      → 500（语义应为 405，该路径只接受 POST）
 | 文档 | `GET /documents`、`POST /documents/upload`、`GET /documents/{doc_id}`、`GET /documents/{doc_id}/content`、`GET /documents/{doc_id}/viewer-url`、`POST /documents/citation/viewer-url` |
 | 会话 | `POST /sessions`、`GET|POST /sessions/{session_id}/documents`、`GET /sessions/{session_id}/documents/{doc_id}` |
 | 标注 | `GET|POST /labeling/tasks`、`GET /labeling/tasks/{task_id}`、`GET /labeling/tasks/{task_id}/export`、`GET|POST /labeling/tasks/{task_id}/items/{idx}`、`GET /labeling/template` 等 |
-| 运维观测 | `GET /ops/system/overview`、`GET /ops/rag/overview`、`GET /ops/rag-traces`、`GET /ops/rag-traces/{trace_id}`、`GET /ops/asknum-traces`、`GET /ops/asknum-traces/{trace_id}`、`GET /ops/obs/overview`、`GET /ops/obs/traces`、`GET /ops/ingest/overview`、`GET /ops/ingest/jobs`、`GET /ops/ingest/session-documents`、`GET /ops/logs/events` |
+| 运维观测 | `GET /ops/system/overview`、`GET /ops/rag/overview`、`GET /ops/rag-traces`、`GET /ops/rag-traces/{trace_id}`、`GET /ops/asknum-traces`、`GET /ops/asknum-traces/{trace_id}`、`GET /ops/obs/overview`、`GET /ops/obs/traces`、`GET /ops/ingest/overview`、`GET /ops/ingest/jobs`、`GET /ops/ingest/session-documents` |
 | 质量 | `GET /ops/quality/gates`、`GET /ops/quality/facts`、`POST /ops/quality/ingest` |
 | 评测 | `GET|POST /ops/eval/tasks`、`DELETE /ops/eval/tasks/{task_id}`、`GET /ops/eval/golden-sets`、`POST /ops/eval/golden-sets/upload`、`GET|POST /ops/eval/runs`、`GET|DELETE /ops/eval/runs/{run_id}` |
 | Prompt 库 | `GET /ops/prompts`、`GET /ops/prompts/{name}`、`POST /ops/prompts/{name}/rollback`（只改钉扎，须绑评测的版本才能进库） |
 | 存储 | `GET /storage/objects/{bucket}/{key}`（签名 URL 访问） |
+
+金融风险 Agent（`:2024`）提供 `GET /regops/agent/monitor/runs`，经 Java 的 `GET /api/risk-agent/monitor/runs` 转发；要求登录，仅返回当前用户的运行状态、耗时与失败摘要。合规问答的 `/ops/obs/traces` 是独立的进程内诊断接口，不作为 Agent 监控数据源。
 
 ### 5.2 java-service（`:8080`，全部为 BFF 代理）
 
@@ -257,10 +259,9 @@ GET /api/sessions      → 500（语义应为 405，该路径只接受 POST）
 | `AiProxyController` | `/api` | `GET /models`、`POST /chat`、`POST /chat/stream` |
 | `DocumentProxyController` | `/api/documents` | `GET /{docId}/viewer-url`、`GET /{docId}/content` |
 | `SessionProxyController` | `/api/sessions` | `POST ""`、`GET /{sessionId}/documents`、`POST /{sessionId}/documents`（multipart）、`GET /{sessionId}/documents/{docId}` |
-| `OpsProxyController` | `/api/ops` | `GET /rag/overview`、`/rag-traces`、`/rag-traces/{traceId}`、`/asknum-traces`、`/asknum-traces/{traceId}`、`/system/overview`、`/ingest/overview`、`/ingest/jobs`、`/ingest/session-documents`、`/logs/events` |
+| `OpsProxyController` | `/api/ops` | `GET /rag/overview`、`/rag-traces`、`/rag-traces/{traceId}`、`/asknum-traces`、`/asknum-traces/{traceId}`、`/system/overview`、`/ingest/overview`、`/ingest/jobs`、`/ingest/session-documents` |
 | `EvalProxyController` | `/api/ops/eval` | `GET /tasks`、`POST /tasks`、`DELETE /tasks/{taskId}`、`GET /golden-sets`、`POST /golden-sets/upload`、`GET /runs`、`POST /runs`、`GET /runs/{runId}`、`DELETE /runs/{runId}` |
 | `LabelingProxyController` | `/api/labeling` | `GET /tasks`、`POST /tasks`（multipart）、`GET /template`、`GET /tasks/{taskId}`、`GET|POST /tasks/{taskId}/items/{idx}`、`GET /tasks/{taskId}/export`、`GET /tasks/{taskId}/pdf/{filename}`、`GET /tasks/{taskId}/html/{idx}` |
-| `AuditController` | `/api/audit` | `GET /events`（JWT；含 actor / before-after / request_id） |
 | `AuthController` | `/api/auth` | `POST /login`、`GET /me`、`GET /demo-accounts` |
 | Actuator | `/actuator` | `GET /health`、`GET /info` |
 

@@ -83,7 +83,7 @@ def ingest_session_pdf(
     chunk_size: int = 512,
     chunk_overlap: int = 128,
 ) -> SessionIngestResult:
-    """同步执行会话 ingest；由 API BackgroundTasks 或 worker 调用。"""
+    """同步执行会话 ingest；由解析 Worker 调用。"""
     doc_service = _build_document_service()
     settings = get_settings()
     store = LocalObjectStore(

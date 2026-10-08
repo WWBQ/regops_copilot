@@ -41,14 +41,14 @@ def insert_rag_trace(conn: psycopg.Connection, trace: RagTrace) -> int:
         cur.execute(
             """
             INSERT INTO rag_query_log (
-                request_id, session_id, question, outcome, rag_used,
+                request_id, session_id, user_id, question, outcome, rag_used,
                 keyword_terms, scoped_doc_ids,
                 vector_hit_count, keyword_hit_count, final_hit_count,
                 max_vector_score, min_score_threshold, total_rag_ms,
                 hits, pipeline
             )
             VALUES (
-                %s, %s::uuid, %s, %s, %s,
+                %s, %s::uuid, %s::uuid, %s, %s, %s,
                 %s::jsonb, %s::jsonb,
                 %s, %s, %s,
                 %s, %s, %s,
@@ -59,6 +59,7 @@ def insert_rag_trace(conn: psycopg.Connection, trace: RagTrace) -> int:
             (
                 trace.request_id,
                 trace.session_id,
+                trace.user_id,
                 trace.question,
                 trace.outcome,
                 trace.rag_used,
@@ -110,12 +111,13 @@ def _row_from_db(row: tuple[Any, ...]) -> RagQueryLogRow:
 def list_rag_traces(
     conn: psycopg.Connection,
     *,
+    user_id: str,
     limit: int = 50,
     offset: int = 0,
     outcome: str | None = None,
 ) -> list[RagQueryLogRow]:
-    clauses = ["1=1"]
-    params: list[Any] = []
+    clauses = ["user_id = %s::uuid"]
+    params: list[Any] = [user_id]
     if outcome:
         clauses.append("outcome = %s")
         params.append(outcome)
@@ -139,7 +141,7 @@ def list_rag_traces(
     return [_row_from_db(row) for row in rows]
 
 
-def get_rag_trace(conn: psycopg.Connection, trace_id: int) -> RagQueryLogRow | None:
+def get_rag_trace(conn: psycopg.Connection, trace_id: int, *, user_id: str) -> RagQueryLogRow | None:
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -149,9 +151,9 @@ def get_rag_trace(conn: psycopg.Connection, trace_id: int) -> RagQueryLogRow | N
                    max_vector_score, min_score_threshold, total_rag_ms,
                    hits, pipeline, created_at
             FROM rag_query_log
-            WHERE id = %s
+            WHERE id = %s AND user_id = %s::uuid
             """,
-            (trace_id,),
+            (trace_id, user_id),
         )
         row = cur.fetchone()
     if not row:
@@ -159,9 +161,9 @@ def get_rag_trace(conn: psycopg.Connection, trace_id: int) -> RagQueryLogRow | N
     return _row_from_db(row)
 
 
-def count_rag_traces(conn: psycopg.Connection, *, outcome: str | None = None) -> int:
-    clauses = ["1=1"]
-    params: list[Any] = []
+def count_rag_traces(conn: psycopg.Connection, *, user_id: str, outcome: str | None = None) -> int:
+    clauses = ["user_id = %s::uuid"]
+    params: list[Any] = [user_id]
     if outcome:
         clauses.append("outcome = %s")
         params.append(outcome)

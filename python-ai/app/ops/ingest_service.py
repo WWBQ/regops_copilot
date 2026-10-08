@@ -20,6 +20,103 @@ def _iso(value: datetime | None) -> str | None:
     return value.isoformat()
 
 
+def list_ingest_batches(
+    *, limit: int = 20, offset: int = 0,
+    status: str | None = None, parser_backend: str | None = None,
+    keyword: str | None = None,
+) -> dict[str, Any]:
+    """按批次返回真实阶段快照；一次批次可以包含多份 PDF。"""
+
+    with get_connection() as conn:
+        if not _table_exists(conn, "ingest_batch"):
+            return {"total": 0, "limit": limit, "offset": offset, "items": []}
+        clauses: list[str] = []
+        params: list[Any] = []
+        if status:
+            clauses.append("b.status = %s")
+            params.append(status)
+        if parser_backend:
+            clauses.append("b.parser_backend = %s")
+            params.append(parser_backend)
+        if keyword and keyword.strip():
+            pattern = f"%{keyword.strip()}%"
+            clauses.append("""(b.title ILIKE %s OR b.batch_id::text ILIKE %s OR EXISTS (
+                SELECT 1 FROM ingest_job j
+                WHERE j.batch_id = b.batch_id AND j.target_doc_id ILIKE %s
+            ))""")
+            params.extend((pattern, pattern, pattern))
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT COUNT(*) FROM ingest_batch b {where}", params)
+            total = int(cur.fetchone()[0])
+            cur.execute(
+                f"""
+                SELECT batch_id::text, title, parser_backend, use_parse_cache,
+                       total_files, status, created_at, started_at, updated_at, finished_at
+                FROM ingest_batch b {where} ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                [*params, limit, offset],
+            )
+            rows = cur.fetchall()
+        if not rows:
+            return {"total": total, "limit": limit, "offset": offset, "items": []}
+        batch_ids = [row[0] for row in rows]
+        files_by_batch: dict[str, list[dict[str, Any]]] = {key: [] for key in batch_ids}
+        events_by_batch: dict[str, list[dict[str, Any]]] = {key: [] for key in batch_ids}
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT batch_id::text, job_id::text, target_doc_id, status,
+                       error_message, retry_count, created_at, updated_at, finished_at
+                FROM ingest_job WHERE batch_id = ANY(%s::uuid[])
+                ORDER BY created_at, id
+                """,
+                (batch_ids,),
+            )
+            for row in cur.fetchall():
+                files_by_batch[row[0]].append({
+                    "job_id": row[1], "doc_id": row[2], "status": row[3],
+                    "error_message": row[4], "retry_count": int(row[5] or 0),
+                    "created_at": _iso(row[6]), "updated_at": _iso(row[7]),
+                    "finished_at": _iso(row[8]),
+                })
+            cur.execute(
+                """
+                SELECT batch_id::text, id, job_id::text, stage, pending_count,
+                       active_count, done_count, failed_count, recorded_at
+                FROM ingest_batch_event
+                WHERE batch_id = ANY(%s::uuid[])
+                ORDER BY id
+                """,
+                (batch_ids,),
+            )
+            for row in cur.fetchall():
+                events_by_batch[row[0]].append({
+                    "id": row[1], "job_id": row[2], "stage": row[3],
+                    "pending": row[4], "active": row[5], "done": row[6],
+                    "failed": row[7], "at": _iso(row[8]),
+                })
+    items = []
+    for row in rows:
+        batch_id = row[0]
+        files = files_by_batch[batch_id]
+        items.append({
+            "batch_id": batch_id, "title": row[1], "parser_backend": row[2],
+            "use_parse_cache": row[3], "total_files": row[4], "status": row[5],
+            "created_at": _iso(row[6]), "started_at": _iso(row[7]),
+            "updated_at": _iso(row[8]), "finished_at": _iso(row[9]),
+            "counts": {
+                "pending": sum(item["status"] == "PENDING" for item in files),
+                "active": sum(item["status"] not in ("PENDING", "DONE", "FAILED") for item in files),
+                "done": sum(item["status"] == "DONE" for item in files),
+                "failed": sum(item["status"] == "FAILED" for item in files),
+            },
+            "files": files, "events": events_by_batch[batch_id],
+        })
+    return {"total": total, "limit": limit, "offset": offset, "items": items}
+
+
 def fetch_ingest_overview() -> dict[str, Any]:
     checked_at = datetime.now(timezone.utc).isoformat()
     overview: dict[str, Any] = {

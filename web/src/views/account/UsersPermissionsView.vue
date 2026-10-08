@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 
 import LoginPanel from '../../components/auth/LoginPanel.vue'
 import { useAuth } from '../../composables/useAuth'
 import { deptLabel, roleLabel } from '../../config/user'
 
 const { user, loggedIn, logout } = useAuth()
+const router = useRouter()
+function signOut() { logout(); void router.replace('/login') }
 
 const initials = computed(() => (user.value?.displayName ?? '未登录').slice(-2))
 const companyScope = computed(() => {
@@ -34,7 +37,7 @@ const companyScope = computed(() => {
             <div><dt>用户名</dt><dd>{{ user?.username }}</dd></div>
           </dl>
         </div>
-        <button type="button" class="ghost-btn" @click="logout">退出</button>
+        <button type="button" class="ghost-btn" @click="signOut">退出</button>
       </template>
       <LoginPanel v-else />
     </section>
