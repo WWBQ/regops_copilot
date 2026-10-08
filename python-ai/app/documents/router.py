@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.core.dependencies import get_document_service
+from app.db.pdf_document_repository import infer_company_year
 from app.documents.service import DocumentService
 from app.documents.schemas import (
+    AnnualReportItem,
+    AnnualReportListResponse,
     CitationViewerRequest,
     DocumentInfoResponse,
     DocumentListResponse,
@@ -70,6 +74,38 @@ async def upload_document(
 def list_documents(service: DocSvcDep) -> DocumentListResponse:
     items = [_info(record) for record in service.list_records()]
     return DocumentListResponse(items=items)
+
+
+@router.get("/reports", response_model=AnnualReportListResponse)
+def list_annual_reports(service: DocSvcDep) -> AnnualReportListResponse:
+    """列出公开年报及其短期签名对象 URL，不包含会话附件。"""
+    items = []
+    for record in service.list_records():
+        if record.doc_type != "annual_report":
+            continue
+        company_code, report_year = record.company_code, record.report_year
+        if not company_code or report_year is None:
+            company_code, report_year = infer_company_year(Path(record.doc_id))
+        if not company_code or report_year is None:
+            continue
+        try:
+            object_url = service.store.generate_presigned_url(
+                record.bucket, record.object_key, expires_in=300,
+            )
+        except ObjectNotFoundError:
+            object_url = None
+        items.append(AnnualReportItem(
+            doc_id=record.doc_id,
+            company_code=company_code,
+            report_year=report_year,
+            source_filename=record.source_filename,
+            page_count=record.page_count,
+            size=record.size,
+            ingest_status=record.ingest_status,
+            updated_at=record.updated_at,
+            object_url=object_url,
+        ))
+    return AnnualReportListResponse(items=items)
 
 
 @router.get("/{doc_id}", response_model=DocumentInfoResponse)

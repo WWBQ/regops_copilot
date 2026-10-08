@@ -15,6 +15,7 @@
 | `w11_chat_history.sql` | 按登录用户持久化合规问答的会话标题和消息 |
 | `w12_trace_ownership.sql` | RAG/问数监控 trace 记录用户归属；仅可靠关联到单一会话所有者的旧数据回填，其他旧记录对用户隐藏 |
 | `w13_ingest_batches.sql` | 解析任务批次与阶段快照；多个 PDF 可归入同一个任务 |
+| `w14_fin_metric_review.sql` | 财务事实人工复核：确认或拒绝，保留原始金额、原因、来源与复核人 |
 
 ## 新库（Docker 首次启动）
 
@@ -34,6 +35,7 @@ psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w10_stor
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w11_chat_history.sql
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w12_trace_ownership.sql
 psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w13_ingest_batches.sql
+psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w14_fin_metric_review.sql
 ```
 
 ## 验证
@@ -42,7 +44,7 @@ psql postgresql://regops:regops123@localhost:5432/regops_db -f docs/sql/w13_inge
 docker compose exec db psql -U regops -d regops_db -c "\dt"
 ```
 
-应看到：`doc_chunks` `pdf_document` `web_document` `ingest_job` `ingest_batch` `ingest_batch_event` `fin_metric` `rag_query_log` `asknum_query_log` `asknum_alias` `app_user` `chat_history`。旧初始化脚本也可能创建已停用的 `audit_event`，不影响当前功能。
+应看到：`doc_chunks` `pdf_document` `web_document` `ingest_job` `ingest_batch` `ingest_batch_event` `fin_metric` `fin_metric_review` `rag_query_log` `asknum_query_log` `asknum_alias` `app_user` `chat_history`。旧初始化脚本也可能创建已停用的 `audit_event`，不影响当前功能。
 
 ## 解析 JSON 回溯
 

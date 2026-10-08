@@ -36,6 +36,22 @@ class DocumentListResponse(BaseModel):
     items: list[DocumentInfoResponse]
 
 
+class AnnualReportItem(BaseModel):
+    doc_id: str
+    company_code: str
+    report_year: int
+    source_filename: str
+    page_count: int | None
+    size: int
+    ingest_status: str
+    updated_at: str
+    object_url: str | None = None
+
+
+class AnnualReportListResponse(BaseModel):
+    items: list[AnnualReportItem]
+
+
 class CitationViewerRequest(BaseModel):
     doc_id: str = Field(..., min_length=1, max_length=128)
     page: int = Field(..., ge=1)

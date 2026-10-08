@@ -157,11 +157,11 @@ def _coverage_note(conn: psycopg.Connection | None, hit: MetricLookup) -> str:
 
 
 def _pick_accepted(rows: list[FinMetricRow]) -> tuple[FinMetricRow | None, str | None]:
-    """只采用 auto_accepted；多值冲突不静默挑选。"""
+    """只采用质量门自动通过或人工确认通过；多值冲突不静默挑选。"""
     accepted = [
         row
         for row in rows
-        if row.status == "auto_accepted" and row.value_yuan is not None
+        if row.status in {"auto_accepted", "manually_accepted"} and row.value_yuan is not None
     ]
     if accepted:
         values = {row.value_yuan for row in accepted}

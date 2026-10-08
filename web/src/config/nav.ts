@@ -27,9 +27,8 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'quality',
     label: '数据质量',
     items: [
-      { id: 'quality-gates', label: '质量门 G1/G2/G3', path: '/quality/gates', phase: 'W2-2', enabled: true },
-      { id: 'human-review', label: '数据标注', path: '/quality/review', enabled: true },
-      { id: 'fin-metrics', label: '财务事实库', path: '/quality/facts', phase: 'W2-4', enabled: true },
+      { id: 'quality-data', label: '财务数据', path: '/quality/gates', enabled: true },
+      { id: 'human-review', label: '数据审核', path: '/quality/review/pending', enabled: true },
     ],
   },
   {
@@ -82,10 +81,10 @@ export const PLACEHOLDER_PAGES: Record<
     phase: 'W2-2',
   },
   'human-review': {
-    title: '数据标注',
-    summary: '上传 Excel/JSON，核对 PDF/HTML/文本并保存标注；问 AI 走 POST /chat。',
-    backend: 'python-ai /labeling/* + /chat',
-    phase: 'W1+',
+    title: '数据审核',
+    summary: '质量门未通过的财务事实进入待审核队列；记录修订金额、审核依据、决定与审核人。',
+    backend: 'GET /api/quality/reviews · POST /api/quality/facts/{id}/review',
+    phase: 'W2',
   },
   'fin-metrics': {
     title: '财务事实库',
@@ -95,7 +94,7 @@ export const PLACEHOLDER_PAGES: Record<
   },
   health: {
     title: '系统健康',
-    summary: 'Java / Python / PostgreSQL / pgvector 探活，语料库、入库任务、RAG trace 与配置概览。',
+    summary: 'BFF 请求量、5xx、响应耗时与 JVM 压力；检查 Java、Python、PostgreSQL、Redis、RabbitMQ 等依赖。',
     backend: 'GET /api/ops/system/overview',
     phase: 'W1',
   },

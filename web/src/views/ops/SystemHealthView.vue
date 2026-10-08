@@ -1,128 +1,75 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-import {
-  getBffHealth,
-  getSystemOverview,
-  type BffHealth,
-  type SystemOverview,
-} from '../../api/system'
-import { getLastRequestId, formatUserFacingError } from '../../api/client'
+import { getSystemOverview, type SystemOverview } from '../../api/system'
+import { formatUserFacingError } from '../../api/client'
+import SystemTrafficChart from '../../components/ops/SystemTrafficChart.vue'
 
 const overview = ref<SystemOverview | null>(null)
-const bffHealth = ref<BffHealth | null>(null)
-const loading = ref(true)
+const loading = ref(false)
 const error = ref('')
 const autoRefresh = ref(true)
-const lastRequestId = ref<string | null>(null)
+let refreshTimer: ReturnType<typeof setInterval> | undefined
 
-let refreshTimer: ReturnType<typeof setInterval> | null = null
-
-function statusClass(status: string) {
-  if (status === 'ok') return 'tag ok'
-  if (status === 'missing' || status === 'down') return 'tag fail'
-  return 'tag warn'
-}
+const serviceCards = computed(() => {
+  const services = overview.value?.services
+  if (!services) return []
+  return [
+    { name: 'Java BFF', data: services.java_bff },
+    { name: 'Python AI', data: services.python_ai },
+    { name: 'PostgreSQL', data: services.postgresql },
+    { name: 'pgvector', data: services.pgvector },
+    { name: 'Redis', data: services.redis },
+    { name: 'RabbitMQ', data: services.rabbitmq },
+  ]
+})
 
 function statusLabel(status: string) {
   if (status === 'ok') return '正常'
   if (status === 'down') return '不可用'
   if (status === 'missing') return '未安装'
-  return status
+  return '未确认'
 }
 
-function formatTime(value: string | null | undefined) {
-  if (!value) return '—'
-  try {
-    return new Date(value).toLocaleString('zh-CN')
-  } catch {
-    return value
-  }
+function statusClass(status: string) {
+  if (status === 'ok') return 'tag ok'
+  if (status === 'down' || status === 'missing') return 'tag fail'
+  return 'tag warn'
 }
 
-const serviceCards = computed(() => {
-  const o = overview.value
-  const bff = bffHealth.value
-  const cards = [
-    {
-      name: 'Java BFF',
-      status: bff?.status === 'ok' ? 'ok' : 'down',
-      detail: bff?.service ?? 'java-service',
-      latency: null as number | null,
-    },
-    {
-      name: 'Python AI',
-      status: bff?.pythonAi?.status === 'ok' ? 'ok' : o?.services.python_ai.status ?? 'down',
-      detail:
-        bff?.pythonAi?.status === 'down'
-          ? String(bff.pythonAi.error_code ?? bff.pythonAi.error ?? 'down')
-          : String(bff?.pythonAi?.service ?? o?.services.python_ai.service ?? 'python-ai'),
-      latency: null,
-    },
-  ]
-  if (o) {
-    cards.push(
-      {
-        name: 'PostgreSQL',
-        status: o.services.postgresql.status ?? 'unknown',
-        detail:
-          o.services.postgresql.latency_ms != null
-            ? `${o.services.postgresql.latency_ms} ms`
-            : o.services.postgresql.error ?? '—',
-        latency: o.services.postgresql.latency_ms ?? null,
-      },
-      {
-        name: 'pgvector',
-        status: o.services.pgvector.status ?? 'unknown',
-        detail: o.services.pgvector.installed ? '已安装' : '未检测到扩展',
-        latency: null,
-      },
-    )
-  }
-  return cards
-})
+function formatBytes(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
-const ragOutcomeRows = computed(() => {
-  const by = overview.value?.rag_traces.by_outcome ?? {}
-  return Object.entries(by).map(([outcome, count]) => ({ outcome, count }))
-})
+function formatUptime(seconds: number) {
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小时 ${Math.floor(seconds % 3600 / 60)} 分钟`
+  return `${Math.floor(seconds / 86400)} 天 ${Math.floor(seconds % 86400 / 3600)} 小时`
+}
 
 async function refresh() {
+  if (loading.value) return
   loading.value = true
   error.value = ''
   try {
-    bffHealth.value = await getBffHealth()
-  } catch (err) {
-    bffHealth.value = null
-    error.value = formatUserFacingError(err)
-  }
-  try {
     overview.value = await getSystemOverview()
-  } catch {
-    overview.value = null
-    if (bffHealth.value?.status === 'ok') {
-      error.value = '语料与 RAG 概况需要 python-ai。Java 探活见上方卡片；复核和审计仍可用。'
-    } else if (!error.value) {
-      error.value = '系统概况加载失败'
-    }
+  } catch (err) {
+    error.value = formatUserFacingError(err)
   } finally {
-    lastRequestId.value = getLastRequestId()
     loading.value = false
   }
 }
 
 function setupAutoRefresh() {
   if (refreshTimer) clearInterval(refreshTimer)
-  if (autoRefresh.value) {
-    refreshTimer = setInterval(refresh, 30000)
-  }
+  refreshTimer = autoRefresh.value ? setInterval(refresh, 30_000) : undefined
 }
 
-onMounted(async () => {
-  await refresh()
+onMounted(() => {
+  refresh()
   setupAutoRefresh()
 })
-
 onBeforeUnmount(() => {
   if (refreshTimer) clearInterval(refreshTimer)
 })
@@ -133,375 +80,101 @@ onBeforeUnmount(() => {
     <header class="head">
       <div>
         <h1>系统健康</h1>
-        <p v-if="overview" class="checked-at">上次检查：{{ formatTime(overview.checked_at) }}</p>
-        <p v-if="lastRequestId" class="checked-at">最近关联 ID：<code>{{ lastRequestId }}</code></p>
+        <p>入口请求与服务压力 · 统计范围为当前 Java BFF 实例</p>
+        <p v-if="overview" class="checked-at">
+          采样时间 {{ new Date(overview.checked_at).toLocaleString('zh-CN') }} · 运行 {{ formatUptime(overview.uptime_seconds) }}
+        </p>
       </div>
-      <div class="head-actions">
-        <label class="auto-refresh">
-          <input v-model="autoRefresh" type="checkbox" @change="setupAutoRefresh" />
-          自动刷新
-        </label>
+      <div class="actions">
+        <label><input v-model="autoRefresh" type="checkbox" @change="setupAutoRefresh" /> 自动刷新</label>
         <button type="button" class="ghost-btn" :disabled="loading" @click="refresh">刷新</button>
       </div>
     </header>
 
-    <p v-if="loading && !overview && !bffHealth" class="hint">加载中…</p>
     <p v-if="error" class="error">{{ error }}</p>
-    <p
-      v-if="bffHealth?.status === 'ok' && bffHealth.pythonAi?.status === 'down'"
-      class="degrade-note"
-    >
-      python-ai 不可用：问答 / 问数 / 标注会失败；此页仍可查看 Java 服务状态。
-    </p>
-
-    <template v-if="bffHealth || overview">
-      <div class="stats">
-        <article v-for="svc in serviceCards" :key="svc.name" class="stat-card">
-          <div class="stat-head">
-            <p class="stat-label">{{ svc.name }}</p>
-            <span :class="statusClass(svc.status)">{{ statusLabel(svc.status) }}</span>
-          </div>
-          <p class="stat-value stat-detail">{{ svc.detail }}</p>
-        </article>
-      </div>
-    </template>
+    <p v-if="loading && !overview" class="hint">加载中…</p>
 
     <template v-if="overview">
+      <div class="stats">
+        <article class="stat-card"><span>累计请求</span><strong>{{ overview.requests.total_since_start.toLocaleString() }}</strong><small>BFF 启动以来</small></article>
+        <article class="stat-card"><span>近 5 分钟请求</span><strong>{{ overview.requests.last_5m.toLocaleString() }}</strong><small>不含探活与监控轮询</small></article>
+        <article class="stat-card"><span>近 5 分钟 5xx</span><strong>{{ overview.requests.errors_5m }}</strong><small>错误率 {{ (overview.requests.error_rate_5m * 100).toFixed(1) }}%</small></article>
+        <article class="stat-card"><span>平均响应耗时</span><strong>{{ overview.requests.avg_latency_ms_5m == null ? '—' : `${overview.requests.avg_latency_ms_5m} ms` }}</strong><small>近 5 分钟</small></article>
+      </div>
+
+      <section class="panel">
+        <h2>近 15 分钟流量</h2>
+        <SystemTrafficChart :points="overview.requests.per_minute" />
+      </section>
 
       <div class="grid-2">
         <section class="panel">
-          <h2>语料库（pdf_document）</h2>
-          <p class="panel-summary">
-            Ready {{ overview.corpus.ready_count }} 份 ·
-            {{ overview.corpus.total_pages }} 页 ·
-            {{ overview.corpus.total_chunks.toLocaleString() }} chunks
-          </p>
-          <div class="table-wrap">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>doc_id</th>
-                  <th>公司</th>
-                  <th>年份</th>
-                  <th>页数</th>
-                  <th>chunks</th>
-                  <th>状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="doc in overview.corpus.documents" :key="doc.doc_id">
-                  <td class="mono">{{ doc.doc_id }}</td>
-                  <td>{{ doc.company_code ?? '—' }}</td>
-                  <td>{{ doc.report_year ?? '—' }}</td>
-                  <td>{{ doc.page_count }}</td>
-                  <td>{{ doc.chunk_count.toLocaleString() }}</td>
-                  <td><span :class="statusClass(doc.ingest_status === 'ready' ? 'ok' : 'warn')">{{ doc.ingest_status }}</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <h2>Java BFF 进程压力</h2>
+          <div class="metric-row"><span>当前进行中的请求</span><strong>{{ overview.requests.in_flight }}</strong></div>
+          <div class="metric-row"><span>CPU 使用率</span><strong>{{ overview.pressure.cpu_percent == null ? '不可用' : `${overview.pressure.cpu_percent}%` }}</strong></div>
+          <div class="metric-row"><span>JVM 堆内存</span><strong>{{ formatBytes(overview.pressure.heap_used_bytes) }} / {{ overview.pressure.heap_max_bytes == null ? '—' : formatBytes(overview.pressure.heap_max_bytes) }}</strong></div>
+          <div class="metric-row"><span>堆使用率</span><strong>{{ overview.pressure.heap_usage_percent == null ? '—' : `${overview.pressure.heap_usage_percent}%` }}</strong></div>
+          <div class="metric-row"><span>JVM 线程数</span><strong>{{ overview.pressure.thread_count }}</strong></div>
+          <div class="metric-row"><span>主机 1 分钟平均负载</span><strong>{{ overview.pressure.load_average_1m ?? '—' }} / {{ overview.pressure.available_processors }} 核</strong></div>
+          <p class="hint">CPU 和内存是 Java 进程指标；平均负载来自运行主机，不代表 Python Worker 单独用量。</p>
         </section>
 
         <section class="panel">
-          <h2>RAG 运行概况</h2>
-          <p class="panel-summary">
-            累计 trace {{ overview.rag_traces.total }} 条 · 近 24h {{ overview.rag_traces.last_24h }} 条
+          <h2>依赖连通性</h2>
+          <div v-for="svc in serviceCards" :key="svc.name" class="metric-row">
+            <span>{{ svc.name }}</span>
+            <div class="dependency-status">
+              <small v-if="svc.data?.latency_ms != null">{{ svc.data.latency_ms }} ms</small>
+              <span :class="statusClass(svc.data?.status ?? 'unknown')">{{ statusLabel(svc.data?.status ?? 'unknown') }}</span>
+            </div>
+          </div>
+          <p v-if="overview.services.redis?.status === 'ok'" class="dependency-detail">
+            Redis 内存 {{ overview.services.redis.used_memory_bytes == null ? '—' : formatBytes(overview.services.redis.used_memory_bytes) }}
+            · 客户端 {{ overview.services.redis.connected_clients ?? '—' }}
           </p>
-          <ul v-if="ragOutcomeRows.length" class="outcome-list">
-            <li v-for="row in ragOutcomeRows" :key="row.outcome">
-              <span>{{ row.outcome }}</span>
-              <strong>{{ row.count }}</strong>
-            </li>
-          </ul>
-          <p v-else class="hint">暂无 RAG trace，去首页提问后会自动记录。</p>
-          <h3 class="sub-title">会话</h3>
-          <p class="panel-summary">
-            会话 {{ overview.sessions.session_count }} · 待解析上传 {{ overview.sessions.pending_documents }}
+          <p v-if="overview.services.rabbitmq?.status === 'ok'" class="dependency-detail">
+            ingest 队列：待消费 {{ overview.services.rabbitmq.ready_messages ?? '—' }}
+            · 消费者 {{ overview.services.rabbitmq.consumer_count ?? '—' }}
+            <span v-if="overview.services.rabbitmq.queue_status !== 'ok'">（队列信息不可用）</span>
+            <span v-else-if="overview.services.rabbitmq.consumer_count === 0" class="warning">（当前没有解析 Worker 消费）</span>
           </p>
-
-          <h3 class="sub-title">评测任务</h3>
-          <p class="panel-summary">已配置 {{ overview.eval.task_count }} 个任务</p>
+          <p class="hint">服务状态取自当前探测；Python 不可用时，下游依赖显示“未确认”。</p>
         </section>
       </div>
-
-      <section class="panel">
-        <h2>入库任务（ingest_job 最近 15 条）</h2>
-        <div v-if="overview.ingest_jobs.length" class="table-wrap">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>job_id</th>
-                <th>类型</th>
-                <th>doc_id</th>
-                <th>状态</th>
-                <th>创建时间</th>
-                <th>错误</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="job in overview.ingest_jobs" :key="job.job_id">
-                <td class="mono">{{ job.job_id.slice(0, 8) }}…</td>
-                <td>{{ job.target_type }}</td>
-                <td class="mono">{{ job.target_doc_id }}</td>
-                <td><span :class="statusClass(job.status === 'DONE' ? 'ok' : job.status === 'FAILED' ? 'fail' : 'warn')">{{ job.status }}</span></td>
-                <td>{{ formatTime(job.created_at) }}</td>
-                <td class="error-cell">{{ job.error_message ?? '—' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p v-else class="hint">暂无 ingest_job 记录。</p>
-      </section>
-
-      <section class="panel">
-        <h2>当前配置（只读）</h2>
-        <div class="config-grid">
-          <div><span class="config-key">default_model</span><span>{{ overview.config.default_model }}</span></div>
-          <div><span class="config-key">embedding_model</span><span>{{ overview.config.embedding_model }}</span></div>
-          <div><span class="config-key">rag_top_k</span><span>{{ overview.config.rag_top_k }}</span></div>
-          <div><span class="config-key">rag_rerank_enabled</span><span>{{ overview.config.rag_rerank_enabled ? '是' : '否' }}</span></div>
-          <div><span class="config-key">rag_trace_enabled</span><span>{{ overview.config.rag_trace_enabled ? '是' : '否' }}</span></div>
-        </div>
-      </section>
+      <p class="footnote">请求统计保存在当前进程内，服务重启后归零；5xx 错误率不包含业务性 4xx。</p>
     </template>
   </section>
 </template>
 
 <style scoped>
-.page {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.head {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.head h1 {
-  margin: 0 0 8px;
-  font-size: 24px;
-}
-
-.head p {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-.checked-at {
-  margin-top: 6px !important;
-  font-size: 12px !important;
-}
-
-.head-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.auto-refresh {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.stat-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-}
-
-.stat-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.stat-label {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.stat-value {
-  margin: 0;
-}
-
-.stat-detail {
-  font-size: 14px;
-  color: var(--text-strong);
-  word-break: break-all;
-}
-
-.grid-2 {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 16px;
-}
-
-.panel h2 {
-  margin: 0 0 8px;
-  font-size: 16px;
-}
-
-.sub-title {
-  margin: 16px 0 6px;
-  font-size: 14px;
-}
-
-.panel-summary {
-  margin: 0 0 12px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.outcome-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.outcome-list li {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
-  border-bottom: 1px dashed var(--border);
-  font-size: 13px;
-}
-
-.table-wrap {
-  overflow: auto;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.data-table th,
-.data-table td {
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-}
-
-.mono {
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: 12px;
-}
-
-.config-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  font-size: 13px;
-}
-
-.config-grid div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
-  background: #f8fafc;
-  border-radius: 8px;
-}
-
-.config-key {
-  color: var(--text-muted);
-  font-family: ui-monospace, Menlo, monospace;
-}
-
-.error-cell {
-  max-width: 180px;
-  color: #b91c1c;
-  font-size: 12px;
-}
-
-.tag {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.tag.ok {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-.tag.fail {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.tag.warn {
-  background: #fff7ed;
-  color: #c2410c;
-}
-
-.hint {
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-.degrade-note {
-  margin: 0 0 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #92400e;
-  font-size: 13px;
-}
-
-.degrade-note a {
-  color: inherit;
-  font-weight: 700;
-}
-
-.error {
-  color: #b91c1c;
-}
-
-@media (max-width: 900px) {
-  .stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .grid-2 {
-    grid-template-columns: 1fr;
-  }
-
-  .config-grid {
-    grid-template-columns: 1fr;
-  }
-}
+.page { max-width: 1200px; margin: 0 auto; }
+.head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; }
+.head h1 { margin: 0 0 6px; font-size: 24px; }
+.head p { margin: 0; color: var(--text-muted); font-size: 13px; }
+.head .checked-at { margin-top: 6px; font-size: 12px; }
+.actions { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--text-muted); }
+.actions label { display: flex; align-items: center; gap: 6px; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat-card, .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.stat-card { display: flex; flex-direction: column; gap: 8px; }
+.stat-card span, .stat-card small, .hint, .footnote { color: var(--text-muted); font-size: 13px; }
+.stat-card strong { font-size: 25px; color: var(--text-strong); font-weight: 650; }
+.panel { margin-bottom: 16px; }
+.panel h2 { margin: 0 0 12px; font-size: 16px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.metric-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.metric-row strong { font-weight: 600; }
+.dependency-status { display: flex; align-items: center; gap: 8px; }
+.dependency-status small { color: var(--text-muted); }
+.dependency-detail { margin: 8px 0 0; font-size: 12px; color: var(--text-muted); }
+.warning { color: #b45309; font-weight: 600; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.tag.ok { background: #ecfdf5; color: #047857; }
+.tag.fail { background: #fef2f2; color: #b91c1c; }
+.tag.warn { background: #fff7ed; color: #c2410c; }
+.hint { margin: 12px 0 0; }
+.footnote { margin: 0 0 20px; }
+.error { color: #b91c1c; }
+@media (max-width: 900px) { .stats { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .stats { grid-template-columns: 1fr; } }
 </style>

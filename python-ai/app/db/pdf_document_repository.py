@@ -34,6 +34,9 @@ class DocumentRecord:
     doc_type: str = "annual_report"
     ingest_status: str = "uploaded"
     meta: dict[str, Any] | None = None
+    company_code: str | None = None
+    report_year: int | None = None
+    page_count: int | None = None
 
 
 def infer_doc_id(pdf_path: Path) -> str:
@@ -54,6 +57,7 @@ def _record(row: tuple[Any, ...] | None) -> DocumentRecord | None:
     if row is None:
         return None
     meta = row[12] if isinstance(row[12], dict) else json.loads(row[12] or "{}")
+    fallback_code, fallback_year = infer_company_year(Path(str(row[0])))
     return DocumentRecord(
         doc_id=str(row[0]),
         bucket=str(row[1]),
@@ -68,13 +72,16 @@ def _record(row: tuple[Any, ...] | None) -> DocumentRecord | None:
         doc_type=str(row[10]),
         ingest_status=str(row[11]),
         meta=meta,
+        company_code=str(row[13]) if row[13] else fallback_code,
+        report_year=int(row[14]) if row[14] is not None else fallback_year,
+        page_count=int(row[15]) if row[15] is not None else None,
     )
 
 
 _SELECT_FIELDS = """
     doc_id, bucket, object_key, content_hash, source_filename, content_type,
     file_size_bytes, parse_object_key, created_at, updated_at,
-    doc_type, ingest_status, meta
+    doc_type, ingest_status, meta, company_code, report_year, page_count
 """
 
 

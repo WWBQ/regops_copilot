@@ -18,6 +18,7 @@ export interface QualityCompanyGate {
   scope: string
   fact_count: number
   auto_accepted: number
+  manually_accepted?: number
   human_review: number
   rejected?: number
   missing_critical: string[]
@@ -33,6 +34,7 @@ export interface QualityGatesResponse {
     companies: number
     facts: number
     auto_accepted: number
+    manually_accepted?: number
     human_review: number
     g2_all_passed: boolean
     g3_all_passed: boolean
@@ -74,6 +76,80 @@ export interface FinMetricListResponse {
   limit: number
   offset: number
   items: FinMetricItem[]
+}
+
+export interface ReviewQueueItem {
+  id: number
+  companyCode: string
+  docId: string
+  concept: string
+  period: string
+  valueYuan: string | null
+  rawValue: string | null
+  status: string
+  reviewReason: string | null
+  updatedAt: string
+}
+
+export interface ReviewQueue {
+  total: number
+  items: ReviewQueueItem[]
+}
+
+export interface ReviewEntry {
+  id: number
+  decision: 'approve' | 'reject'
+  originalValueYuan: string | null
+  reviewedValueYuan: string | null
+  originalStatus: string
+  originalReason: string | null
+  note: string
+  sourceContentHash: string | null
+  reviewerName: string
+  createdAt: string
+}
+
+export interface ReviewDetail {
+  metricId: number
+  status: string
+  valueYuan: string | null
+  rawValue: string | null
+  reviewReason: string | null
+  updatedAt: string
+  companyCode: string
+  docId: string
+  concept: string
+  period: string
+  sourceType: string
+  contentHash: string | null
+  pageNo: number | null
+  rawName: string | null
+  unitRaw: string | null
+  xbrlTag: string | null
+  statement: string
+  scope: string
+  history: ReviewEntry[]
+}
+
+export function listReviewQueue(view: 'pending' | 'reviewed', offset = 0): Promise<ReviewQueue> {
+  return apiFetch(`/quality/reviews?view=${view}&offset=${offset}`)
+}
+
+export function getReviewDetail(metricId: number): Promise<ReviewDetail> {
+  return apiFetch(`/quality/facts/${metricId}/review`)
+}
+
+export function submitReview(metricId: number, body: {
+  decision: 'approve' | 'reject'
+  reviewedValueYuan: string | null
+  note: string
+  expectedUpdatedAt: string
+}): Promise<ReviewDetail> {
+  return apiFetch(`/quality/facts/${metricId}/review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 }
 
 export function fetchQualityGates(): Promise<QualityGatesResponse> {
@@ -121,6 +197,7 @@ export const STATEMENT_LABELS: Record<string, string> = {
 
 export const METRIC_STATUS_LABELS: Record<string, string> = {
   auto_accepted: '自动通过',
-  human_review: '人工复核',
+  manually_accepted: '人工确认',
+  human_review: '待审核',
   rejected: '已拒绝',
 }

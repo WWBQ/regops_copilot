@@ -51,6 +51,11 @@ function isActive(item: NavItem): boolean {
   if (item.id === 'runtime-monitor') {
     return route.path.startsWith('/ops/monitor')
   }
+  if (item.id === 'quality-data') {
+    return ['/quality/gates', '/quality/facts', '/quality/reports'].some(
+      (path) => route.path === path || route.path.startsWith(`${path}/`),
+    )
+  }
   if (item.path === '/') {
     return route.path === '/'
   }

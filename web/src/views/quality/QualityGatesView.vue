@@ -82,9 +82,9 @@ onMounted(refresh)
           <p class="stat-sub">{{ summary.facts }} 条事实</p>
         </article>
         <article class="stat-card">
-          <p class="stat-label">自动通过</p>
-          <p class="stat-value">{{ summary.auto_accepted }}</p>
-          <p class="stat-sub">人工复核 {{ summary.human_review }}</p>
+          <p class="stat-label">可用事实</p>
+          <p class="stat-value">{{ summary.auto_accepted + (summary.manually_accepted ?? 0) }}</p>
+          <p class="stat-sub">自动通过 {{ summary.auto_accepted }} · 人工确认 {{ summary.manually_accepted ?? 0 }} · 待审核 {{ summary.human_review }}</p>
         </article>
         <article class="stat-card">
           <p class="stat-label">G2 勾稽</p>
@@ -138,7 +138,7 @@ onMounted(refresh)
                   </span>
                 </td>
                 <td><span :class="passClass(row.g3.passed)">{{ row.g3.passed ? '通过' : '缺证据' }}</span></td>
-                <td>{{ row.auto_accepted }}/{{ row.fact_count }} 通过</td>
+                <td>{{ row.auto_accepted + (row.manually_accepted ?? 0) }}/{{ row.fact_count }} 可用 · {{ row.human_review }} 待审核</td>
                 <td>{{ row.missing_critical.length ? row.missing_critical.join(', ') : '—' }}</td>
               </tr>
             </tbody>

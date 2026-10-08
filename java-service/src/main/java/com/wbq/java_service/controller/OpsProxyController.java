@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.wbq.java_service.client.PythonAiClient;
 import com.wbq.java_service.auth.AuthSupport;
+import com.wbq.java_service.monitoring.SystemHealthService;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,9 +22,11 @@ import org.springframework.web.multipart.MultipartFile;
 public class OpsProxyController {
 
     private final PythonAiClient pythonAiClient;
+    private final SystemHealthService systemHealthService;
 
-    public OpsProxyController(PythonAiClient pythonAiClient) {
+    public OpsProxyController(PythonAiClient pythonAiClient, SystemHealthService systemHealthService) {
         this.pythonAiClient = pythonAiClient;
+        this.systemHealthService = systemHealthService;
     }
 
     @GetMapping("/rag/overview")
@@ -66,7 +69,7 @@ public class OpsProxyController {
 
     @GetMapping("/system/overview")
     public Map<String, Object> systemOverview() {
-        return pythonAiClient.getSystemOverview();
+        return systemHealthService.overview();
     }
 
     @GetMapping("/obs/overview")

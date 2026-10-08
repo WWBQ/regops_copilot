@@ -93,7 +93,7 @@ def _accepted_fact(rows: list[dict[str, Any]], *, company_code: str, concept: st
         and row.get("source_type") == "web"
         and row.get("parser") == "eastmoney_f10"
     ]
-    accepted = [row for row in matching if row.get("status") == "auto_accepted"]
+    accepted = [row for row in matching if row.get("status") in {"auto_accepted", "manually_accepted"}]
     if not accepted:
         return {"year": year, "outcome": "unverified" if matching else "missing", "review_required": bool(matching)}
     try:

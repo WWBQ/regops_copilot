@@ -32,6 +32,23 @@ def test_f10_fact_accepts_hash_without_pdf_page():
     assert "page" not in result["sources"][0]
 
 
+def test_manually_accepted_fact_is_available_to_agent():
+    result = financial_server._accepted_fact(
+        [_f10_fact(status="manually_accepted", value_yuan="456.78")],
+        company_code="002594", concept="revenue", year=2024,
+    )
+    assert result["outcome"] == "ok"
+    assert result["value_yuan"] == "456.78"
+
+
+def test_rejected_fact_is_not_available_to_agent():
+    result = financial_server._accepted_fact(
+        [_f10_fact(status="rejected")],
+        company_code="002594", concept="revenue", year=2024,
+    )
+    assert result["outcome"] != "ok"
+
+
 def test_f10_fact_rejects_invalid_or_mismatched_provenance():
     for row in (
         _f10_fact(content_hash="sha256:short"),

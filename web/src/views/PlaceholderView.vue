@@ -23,7 +23,7 @@ const links = computed(() => {
     items.push(
       { label: '质量门 G1/G2/G3', path: '/quality/gates' },
       { label: '财务事实库', path: '/quality/facts' },
-      { label: '数据标注', path: '/quality/review' },
+      { label: '数据审核', path: '/quality/review/pending' },
     )
   }
   if (route.meta.group === 'qa') {

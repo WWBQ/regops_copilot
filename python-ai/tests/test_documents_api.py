@@ -97,6 +97,29 @@ async def test_upload_idempotent(doc_client: AsyncClient):
 
 
 @pytest.mark.anyio
+async def test_annual_report_list_excludes_session_uploads(doc_client: AsyncClient, document_repository_stub):
+    files = {"file": ("002594_2024.pdf", b"%PDF-1.4 report", "application/pdf")}
+    response = await doc_client.post("/documents/upload", files=files, data={"doc_id": "002594_2024"})
+    assert response.status_code == 200
+    from dataclasses import replace
+    document_repository_stub["session_doc"] = replace(
+        document_repository_stub["002594_2024"], doc_id="session_doc", doc_type="session_upload"
+    )
+
+    listed = await doc_client.get("/documents/reports")
+    assert listed.status_code == 200
+    assert len(listed.json()["items"]) == 1
+    report = listed.json()["items"][0]
+    assert report["doc_id"] == "002594_2024"
+    assert report["company_code"] == "002594"
+    assert report["report_year"] == 2024
+    assert "object_key" not in report
+    assert "/storage/objects/regops-docs/reports/002594_2024/" in report["object_url"]
+    assert "expires=" in report["object_url"]
+    assert "signature=" in report["object_url"]
+
+
+@pytest.mark.anyio
 async def test_storage_rejects_unsigned(doc_client: AsyncClient):
     response = await doc_client.get("/storage/objects/regops-docs/reports/x.pdf")
     assert response.status_code == 422

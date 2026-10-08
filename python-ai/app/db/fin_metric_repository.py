@@ -92,15 +92,27 @@ def upsert_fin_metrics(conn: psycopg.Connection, facts: list[FinancialFact]) -> 
                 scope = EXCLUDED.scope,
                 currency = EXCLUDED.currency,
                 statement = EXCLUDED.statement,
-                value_yuan = EXCLUDED.value_yuan,
+                value_yuan = CASE
+                    WHEN fin_metric.status IN ('manually_accepted', 'rejected')
+                     AND fin_metric.content_hash IS NOT NULL
+                     AND fin_metric.content_hash = EXCLUDED.content_hash
+                    THEN fin_metric.value_yuan ELSE EXCLUDED.value_yuan END,
                 unit_raw = EXCLUDED.unit_raw,
                 raw_name = EXCLUDED.raw_name,
                 raw_value = EXCLUDED.raw_value,
                 page_no = EXCLUDED.page_no,
                 bbox_json = EXCLUDED.bbox_json,
                 parser = EXCLUDED.parser,
-                status = EXCLUDED.status,
-                review_reason = EXCLUDED.review_reason,
+                status = CASE
+                    WHEN fin_metric.status IN ('manually_accepted', 'rejected')
+                     AND fin_metric.content_hash IS NOT NULL
+                     AND fin_metric.content_hash = EXCLUDED.content_hash
+                    THEN fin_metric.status ELSE EXCLUDED.status END,
+                review_reason = CASE
+                    WHEN fin_metric.status IN ('manually_accepted', 'rejected')
+                     AND fin_metric.content_hash IS NOT NULL
+                     AND fin_metric.content_hash = EXCLUDED.content_hash
+                    THEN fin_metric.review_reason ELSE EXCLUDED.review_reason END,
                 xbrl_tag = EXCLUDED.xbrl_tag,
                 content_hash = EXCLUDED.content_hash,
                 updated_at = NOW()
@@ -284,7 +296,7 @@ def list_metric_coverage(
         clauses.append("scope = %s")
         params.append(scope)
     if accepted_only:
-        clauses.append("status = 'auto_accepted'")
+        clauses.append("status IN ('auto_accepted', 'manually_accepted')")
         clauses.append("value_yuan IS NOT NULL")
     with conn.cursor() as cur:
         cur.execute(

@@ -7,7 +7,6 @@ import { useAuth } from '../composables/useAuth'
 import { ApiRequestError } from '../api/client'
 import RiskAgentView from '../views/agent/RiskAgentView.vue'
 import DocumentViewerView from '../views/documents/DocumentViewerView.vue'
-import SystemHealthView from '../views/ops/SystemHealthView.vue'
 import EvalReportView from '../views/ops/EvalReportView.vue'
 import MonitorView from '../views/ops/MonitorView.vue'
 import ProfileView from '../views/account/ProfileView.vue'
@@ -15,10 +14,7 @@ import UsersPermissionsView from '../views/account/UsersPermissionsView.vue'
 import PlaceholderView from '../views/PlaceholderView.vue'
 import QualityGatesView from '../views/quality/QualityGatesView.vue'
 import FinMetricsView from '../views/quality/FinMetricsView.vue'
-import CreateTaskView from '../views/labeling/CreateTaskView.vue'
-import LabelWorkspaceView from '../views/labeling/LabelWorkspaceView.vue'
-import TaskHallView from '../views/labeling/TaskHallView.vue'
-import TaskItemsView from '../views/labeling/TaskItemsView.vue'
+import DataReviewView from '../views/quality/DataReviewView.vue'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -104,33 +100,35 @@ const router = createRouter({
     },
     {
       path: '/quality/review',
-      name: 'human-review',
-      component: TaskHallView,
-      meta: { title: '数据标注' },
+      redirect: '/quality/review/pending',
     },
     {
-      path: '/quality/review/create',
-      name: 'label-create',
-      component: CreateTaskView,
-      meta: { title: '创建标注任务' },
+      path: '/quality/review/pending',
+      name: 'review-pending',
+      component: DataReviewView,
+      meta: { title: '待审核 · 数据审核', pageId: 'human-review', group: 'quality' },
     },
     {
-      path: '/quality/review/:taskId/:idx',
-      name: 'label-item',
-      component: LabelWorkspaceView,
-      meta: { title: '标注条目' },
+      path: '/quality/review/completed',
+      name: 'review-completed',
+      component: DataReviewView,
+      meta: { title: '已审核 · 数据审核', pageId: 'human-review', group: 'quality' },
     },
     {
-      path: '/quality/review/:taskId',
-      name: 'label-items',
-      component: TaskItemsView,
-      meta: { title: '标注列表' },
+      path: '/quality/review/:legacyPath(.*)',
+      redirect: '/quality/review/pending',
     },
     {
       path: '/quality/facts',
       name: 'fin-metrics',
       component: FinMetricsView,
       meta: { title: '财务事实库', pageId: 'fin-metrics', group: 'quality' },
+    },
+    {
+      path: '/quality/reports',
+      name: 'annual-reports',
+      component: () => import('../views/quality/AnnualReportsView.vue'),
+      meta: { title: 'PDF 年报', pageId: 'annual-reports', group: 'quality' },
     },
     {
       path: '/compliance/audit',
@@ -151,7 +149,7 @@ const router = createRouter({
     {
       path: '/ops/health',
       name: 'health',
-      component: SystemHealthView,
+      component: () => import('../views/ops/SystemHealthView.vue'),
       meta: { title: '系统健康', pageId: 'health', group: 'ops' },
     },
     {

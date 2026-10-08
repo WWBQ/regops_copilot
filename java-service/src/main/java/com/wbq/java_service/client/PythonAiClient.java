@@ -221,6 +221,14 @@ public class PythonAiClient {
         return body;
     }
 
+    public Map<String, Object> listAnnualReports() {
+        return exchange(() -> restClient.get()
+                .uri("/documents/reports")
+                .headers(this::forwardRequestId)
+                .retrieve()
+                .body(MAP_TYPE));
+    }
+
     public SessionCreateResponse createSession() {
         return exchange(() -> restClient.post()
                 .uri("/sessions")

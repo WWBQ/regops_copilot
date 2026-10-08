@@ -45,6 +45,28 @@ class OpsProxyControllerTest {
     }
 
     @Test
+    void systemHealthShowsTrafficAndPressureWithoutBusinessMonitorData() throws Exception {
+        when(pythonAiClient.getSystemOverview()).thenReturn(Map.of(
+                "services", Map.of(
+                        "python_ai", Map.of("status", "ok"),
+                        "postgresql", Map.of("status", "ok", "latency_ms", 1.2),
+                        "pgvector", Map.of("status", "ok", "installed", true),
+                        "redis", Map.of("status", "ok", "used_memory_bytes", 4096),
+                        "rabbitmq", Map.of("status", "ok", "ready_messages", 2))));
+
+        mvc.perform(get("/api/ops/system/overview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requests.total_since_start").isNumber())
+                .andExpect(jsonPath("$.requests.per_minute.length()").value(15))
+                .andExpect(jsonPath("$.pressure.heap_used_bytes").isNumber())
+                .andExpect(jsonPath("$.services.python_ai.status").value("ok"))
+                .andExpect(jsonPath("$.services.redis.used_memory_bytes").value(4096))
+                .andExpect(jsonPath("$.services.rabbitmq.ready_messages").value(2))
+                .andExpect(jsonPath("$.corpus").doesNotExist())
+                .andExpect(jsonPath("$.rag_traces").doesNotExist());
+    }
+
+    @Test
     void postIngestForwardsMultipart() throws Exception {
         when(pythonAiClient.startPdfIngest(any(), eq("002594_2024"), eq(true)))
                 .thenReturn(Map.of(

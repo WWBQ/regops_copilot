@@ -54,7 +54,7 @@ python3.14 -m venv .venv-mcp
 ./.venv-mcp/bin/python -m app.mcp.financial_server
 ```
 
-最后一条命令是可选的 stdio 服务，不用于 RegOps 页面。页面实际使用 `http://127.0.0.1:8000/mcp/`（Compose 内为 `http://python-ai:8000/mcp/`）。`lookup_financial_facts` 通过 `REGOPS_API_BASE_URL` 读取 F10 网页结构化事实：只接受质量门 `auto_accepted`、合并报表、人民币、完整 SHA-256 来源哈希；返回中明确标注 `source_type=web` 和 `content_hash`，不伪造 PDF 页码。哈希在入库时由原始 F10 文件包计算，查询时只校验已存哈希格式与质量门状态，不重新读取原始文件。`search_report_evidence` 则在本服务内按公司、年份和入库状态锁定 PDF 年报，再直接复用 RAG 检索，返回带页码的候选片段，不经过 `/chat` 或回答模型。配置为本地 BGE 时可执行重排；配置为 LLM 重排时退回 Hybrid 检索，避免工具额外调用聊天模型。候选片段仍需核对年报原文。
+最后一条命令是可选的 stdio 服务，不用于 RegOps 页面。页面实际使用 `http://127.0.0.1:8000/mcp/`（Compose 内为 `http://python-ai:8000/mcp/`）。`lookup_financial_facts` 通过 `REGOPS_API_BASE_URL` 读取 F10 网页结构化事实：只接受质量门 `auto_accepted` 或已完成数据审核的 `manually_accepted`、合并报表、人民币、完整 SHA-256 来源哈希；返回中明确标注 `source_type=web` 和 `content_hash`，不伪造 PDF 页码。哈希在入库时由原始 F10 文件包计算，查询时只校验已存哈希格式与质量门状态，不重新读取原始文件。`search_report_evidence` 则在本服务内按公司、年份和入库状态锁定 PDF 年报，再直接复用 RAG 检索，返回带页码的候选片段，不经过 `/chat` 或回答模型。配置为本地 BGE 时可执行重排；配置为 LLM 重排时退回 Hybrid 检索，避免工具额外调用聊天模型。候选片段仍需核对年报原文。
 
 ## PDF 解析器切换
 
@@ -108,8 +108,10 @@ LLM 重排只接收 RRF 后的少量候选，默认 12 条、每条最多 800 �
 Pydantic 校验，模型输出的 0～100 分不会和向量/RRF 分数混算。调用或结构校验失败时
 会明确记录 trace 并回退到 BGE；模型明确判断“没有直接证据”时不会回退。
 
-`GET /ops/system/overview` 可查看脱敏后的当前后端、部署位置、模型和地址；API Key
-不会返回。每次请求的 `/ops/rag-traces` 还会记录实际后端、耗时、排序和降级情况。
+`GET /ops/system/overview` 检查 Python、PostgreSQL、pgvector、Redis 和 RabbitMQ；
+Redis 返回内存与连接数，RabbitMQ 只读查询 `ingest` 队列的待消费消息与消费者数。
+面向页面的 `/api/ops/system/overview` 由 Java BFF 汇总入口请求、JVM 压力和依赖状态。
+RAG 后端、耗时、排序与降级情况在 `/ops/rag-traces` 查看。
 
 ## 暂缓：模型问题改写
 

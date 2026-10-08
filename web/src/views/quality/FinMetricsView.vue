@@ -58,7 +58,7 @@ watch([companyCode, status, statement, concept], () => {
 onMounted(refresh)
 
 function statusClass(value: string) {
-  if (value === 'auto_accepted') return 'tag ok'
+  if (value === 'auto_accepted' || value === 'manually_accepted') return 'tag ok'
   if (value === 'human_review') return 'tag warn'
   return 'tag fail'
 }
@@ -93,7 +93,9 @@ function statusClass(value: string) {
       <select v-model="status" class="filter-select">
         <option value="">全部状态</option>
         <option value="auto_accepted">自动通过</option>
-        <option value="human_review">人工复核</option>
+        <option value="human_review">待审核</option>
+        <option value="manually_accepted">人工确认</option>
+        <option value="rejected">已拒绝</option>
       </select>
       <select v-model="concept" class="filter-select">
         <option value="">全部指标</option>
@@ -124,6 +126,7 @@ function statusClass(value: string) {
               <th>原文</th>
               <th>状态</th>
               <th>原因</th>
+              <th>审核</th>
             </tr>
           </thead>
           <tbody>
@@ -140,11 +143,18 @@ function statusClass(value: string) {
                 </span>
               </td>
               <td>{{ row.review_reason ?? '—' }}</td>
+              <td>
+                <router-link
+                  v-if="row.status === 'human_review' || row.status === 'manually_accepted' || row.status === 'rejected'"
+                  :to="{ path: row.status === 'human_review' ? '/quality/review/pending' : '/quality/review/completed', query: { fact_id: String(row.id) } }"
+                >{{ row.status === 'human_review' ? '去审核' : '查看记录' }}</router-link>
+                <span v-else>—</span>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p v-if="!loading && !items.length" class="hint">暂无财务事实。请先到质量门页入库 F10。</p>
+      <p v-if="!loading && !items.length" class="hint">暂无财务事实。可在左侧切换到「质量门」入库 F10。</p>
     </section>
   </section>
 </template>

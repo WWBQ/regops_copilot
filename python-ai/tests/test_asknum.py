@@ -190,6 +190,25 @@ def test_lookup_metric_human_review():
     assert hit.to_trace_dict()["value_yuan"] is None
 
 
+def test_lookup_metric_manually_accepted_after_review():
+    rows = [_row(status="manually_accepted", value=Decimal("123.4500"), review_reason="人工复核通过")]
+    with patch("app.asknum.lookup.get_connection", return_value=_Conn()), patch(
+        "app.asknum.lookup.find_company_metrics", return_value=rows
+    ):
+        hit = lookup_metric(company_code="002594", concept="revenue", year=2024)
+    assert hit.outcome == "ok"
+    assert hit.row is rows[0]
+
+
+def test_lookup_metric_rejected_remains_unavailable():
+    rows = [_row(status="rejected", value=Decimal("123.4500"))]
+    with patch("app.asknum.lookup.get_connection", return_value=_Conn()), patch(
+        "app.asknum.lookup.find_company_metrics", return_value=rows
+    ):
+        hit = lookup_metric(company_code="002594", concept="revenue", year=2024)
+    assert hit.outcome == "not_accepted"
+
+
 def test_lookup_metric_missing():
     with patch("app.asknum.lookup.get_connection", return_value=_Conn()), patch(
         "app.asknum.lookup.find_company_metrics", return_value=[]
