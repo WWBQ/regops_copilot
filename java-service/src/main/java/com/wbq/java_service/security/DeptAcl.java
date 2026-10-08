@@ -10,9 +10,10 @@ import com.wbq.java_service.exception.BusinessException;
  */
 public final class DeptAcl {
 
-    public static final Set<String> RESEARCH = Set.of("002594", "601633");
-    public static final Set<String> COMPLIANCE = Set.of(
+    public static final Set<String> ALL_COMPANIES = Set.of(
             "002594", "601633", "000333", "000651", "600031", "300750", "600519");
+    public static final Set<String> RESEARCH = ALL_COMPANIES;
+    public static final Set<String> COMPLIANCE = ALL_COMPANIES;
     public static final Set<String> RM = Set.of("000333", "000651");
 
     private DeptAcl() {

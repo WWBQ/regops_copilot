@@ -18,12 +18,8 @@ class DeptAclTest {
     }
 
     @Test
-    void researchCannotReadMidea() {
-        BusinessException ex = assertThrows(
-                BusinessException.class,
-                () -> DeptAcl.requireCompany("research", "000333")
-        );
-        assertEquals("unauthorized", ex.getErrorCode());
+    void researchCanReadMidea() {
+        DeptAcl.requireCompany("research", "000333");
     }
 
     @Test
@@ -46,10 +42,15 @@ class DeptAclTest {
     }
 
     @Test
-    void researchCannotReadCatl() {
+    void researchCanReadCatl() {
+        DeptAcl.requireCompany("research", "300750");
+    }
+
+    @Test
+    void researchCannotReadOutsideConfiguredDataDomain() {
         BusinessException ex = assertThrows(
                 BusinessException.class,
-                () -> DeptAcl.requireCompany("research", "300750")
+                () -> DeptAcl.requireCompany("research", "999999")
         );
         assertEquals("unauthorized", ex.getErrorCode());
     }

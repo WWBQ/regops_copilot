@@ -20,6 +20,10 @@ function goBack() {
     void router.push('/')
   }
 }
+
+function updatePage(nextPage: number) {
+  void router.replace({ query: { ...route.query, page: String(nextPage) } })
+}
 </script>
 
 <template>
@@ -33,7 +37,7 @@ function goBack() {
     </header>
 
     <div class="doc-viewer-frame-wrap">
-      <DocumentPdfFrame :doc-id="docId" :page="page" />
+      <DocumentPdfFrame :doc-id="docId" :page="page" @page-change="updatePage" />
     </div>
   </section>
 </template>

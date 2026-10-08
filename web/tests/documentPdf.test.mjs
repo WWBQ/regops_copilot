@@ -47,6 +47,16 @@ test('expired login is reported before trying to render PDF', async () => {
   }
 })
 
+test('a PDF outside the current department is reported as forbidden', async () => {
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = async () => new Response('', { status: 403 })
+  try {
+    await assert.rejects(fetchDocumentPdf('000333_2024'), /没有查看这份年报的权限/u)
+  } finally {
+    globalThis.fetch = previousFetch
+  }
+})
+
 test('missing source PDF is distinguishable from an authentication failure', async () => {
   const previousFetch = globalThis.fetch
   globalThis.fetch = async () => new Response('', { status: 404 })

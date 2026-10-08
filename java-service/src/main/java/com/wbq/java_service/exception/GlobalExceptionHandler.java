@@ -8,6 +8,7 @@ import com.wbq.java_service.filter.RequestIdFilter;
 
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
@@ -23,18 +24,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiError> handleBusiness(BusinessException ex) {
         return ResponseEntity.status(ex.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(new ApiError(ex.getMessage(), extra("error_code", ex.getErrorCode())));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(new ApiError("无权访问", extra("error_code", "unauthorized")));
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ResponseEntity<ApiError> handleOptimistic(ObjectOptimisticLockingFailureException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(new ApiError("并发更新冲突", extra("error_code", "conflict")));
     }
 
@@ -45,6 +49,7 @@ public class GlobalExceptionHandler {
             status = HttpStatus.BAD_GATEWAY;
         }
         return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(new ApiError(ex.getMessage(), extra("error_code", ex.getErrorCode())));
     }
 
@@ -52,18 +57,21 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex) {
         FieldError fieldError = ex.getBindingResult().getFieldError();
         String detail = fieldError != null ? fieldError.getDefaultMessage() : "validation failed";
-        return ResponseEntity.badRequest().body(new ApiError(detail, extra("error_code", "invalid_params")));
+        return ResponseEntity.badRequest().contentType(MediaType.APPLICATION_JSON)
+                .body(new ApiError(detail, extra("error_code", "invalid_params")));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiError> handleNoResource(NoResourceFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(new ApiError("资源不存在", extra("error_code", "not_found")));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex) {
         return ResponseEntity.internalServerError()
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(new ApiError(ex.getMessage(), extra("error_code", "internal_error")));
     }
 

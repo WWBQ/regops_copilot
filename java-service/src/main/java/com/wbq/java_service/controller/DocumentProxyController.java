@@ -61,9 +61,10 @@ public class DocumentProxyController {
     }
 
     /**
-     * 应用内 PDF 预览：inline 流式返回，供前端 iframe 嵌入，不触发下载。
+     * 应用内 PDF 预览：返回 PDF 字节，前端通过带 Bearer Token 的请求读取并绘制。
      */
-    @GetMapping(value = "/{docId}/content", produces = MediaType.APPLICATION_PDF_VALUE)
+    // Do not constrain the mapping to PDF: access errors must be serializable as JSON.
+    @GetMapping("/{docId}/content")
     public ResponseEntity<byte[]> documentContent(@PathVariable String docId) {
         requireDocumentAccess(docId);
         byte[] body = pythonAiClient.documentContent(docId);
