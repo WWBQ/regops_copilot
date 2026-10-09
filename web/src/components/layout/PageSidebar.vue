@@ -9,7 +9,7 @@ const route = useRoute()
 const router = useRouter()
 const chatBridge = inject(CHAT_BRIDGE_KEY, null) as Ref<ChatBridge> | null
 
-const isChatPage = computed(() => route.path === '/' || route.path.startsWith('/rag') || route.path.startsWith('/risk-agent'))
+const isChatPage = computed(() => route.path === '/' || route.path.startsWith('/rag') || route.path.startsWith('/risk-agent') || route.path.startsWith('/ai-coding'))
 const pageItems = computed(() => pageMenuForPath(route.path))
 
 const renamingId = ref<string | null>(null)

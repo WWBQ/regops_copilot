@@ -54,6 +54,7 @@ eval/reports/
 
 # 本地 K8s 覆盖（含真实 Key，勿提交）
 k8s/secret.local.yaml
+deploy/opensandbox/.local/
 
 # 本地开发编排脚本产物（日志 + pid）
 .dev-logs/

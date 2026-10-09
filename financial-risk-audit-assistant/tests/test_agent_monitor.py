@@ -6,6 +6,25 @@ from agent.store.sqlite_store import LocalSqliteStore
 
 
 class AgentMonitorStoreTest(unittest.TestCase):
+    def test_coding_threads_are_excluded_from_risk_lists(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = LocalSqliteStore(Path(directory) / "store.sqlite")
+            try:
+                store.upsert_thread(thread_id="user-a_risk-1", title="风险初筛")
+                store.upsert_thread(thread_id="user-a_coding_code-1", title="代码任务")
+                store.record_run(run_id="risk-run", thread_id="user-a_risk-1", status="completed")
+                store.record_run(run_id="code-run", thread_id="user-a_coding_code-1", status="completed")
+                risk = store.list_threads(owner_prefix="user-a_", exclude_prefix="user-a_coding_")
+                coding = store.list_threads(owner_prefix="user-a_coding_")
+                self.assertEqual([item["title"] for item in risk], ["风险初筛"])
+                self.assertEqual([item["title"] for item in coding], ["代码任务"])
+                monitor = store.list_run_monitor(owner_prefix="user-a_", exclude_prefix="user-a_coding_")
+                self.assertEqual(monitor["total"], 1)
+                self.assertEqual(monitor["items"][0]["run_id"], "risk-run")
+                self.assertEqual(len(monitor["sessions"]), 1)
+            finally:
+                store.close()
+
     def test_run_questions_and_session_filter_are_separate(self):
         with tempfile.TemporaryDirectory() as directory:
             store = LocalSqliteStore(Path(directory) / "store.sqlite")

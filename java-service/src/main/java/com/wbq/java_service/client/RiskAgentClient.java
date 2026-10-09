@@ -55,9 +55,41 @@ public class RiskAgentClient {
         }
     }
 
-    public void deleteThread(String threadId, UUID userId) {
+    public byte[] downloadArchive(String path, UUID userId) {
         try {
-            HttpRequest request = request("/regops/agent/threads/" + checkedThreadId(threadId), userId)
+            HttpRequest request = request(path, userId)
+                    .timeout(Duration.ofMinutes(2))
+                    .GET()
+                    .build();
+            HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            try (InputStream body = response.body()) {
+                if (response.statusCode() >= 400) {
+                    checkResponse(response.statusCode(), new String(body.readNBytes(8192), StandardCharsets.UTF_8));
+                }
+                checkResponse(response.statusCode(), "");
+                byte[] archive = body.readNBytes(20 * 1024 * 1024 + 1);
+                if (archive.length > 20 * 1024 * 1024) {
+                    throw new PythonAiException(413, "沙箱导出超过 20 MiB", "archive_too_large");
+                }
+                return archive;
+            }
+        } catch (PythonAiException ex) {
+            throw ex;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw unavailable();
+        } catch (Exception ex) {
+            throw unavailable();
+        }
+    }
+
+    public void deleteThread(String threadId, UUID userId) {
+        deleteThread("/regops/agent", threadId, userId);
+    }
+
+    public void deleteThread(String apiPrefix, String threadId, UUID userId) {
+        try {
+            HttpRequest request = request(apiPrefix + "/threads/" + checkedThreadId(threadId), userId)
                     .timeout(Duration.ofSeconds(30))
                     .DELETE()
                     .build();
@@ -75,10 +107,14 @@ public class RiskAgentClient {
 
     /** Opens the upstream before sending HTTP 200 to the browser, preserving early 4xx/5xx errors. */
     public InputStream openStream(String threadId, String content, String modelId, UUID userId) {
+        return openStream("/regops/agent", threadId, content, modelId, userId);
+    }
+
+    public InputStream openStream(String apiPrefix, String threadId, String content, String modelId, UUID userId) {
         try {
             String path = threadId == null
-                    ? "/regops/agent/threads/stream-message"
-                    : "/regops/agent/threads/" + checkedThreadId(threadId) + "/stream-message";
+                    ? apiPrefix + "/threads/stream-message"
+                    : apiPrefix + "/threads/" + checkedThreadId(threadId) + "/stream-message";
             Map<String, String> payload = new HashMap<>();
             payload.put("content", content);
             if (modelId != null) {
@@ -133,7 +169,7 @@ public class RiskAgentClient {
     }
 
     private String checkedThreadId(String threadId) {
-        if (!threadId.matches("[0-9a-fA-F-]{36}_[0-9a-fA-F-]{36}")) {
+        if (!threadId.matches("[0-9a-fA-F-]{36}_(coding_)?[0-9a-fA-F-]{36}")) {
             throw new PythonAiException(404, "thread not found", "not_found");
         }
         return threadId;
@@ -152,6 +188,6 @@ public class RiskAgentClient {
     }
 
     private PythonAiException unavailable() {
-        return new PythonAiException(502, "金融风险审计助手暂不可用", "upstream_down");
+        return new PythonAiException(502, "Agent 服务暂不可用", "upstream_down");
     }
 }

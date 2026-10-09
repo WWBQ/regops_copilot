@@ -32,7 +32,9 @@ from agent.prompt import get_system_prompt
 from agent.financial import TOOLS_UNAVAILABLE_MESSAGE
 from agent.financial.citations import ToolCitationIndexer, citations_from_messages
 from agent.server import get_agent
-from agent import server as agent_server
+from agent.financial import factory as financial_factory
+from agent.financial import service as financial_service
+from agent.api import auth as agent_auth
 from agent.mcp import financial_client
 from agent.store.sqlite_store import LocalSqliteStore
 from agent.tools.external_risk_search import _clear_search_cache, create_external_risk_search_tool
@@ -336,7 +338,10 @@ def main() -> None:
         "thread_id": "financial-no-tools-test", "task_kind": "financial_audit",
         "__is_for_execution__": True,
     }}
-    with patch.object(agent_server, "load_financial_tools", side_effect=RuntimeError(TOOLS_UNAVAILABLE_MESSAGE)):
+    with (
+        patch.object(financial_factory, "_delta_messages_from_checkpoint", return_value=[]),
+        patch.object(financial_factory, "load_financial_tools", side_effect=RuntimeError(TOOLS_UNAVAILABLE_MESSAGE)),
+    ):
         try:
             get_agent(financial_config)
         except RuntimeError as exc:
@@ -367,10 +372,11 @@ def main() -> None:
 
     financial_tools = [SimpleNamespace(name="lookup_financial_facts"), SimpleNamespace(name="search_report_evidence")]
     with (
-        patch.object(agent_server, "load_financial_tools", return_value=financial_tools),
-        patch.object(agent_server, "make_main_model", return_value=object()),
-        patch.object(agent_server, "create_agent", return_value=FakeGraph()) as create_financial,
-        patch.object(agent_server, "ensure_backend_for_thread", side_effect=AssertionError("financial mode must not create shell backend")),
+        patch.object(financial_factory, "_delta_messages_from_checkpoint", return_value=[]),
+        patch.object(financial_factory, "load_financial_tools", return_value=financial_tools),
+        patch.object(financial_factory, "make_main_model", return_value=object()),
+        patch.object(financial_factory, "create_agent", return_value=FakeGraph()) as create_financial,
+        patch.object(financial_factory, "get_checkpointer", return_value=MemorySaver()),
     ):
         get_agent(financial_config)
         assert {item.name for item in create_financial.call_args.kwargs["tools"]} == {
@@ -417,10 +423,10 @@ def main() -> None:
         AIMessage(content="已获得带来源的财务事实，仍需人工核查。"),
     ])
     with (
-        patch.object(agent_server, "load_financial_tools", return_value=[lookup_financial_facts, search_report_evidence]),
-        patch.object(agent_server, "make_main_model", return_value=fake_model),
-        patch("agent.core.graph.get_checkpointer", return_value=MemorySaver()),
-        patch.object(agent_server, "ensure_backend_for_thread", side_effect=AssertionError("financial mode must not create shell backend")),
+        patch.object(financial_factory, "_delta_messages_from_checkpoint", return_value=[]),
+        patch.object(financial_factory, "load_financial_tools", return_value=[lookup_financial_facts, search_report_evidence]),
+        patch.object(financial_factory, "make_main_model", return_value=fake_model),
+        patch.object(financial_factory, "get_checkpointer", return_value=MemorySaver()),
     ):
         graph = get_agent(financial_config)
         result = graph.invoke({"messages": [HumanMessage(content="检查美的营收")]})
@@ -443,11 +449,11 @@ def main() -> None:
     # 页面入口必须在创建会话或调用模型前明确拒绝金融初筛。
     fake_thread = {"thread_id": "test-thread", "title": "测试初筛", "latest_run_status": "completed"}
     with (
-        patch.object(risk_agent, "load_financial_tools", side_effect=RuntimeError(TOOLS_UNAVAILABLE_MESSAGE)),
+        patch.object(financial_service, "load_financial_tools", side_effect=RuntimeError(TOOLS_UNAVAILABLE_MESSAGE)),
         patch.object(risk_agent, "initialize_task_record") as initialize,
         patch.object(risk_agent, "get_task", return_value=fake_thread),
         patch.object(risk_agent, "visible_checkpoint_messages", return_value=[]) as checkpoint_messages,
-        patch.object(risk_agent, "run_agent_task", return_value={"final_answer": "需要人工核查。"}) as run,
+        patch.object(risk_agent, "run_risk_task", return_value={"final_answer": "需要人工核查。"}) as run,
         patch.object(risk_agent, "require_agent_model_id") as require_model,
     ):
         assert "messages" not in risk_agent._thread_meta_payload(fake_thread)
@@ -459,7 +465,7 @@ def main() -> None:
         response = TestClient(agent_app.app).post(
             "/regops/agent/threads/stream-message",
             headers={
-                "X-Regops-Service-Token": risk_agent.get_env("REGOPS_SERVICE_TOKEN"),
+                "X-Regops-Service-Token": agent_auth.get_env("REGOPS_SERVICE_TOKEN"),
                 "X-Regops-User": "00000000-0000-0000-0000-000000000001",
             },
             json={"content": "检查 000333", "model_id": "qwen3.8-max", "repo": "https://gitee.com/example-org/sample_repo"},
@@ -471,7 +477,7 @@ def main() -> None:
         require_model.assert_not_called()
 
         headers = {
-            "X-Regops-Service-Token": risk_agent.get_env("REGOPS_SERVICE_TOKEN"),
+            "X-Regops-Service-Token": agent_auth.get_env("REGOPS_SERVICE_TOKEN"),
             "X-Regops-User": "00000000-0000-0000-0000-000000000001",
         }
         owned_thread = "00000000-0000-0000-0000-000000000001_00000000-0000-0000-0000-000000000003"
@@ -494,7 +500,7 @@ def main() -> None:
 
     # MCP 预检通过后，页面入口必须进入流式处理，而不是继续固定返回 503。
     with (
-        patch.object(risk_agent, "load_financial_tools", return_value=financial_tools) as load,
+        patch.object(financial_service, "load_financial_tools", return_value=financial_tools) as load,
         patch.object(risk_agent, "_post_streaming_response", return_value=PlainTextResponse("ready")) as start,
     ):
         ready = TestClient(agent_app.app).post(

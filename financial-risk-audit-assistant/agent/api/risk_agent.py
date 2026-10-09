@@ -22,13 +22,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-import secrets
 import threading
 import uuid
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
@@ -36,31 +35,17 @@ from starlette.concurrency import run_in_threadpool
 from agent.core.checkpoint_history import visible_checkpoint_messages
 from agent.core.graph import get_store
 from agent.core.model import available_agent_models, default_agent_model_id, require_agent_model_id
-from agent.core.runtime import delete_task, get_task, initialize_task_record, list_tasks, run_agent_task
-from agent.env_utils import get_env
+from agent.core.runtime import delete_task, get_task, initialize_task_record, list_tasks
+from agent.api.auth import require_regops_user as _require_regops_user
 from agent.financial import TOOLS_UNAVAILABLE_MESSAGE
 from agent.financial.risk_result import answer_hash
-from agent.mcp.financial_client import load_financial_tools
-
-def _require_regops_user(request: Request) -> str:
-    """Only the authenticated RegOps BFF may call these conversation endpoints."""
-
-    expected = get_env("REGOPS_SERVICE_TOKEN").strip()
-    supplied = request.headers.get("X-Regops-Service-Token", "")
-    if not expected or not secrets.compare_digest(supplied, expected):
-        raise HTTPException(status_code=401, detail="Agent service authentication required")
-    try:
-        user_id = str(uuid.UUID(request.headers.get("X-Regops-User", "")))
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(status_code=401, detail="RegOps user identity required") from exc
-    return user_id
-
+from agent.financial.service import require_financial_tools, run_risk_task
 
 def _require_financial_tools() -> None:
     """创建会话前确认两个只读 MCP 工具可用；故障时维持 503。"""
 
     try:
-        load_financial_tools()
+        require_financial_tools()
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=TOOLS_UNAVAILABLE_MESSAGE) from exc
 
@@ -258,7 +243,8 @@ def risk_agent_monitor_runs(
     if thread_id is not None:
         thread_id = _owned_thread_id(user_id, thread_id)
     return get_store().list_run_monitor(
-        owner_prefix=f"{user_id}_", limit=limit, offset=offset, thread_id=thread_id
+        owner_prefix=f"{user_id}_", exclude_prefix=f"{user_id}_coding_",
+        limit=limit, offset=offset, thread_id=thread_id,
     )
 
 
@@ -270,7 +256,7 @@ def risk_agent_run_trace(
     """获取当前用户一次运行的详细时间线，找不到或跨用户均返回 404。"""
 
     trace = get_store().get_agent_run_trace(run_id=str(run_id), owner_prefix=f"{user_id}_")
-    if trace is None:
+    if trace is None or str(trace.get("thread_id", "")).startswith(f"{user_id}_coding_"):
         raise HTTPException(status_code=404, detail="run not found")
     return trace
 
@@ -286,7 +272,10 @@ def risk_agent_threads(limit: int = 50, user_id: str = Depends(_require_regops_u
     bounded_limit = max(1, min(limit, 100))
     return [
         _thread_payload(thread)
-        for thread in list_tasks(limit=bounded_limit, owner_prefix=f"{user_id}_")
+        for thread in list_tasks(
+            limit=bounded_limit, owner_prefix=f"{user_id}_",
+            exclude_prefix=f"{user_id}_coding_",
+        )
     ]
 
 
@@ -391,17 +380,9 @@ def _post_streaming_response(*, thread_id: str, content: str, model_id: str | No
             # worker 线程内部必须捕获异常，否则线程异常只会写到后端日志，前端收不到失败事件。
             try:
                 # 真正运行 Agent 的入口。runtime 会做任务分类、方案确认、Agent 构建和事件流消费。
-                result = run_agent_task(
-                    # 金融初筛始终不绑定代码仓库。
-                    repo_url=None,
-                    # 用户本轮真实输入，runtime 会根据任务类型决定是否包装内部执行上下文。
-                    prompt=content,
-                    # 当前会话 id，用于绑定 Store、checkpoint、SSE 和 Agent config。
-                    thread_id=thread_id,
-                    forced_financial_audit=True,
-                    model_id=selected_model_id,
-                    # 把 runtime/streaming_runtime 产生的实时事件送回本函数的 SSE 队列。
-                    event_sink=event_sink,
+                result = run_risk_task(
+                    prompt=content, thread_id=thread_id,
+                    model_id=selected_model_id, event_sink=event_sink,
                 )
 
                 # 过程文本可能有多段；最终回答由 runtime 从最后一条 assistant

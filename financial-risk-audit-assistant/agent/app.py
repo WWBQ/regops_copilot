@@ -28,8 +28,9 @@ configure_logging()
 # 延迟导入 API 路由模块
 # 使用 # noqa: E402 忽略 flake8 关于导入顺序的警告，
 # 因为此处必须等环境变量和日志配置初始化完成后才能导入路由模块。
-from agent.api import health_router, risk_agent_router  # noqa: E402
+from agent.api import health_router, risk_agent_router, coding_agent_router  # noqa: E402
 from agent.core.graph import close_persistence  # noqa: E402
+from agent.backends.open_sandbox import close_sandbox_connections  # noqa: E402
 
 
 @asynccontextmanager
@@ -37,6 +38,7 @@ async def lifespan(_app: FastAPI):
     try:
         yield
     finally:
+        close_sandbox_connections()
         close_persistence()
 
 # ---------------------------------------------------------------
@@ -56,3 +58,4 @@ app = FastAPI(
 # ---------------------------------------------------------------
 app.include_router(health_router)
 app.include_router(risk_agent_router)
+app.include_router(coding_agent_router)

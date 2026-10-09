@@ -57,6 +57,7 @@ const showModelOnlyNotice = computed(() => {
     'rag_compare',
     'rag_compare_blocked',
     'risk_agent',
+    'coding_agent',
   ].includes(props.message.route ?? '')
 })
 
@@ -71,6 +72,7 @@ const routeLabel = computed(() => {
   if (route === 'rag' || route === 'rag_blocked' || props.message.ragUsed) {
     return route === 'rag_blocked' ? '数字拦截' : 'RAG'
   }
+  if (route === 'coding_agent') return 'AI Coding'
   return ''
 })
 
@@ -212,7 +214,7 @@ function evidenceCitationTitle(evidenceId: number): string {
         {{ message.statusText || '正在回复…' }}
       </p>
       <details
-        v-if="message.route === 'risk_agent' && ((message.stages?.length ?? 0) > 0 || message.stageText)"
+        v-if="(message.route === 'risk_agent' || message.route === 'coding_agent') && ((message.stages?.length ?? 0) > 0 || message.stageText)"
         class="agent-stages"
         :open="Boolean(message.streaming && !message.content)"
       >

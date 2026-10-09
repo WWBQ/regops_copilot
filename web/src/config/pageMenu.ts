@@ -25,7 +25,7 @@ export const PAGE_MENUS: Record<string, PageMenuItem[]> = {
 }
 
 export function pageMenuForPath(path: string): PageMenuItem[] {
-  if (path === '/' || path.startsWith('/rag') || path.startsWith('/risk-agent')) {
+  if (path === '/' || path.startsWith('/rag') || path.startsWith('/risk-agent') || path.startsWith('/ai-coding')) {
     return [{ id: 'new-chat', label: '新对话', action: 'new-chat', icon: 'plus' }]
   }
   if (path.startsWith('/quality/review')) {

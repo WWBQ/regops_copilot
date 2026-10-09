@@ -1,0 +1,13 @@
+# Match server.gateway settings in kind-server-values.yaml.
+gateway:
+  replicaCount: 1
+  gatewayRouteMode: header
+  secureAccess:
+    existingSecret: opensandbox-gateway-signing
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

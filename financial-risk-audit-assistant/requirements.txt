@@ -1,4 +1,5 @@
 deepagents==0.6.11
+opensandbox==1.1.0
 langchain==1.4.1
 fastapi==0.141.1
 uvicorn==0.53.0

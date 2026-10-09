@@ -25,6 +25,7 @@ from collections.abc import Callable
 from typing import Any
 
 from agent.backends.local_shell import LocalShellBackend
+from agent.backends.open_sandbox import execution_backend
 from agent.backends.workspace import Workspace
 from agent.core.events import record_event
 from agent.core.graph import get_checkpointer, get_langgraph_store, get_store
@@ -828,7 +829,13 @@ def run_plan_response_task(
     record_event(thread_id, "agent", "构建方案生成 Agent", status="in_progress")
     # 方案任务也使用 DeepAgent，是因为它需要读取仓库结构、测试方式、关键文件等上下文。
     # 但 task_kind 固定为 planning，中间件和工具权限会保持只读。
-    agent = _build_agent_for_runtime(thread_id=thread_id, task_kind="planning", repo_url=repo.clone_url if repo else None)
+    try:
+        agent = _build_agent_for_runtime(thread_id=thread_id, task_kind="planning", repo_url=repo.clone_url if repo else None)
+    except Exception as exc:
+        store.update_thread_status(thread_id, "failed")
+        store.record_run(run_id=run_id, thread_id=thread_id, status="failed", error=mask_token(str(exc)), finished=True)
+        record_event(thread_id, "failed", "Agent 构建失败", status="error", detail=mask_token(str(exc)))
+        raise
     record_event(thread_id, "agent", "构建方案生成 Agent", status="completed")
 
     try:
@@ -885,6 +892,7 @@ def run_agent_task(
     thread_id: str | None = None,
     event_sink: RuntimeEventSink | None = None,
     forced_financial_audit: bool = False,
+    allow_financial_audit: bool = True,
     model_id: str | None = None,
 ) -> dict[str, Any]:
     """运行一次普通 Agent 任务的总入口。
@@ -902,10 +910,15 @@ def run_agent_task(
     """
 
     # 两个直达分支都不需要 LLM，能显著减少模型调用和等待时间。
-    if not forced_financial_audit and is_workspace_listing_task(prompt):
+    coding_sandbox = not allow_financial_audit and execution_backend() == "opensandbox"
+    if not allow_financial_audit and thread_id and not coding_sandbox:
+        prior_thread = get_store().get_thread(thread_id)
+        if prior_thread and prior_thread.get("sandbox_id"):
+            raise RuntimeError("此会话已经绑定 OpenSandbox，不能切回本机执行")
+    if not coding_sandbox and not forced_financial_audit and is_workspace_listing_task(prompt):
         return run_workspace_listing_task(repo_url=repo_url, prompt=prompt, thread_id=thread_id)
 
-    if not forced_financial_audit and is_pull_only_task(prompt):
+    if not coding_sandbox and not forced_financial_audit and is_pull_only_task(prompt):
         return run_pull_only_task(repo_url=repo_url, prompt=prompt, thread_id=thread_id)
 
     # 第一层用户意图识别。这里只得到粗粒度 task_kind，后续还会经过方案确认、
@@ -957,6 +970,11 @@ def run_agent_task(
     if approved_plan_text is not None:
         task_kind = "coding"
 
+    # AI Coding API 不可因意图分类误判而进入金融工具分支；两种产品的
+    # 能力边界由 API 强制指定，不交给模型自行决定。
+    if not allow_financial_audit and task_kind == "financial_audit":
+        task_kind = "qa"
+
     if task_kind == "financial_audit":
         # 金融任务不继承旧会话附带的代码仓库绑定。
         repo_url = None
@@ -1001,10 +1019,16 @@ def run_agent_task(
     record_event(thread_id, "agent", "构建 Agent 运行图", status="in_progress")
     # get_agent 会根据 config 注入 backend、tools、skills、middleware 和系统提示词。
     # runtime 不直接拼装这些底层能力，避免调度层和 Agent 工厂耦合过深。
-    agent = _build_agent_for_runtime(
-        thread_id=thread_id, task_kind=task_kind,
-        repo_url=repo.clone_url if repo else None, model_id=model_id,
-    )
+    try:
+        agent = _build_agent_for_runtime(
+            thread_id=thread_id, task_kind=task_kind,
+            repo_url=repo.clone_url if repo else None, model_id=model_id,
+        )
+    except Exception as exc:
+        store.update_thread_status(thread_id, "failed")
+        store.record_run(run_id=run_id, thread_id=thread_id, status="failed", error=mask_token(str(exc)), finished=True)
+        record_event(thread_id, "failed", "Agent 构建失败", status="error", detail=mask_token(str(exc)))
+        raise
     logger.info("Agent 图已构建：thread_id=%s", thread_id)
     record_event(thread_id, "agent", "构建 Agent 运行图", status="completed")
     try:
@@ -1139,7 +1163,10 @@ def get_task(thread_id: str) -> dict[str, Any] | None:
     return thread
 
 
-def list_tasks(limit: int = 50, *, owner_prefix: str | None = None) -> list[dict[str, Any]]:
+def list_tasks(
+    limit: int = 50, *, owner_prefix: str | None = None,
+    exclude_prefix: str | None = None,
+) -> list[dict[str, Any]]:
     """读取最近任务列表，供页面展示历史运行记录。
 
     返回值包含最新 run 和 run_events，方便列表页展示任务状态、运行耗时和简要步骤。
@@ -1147,7 +1174,7 @@ def list_tasks(limit: int = 50, *, owner_prefix: str | None = None) -> list[dict
     """
 
     store = get_store()
-    threads = store.list_threads(limit=limit, owner_prefix=owner_prefix)
+    threads = store.list_threads(limit=limit, owner_prefix=owner_prefix, exclude_prefix=exclude_prefix)
     for thread in threads:
         thread_id = thread["thread_id"]
         thread["latest_run"] = store.get_latest_run(thread_id)

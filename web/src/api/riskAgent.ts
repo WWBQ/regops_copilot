@@ -6,6 +6,8 @@ export interface RiskAgentThread {
   title: string
   status: string
   updatedAt: number
+  sandboxProject?: string
+  sandboxReady?: boolean
   messages: Array<{
     id: string
     author: string
@@ -117,9 +119,21 @@ export async function streamRiskAgentMessage(
   onEvent: (event: RiskAgentEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
+  return streamAgentMessage('risk-agent', threadId, content, modelId, onEvent, signal)
+}
+
+/** Shared SSE transport; risk and coding have separate API namespaces and histories. */
+export async function streamAgentMessage(
+  agentPath: 'risk-agent' | 'coding-agent',
+  threadId: string | null,
+  content: string,
+  modelId: string,
+  onEvent: (event: RiskAgentEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
   const path = threadId
-    ? `/risk-agent/threads/${encodeURIComponent(threadId)}/stream-message`
-    : '/risk-agent/threads/stream-message'
+    ? `/${agentPath}/threads/${encodeURIComponent(threadId)}/stream-message`
+    : `/${agentPath}/threads/stream-message`
   // 成功响应是 SSE；上游在流建立前失败时由 Java BFF 返回 JSON 错误。
   // 同时声明两种类型，避免 Spring 因只接受 SSE 而把原始 4xx/5xx 再变成 500。
   const headers = authHeaders({

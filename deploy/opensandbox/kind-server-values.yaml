@@ -1,0 +1,51 @@
+# OpenSandbox release-1.1.0, local kind learning environment only.
+# Secrets are created separately; no key is committed to this file.
+server:
+  replicaCount: 1
+  env:
+    - name: OPENSANDBOX_SERVER_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: opensandbox-api-key
+          key: api-key
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  gateway:
+    enabled: true
+    host: 127.0.0.1:8091
+    gatewayRouteMode: header
+    secureAccess:
+      existingSecret: opensandbox-gateway-signing
+
+configToml: |
+  [server]
+  host = "0.0.0.0"
+  port = 80
+  api_key = ""
+  max_sandbox_timeout_seconds = 3600
+
+  [log]
+  level = "INFO"
+
+  [runtime]
+  type = "kubernetes"
+  execd_image = "sandbox-registry.cn-zhangjiakou.cr.aliyuncs.com/opensandbox/execd:release-1.1.0"
+
+  [kubernetes]
+  kubeconfig_path = ""
+  namespace = "opensandbox"
+  informer_resync_seconds = 300
+  informer_watch_timeout_seconds = 60
+  workload_provider = "batchsandbox"
+  batchsandbox_template_file = "/etc/opensandbox/example.batchsandbox-template.yaml"
+
+  [egress]
+  image = "sandbox-registry.cn-zhangjiakou.cr.aliyuncs.com/opensandbox/egress:release-1.1.0"
+  mode = "dns+nft"
+  requests = { cpu = "25m", memory = "64Mi" }
+  limits = { cpu = "250m", memory = "256Mi" }

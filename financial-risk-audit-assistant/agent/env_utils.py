@@ -47,6 +47,9 @@ def load_environment() -> None:
             "FIN_RISK_WEB_MAX_CALLS_PER_RUN",
             "MAIN_MODEL", "REGOPS_SERVICE_TOKEN", "REGOPS_MCP_URL",
             "DATABASE_URL", "AGENT_DATABASE_URL",
+            "AI_CODING_EXECUTION_BACKEND", "AI_CODING_SANDBOX_DOMAIN",
+            "AI_CODING_SANDBOX_API_KEY", "AI_CODING_SANDBOX_PROTOCOL",
+            "AI_CODING_SANDBOX_IMAGE",
         },
     )
     _load_non_empty_env(LOCAL_ENV, override=True)

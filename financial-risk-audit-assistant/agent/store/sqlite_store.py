@@ -72,6 +72,8 @@ class LocalSqliteStore:
               thread_id TEXT PRIMARY KEY,
               title TEXT NOT NULL,
               user_prompt TEXT,
+              sandbox_id TEXT,
+              sandbox_project TEXT,
               repo_url TEXT,
               repo_owner TEXT,
               repo_name TEXT,
@@ -206,6 +208,8 @@ class LocalSqliteStore:
             """
             )
             self._ensure_column("threads", "user_prompt", "TEXT")
+            self._ensure_column("threads", "sandbox_id", "TEXT")
+            self._ensure_column("threads", "sandbox_project", "TEXT")
             self._ensure_column("runs", "user_question", "TEXT")
             self._conn.commit()
 
@@ -283,17 +287,41 @@ class LocalSqliteStore:
             ).fetchone()
             return self._row_to_dict(row)
 
-    def list_threads(self, limit: int = 50, *, owner_prefix: str | None = None) -> list[dict[str, Any]]:
+    def set_thread_sandbox(
+        self, thread_id: str, *, sandbox_id: str | None = None,
+        project_name: str | None = None,
+    ) -> None:
         with self._lock:
-            if owner_prefix is None:
-                rows = self._conn.execute(
-                    "SELECT * FROM threads ORDER BY updated_at DESC LIMIT ?", (limit,)
-                ).fetchall()
-            else:
-                rows = self._conn.execute(
-                    "SELECT * FROM threads WHERE substr(thread_id, 1, ?) = ? ORDER BY updated_at DESC LIMIT ?",
-                    (len(owner_prefix), owner_prefix, limit),
-                ).fetchall()
+            row = self.get_thread(thread_id)
+            if row is None:
+                raise ValueError("会话不存在")
+            if project_name is not None and row.get("sandbox_id") and row.get("sandbox_project") != project_name:
+                raise ValueError("沙箱已绑定项目，不能在同一会话切换")
+            self._conn.execute(
+                "UPDATE threads SET sandbox_id = COALESCE(?, sandbox_id), "
+                "sandbox_project = COALESCE(?, sandbox_project), updated_at = ? WHERE thread_id = ?",
+                (sandbox_id, project_name, utc_now(), thread_id),
+            )
+            self._conn.commit()
+
+    def list_threads(
+        self, limit: int = 50, *, owner_prefix: str | None = None,
+        exclude_prefix: str | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._lock:
+            clauses: list[str] = []
+            params: list[Any] = []
+            if owner_prefix is not None:
+                clauses.append("substr(thread_id, 1, ?) = ?")
+                params.extend((len(owner_prefix), owner_prefix))
+            if exclude_prefix is not None:
+                clauses.append("substr(thread_id, 1, ?) <> ?")
+                params.extend((len(exclude_prefix), exclude_prefix))
+            where = " WHERE " + " AND ".join(clauses) if clauses else ""
+            rows = self._conn.execute(
+                f"SELECT * FROM threads{where} ORDER BY updated_at DESC LIMIT ?",
+                (*params, limit),
+            ).fetchall()
             return [dict(row) for row in rows]
 
     def update_thread_status(
@@ -682,25 +710,32 @@ class LocalSqliteStore:
 
     def list_run_monitor(
         self, *, owner_prefix: str, limit: int = 50, offset: int = 0,
-        thread_id: str | None = None,
+        thread_id: str | None = None, exclude_prefix: str | None = None,
     ) -> dict[str, Any]:
         """只返回当前用户的运行摘要，可按会话筛选；逐轮标题不复用会话标题。"""
 
         with self._lock:
             run_filter = "substr(r.thread_id, 1, ?) = ?"
             run_params: tuple[Any, ...] = (len(owner_prefix), owner_prefix)
+            session_filter = "substr(t.thread_id, 1, ?) = ?"
+            session_params: tuple[Any, ...] = (len(owner_prefix), owner_prefix)
+            if exclude_prefix is not None:
+                run_filter += " AND substr(r.thread_id, 1, ?) <> ?"
+                run_params += (len(exclude_prefix), exclude_prefix)
+                session_filter += " AND substr(t.thread_id, 1, ?) <> ?"
+                session_params += (len(exclude_prefix), exclude_prefix)
             if thread_id is not None:
                 run_filter += " AND r.thread_id = ?"
                 run_params += (thread_id,)
             sessions = self._conn.execute(
-                """
+                f"""
                 SELECT t.thread_id, t.title, COUNT(r.run_id) AS run_count,
                        MAX(r.started_at) AS latest_run_at
                 FROM threads t JOIN runs r ON r.thread_id = t.thread_id
-                WHERE substr(t.thread_id, 1, ?) = ?
+                WHERE {session_filter}
                 GROUP BY t.thread_id, t.title
                 ORDER BY latest_run_at DESC
-                """, (len(owner_prefix), owner_prefix),
+                """, session_params,
             ).fetchall()
             summary = self._conn.execute(
                 f"""

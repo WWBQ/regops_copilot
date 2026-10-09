@@ -5,11 +5,17 @@ import { useRoute, useRouter } from 'vue-router'
 import PageSidebar from './PageSidebar.vue'
 import UserAccountBar from './UserAccountBar.vue'
 import { NAV_GROUPS, type NavItem } from '../../config/nav'
+import { useAuth } from '../../composables/useAuth'
 import { CHAT_BRIDGE_KEY, createEmptyChatBridge } from '../../composables/chatBridge'
 import { SERVICE_HEALTH_KEY } from '../../composables/useServiceHealth'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuth()
+const visibleNavGroups = computed(() => NAV_GROUPS.map((group) => ({
+  ...group,
+  items: group.items.filter((item) => item.id !== 'ai-coding' || auth.user.value?.role === 'ADMIN'),
+})))
 
 const chatBridge = ref(createEmptyChatBridge())
 provide(CHAT_BRIDGE_KEY, chatBridge)
@@ -143,7 +149,7 @@ onUnmounted(() => {
           @click.stop
         >
           <nav class="menu-columns">
-            <section v-for="group in NAV_GROUPS" :key="group.id" class="menu-column">
+            <section v-for="group in visibleNavGroups" :key="group.id" class="menu-column">
               <p class="menu-group-label">{{ group.label }}</p>
               <div class="menu-items-row">
                 <button

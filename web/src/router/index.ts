@@ -6,6 +6,7 @@ import { getAuthToken } from '../api/client'
 import { useAuth } from '../composables/useAuth'
 import { ApiRequestError } from '../api/client'
 import RiskAgentView from '../views/agent/RiskAgentView.vue'
+import CodingAgentView from '../views/agent/CodingAgentView.vue'
 import DocumentViewerView from '../views/documents/DocumentViewerView.vue'
 import EvalReportView from '../views/ops/EvalReportView.vue'
 import MonitorView from '../views/ops/MonitorView.vue'
@@ -35,6 +36,12 @@ const router = createRouter({
       name: 'risk-agent',
       component: RiskAgentView,
       meta: { title: '金融风险审计助手' },
+    },
+    {
+      path: '/ai-coding',
+      name: 'ai-coding',
+      component: CodingAgentView,
+      meta: { title: 'AI Coding', adminOnly: true },
     },
     {
       path: '/rag',
@@ -204,6 +211,7 @@ router.beforeEach(async (to) => {
     }
     if (!auth.loggedIn.value) return { path: '/login', query: { redirect: to.fullPath } }
   }
+  if (to.meta.adminOnly && auth.user.value?.role !== 'ADMIN') return '/'
   return true
 })
 

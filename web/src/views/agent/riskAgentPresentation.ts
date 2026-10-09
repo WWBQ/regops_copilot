@@ -19,6 +19,10 @@ interface HistoryMessage {
 
 /** 一轮用户提问只对应一条回答；此前的 assistant 文本是执行阶段。 */
 export function groupRiskAgentHistory(history: HistoryMessage[]): ChatMessage[] {
+  return groupAgentHistory(history, 'risk_agent')
+}
+
+export function groupAgentHistory(history: HistoryMessage[], route: 'risk_agent' | 'coding_agent'): ChatMessage[] {
   const result: ChatMessage[] = []
   let assistantParts: AgentTextPart[] = []
 
@@ -28,7 +32,7 @@ export function groupRiskAgentHistory(history: HistoryMessage[]): ChatMessage[] 
     result.push({
       id: last.id,
       role: 'assistant',
-      route: 'risk_agent',
+      route,
       content: last.text,
       stages: assistantParts.slice(0, -1).map((part) => part.text),
       citations: [...assistantParts].reverse().find((part) => part.citations?.length)?.citations,

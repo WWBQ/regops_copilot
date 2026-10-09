@@ -41,14 +41,19 @@ flowchart LR
     end
 
     JAVA -->|合规问答、问数、文档、运维| PY
-    JAVA -->|金融风险会话、SSE| AGENT[Risk Agent / FastAPI<br/>:2024]
-    AGENT -->|FastMCP · 仅两项只读工具| MCP
-    AGENT -->|内部只读工具| SEARCH[Web Search<br/>外部风险线索]
+    JAVA -->|金融风险会话、SSE| AGENT[Agent FastAPI<br/>:2024]
+    JAVA -->|管理员 AI Coding 会话、SSE| AGENT
+    AGENT --> RISK[金融风险 Agent<br/>LangChain]
+    AGENT --> CODING[AI Coding<br/>DeepAgents · 工作区]
+    RISK -->|FastMCP · 仅两项只读工具| MCP
+    RISK -->|内部只读工具| SEARCH[Web Search<br/>外部风险线索]
 
     PY --> PG[(PostgreSQL + pgvector<br/>文档、向量、财务事实)]
     MCP --> PG
-    AGENT --> CP[(PostgreSQL checkpoint<br/>对话与 Agent 状态)]
-    AGENT --> BS[(PostgreSQL agent schema<br/>运行记录与结构化风险线索)]
+    RISK --> CP[(PostgreSQL checkpoint<br/>对话与 Agent 状态)]
+    CODING --> CP
+    RISK --> BS[(PostgreSQL agent schema<br/>运行记录与结构化风险线索)]
+    CODING --> BS
     PY --> LLM[DeepSeek / Qwen API]
     AGENT --> LLM
     PY -->|投递解析批次| MQ[(RabbitMQ)]
@@ -64,8 +69,8 @@ flowchart LR
 |------|--------|------|
 | `python-ai` | FastAPI · Python 3.14 | LLM 调用、RAG 检索与引用、问数、文档解析入库、评测任务 |
 | `java-service` | Spring Boot · JDK 21 | 对外 API 聚合、认证与 RBAC、审计 |
-| `risk-agent` | FastAPI · LangChain Agent | 公开财报风险线索初筛、MCP 工具循环、可切换 Web Search、引用、结构化线索、checkpoint 与 SSE；见 [`financial-risk-audit-assistant/`](./financial-risk-audit-assistant/) |
-| `web` | Vue 3 · Vite | 合规问答、金融风险审计助手、文档标注、评测与运维看板 |
+| `agent` | FastAPI · LangChain · DeepAgents | 风险初筛与 AI Coding 使用独立 API、会话命名空间和前端页面；AI Coding 可选 OpenSandbox 隔离执行，默认仍为本地模式；见 [`financial-risk-audit-assistant/`](./financial-risk-audit-assistant/) |
+| `web` | Vue 3 · Vite | 合规问答、金融风险审计助手、管理员 AI Coding、文档标注、评测与运维看板 |
 
 服务边界、端点契约、`X-Request-ID` 关联 ID 约定见 [`docs/api-spec.md`](./docs/api-spec.md)。
 W9-1 双栈链路与超时/降级见 [`docs/W9_E2E.md`](./docs/W9_E2E.md)。

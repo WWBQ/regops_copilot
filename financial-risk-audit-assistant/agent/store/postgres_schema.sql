@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS threads (
   thread_id TEXT PRIMARY KEY, title TEXT NOT NULL, user_prompt TEXT,
+  sandbox_id TEXT, sandbox_project TEXT,
   repo_url TEXT, repo_owner TEXT, repo_name TEXT, branch_name TEXT, pr_url TEXT,
   latest_run_status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );

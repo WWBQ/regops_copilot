@@ -67,6 +67,8 @@ class PostgresBusinessStore(LocalSqliteStore):
         with self._lock:
             self._conn.executescript(script)
             self._ensure_column("threads", "user_prompt", "TEXT")
+            self._ensure_column("threads", "sandbox_id", "TEXT")
+            self._ensure_column("threads", "sandbox_project", "TEXT")
             self._ensure_column("runs", "user_question", "TEXT")
             self._conn.commit()
 

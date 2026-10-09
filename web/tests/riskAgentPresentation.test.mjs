@@ -2,10 +2,22 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  groupAgentHistory,
   groupRiskAgentHistory,
   presentAgentRun,
   updateAgentTextPart,
 } from '../src/views/agent/riskAgentPresentation.ts'
+
+test('coding history keeps its own route and groups stages', () => {
+  const grouped = groupAgentHistory([
+    { id: 'u1', author: 'user', chunks: [{ kind: 'text', text: '分析项目' }] },
+    { id: 'a1', author: 'agent', chunks: [{ kind: 'text', text: '读取目录' }] },
+    { id: 'a2', author: 'agent', chunks: [{ kind: 'text', text: '找到测试入口' }] },
+  ], 'coding_agent')
+  assert.equal(grouped[1].route, 'coding_agent')
+  assert.deepEqual(grouped[1].stages, ['读取目录'])
+  assert.equal(grouped[1].content, '找到测试入口')
+})
 
 test('one question groups progress and conclusion into one assistant reply', () => {
   const citation = {
