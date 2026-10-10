@@ -175,7 +175,7 @@ def _extract_user_prompt(text: str) -> str:
 
 
 def _has_visible_markdown_value(text: str) -> bool:
-    """判断 assistant 消息是否值得作为历史正文展示。
+    """判断非最终 assistant 消息是否值得作为历史过程展示。
 
     DeepAgents 会产生很多很短的过程消息，例如“现在读取文件”。这些已经通过
     V3 event streaming 和 run_events 展示过，不应该在历史正文里堆积。
@@ -195,6 +195,29 @@ def _has_visible_markdown_value(text: str) -> bool:
         "整体架构",
     ]
     return any(marker in text for marker in value_markers)
+
+
+def _final_assistant_indexes(messages: list[Any]) -> set[int]:
+    """Locate the last text answer in each user turn, independent of its length."""
+    final_indexes: set[int] = set()
+    candidate: int | None = None
+    for index, message in enumerate(messages):
+        role = _message_role(message)
+        if role == "user":
+            if candidate is not None:
+                final_indexes.add(candidate)
+            candidate = None
+        elif role == "agent":
+            if (getattr(message, "tool_calls", None)
+                    or getattr(message, "invalid_tool_calls", None)
+                    or (getattr(message, "additional_kwargs", None) or {}).get("tool_calls")
+                    or (getattr(message, "response_metadata", None) or {}).get("finish_reason") == "tool_calls"):
+                continue
+            if strip_risk_result_block(_content_to_text(getattr(message, "content", None))).strip():
+                candidate = index
+    if candidate is not None:
+        final_indexes.add(candidate)
+    return final_indexes
 
 
 def _message_role(message: Any) -> str | None:
@@ -234,7 +257,7 @@ def _compact_content(content: str) -> str:
     return re.sub(r"\s+", " ", (content or "").strip())
 
 
-def stable_history_message_id(thread_id: str, author: str, content: str) -> str:
+def stable_history_message_id(thread_id: str, author: str, content: str, occurrence: int = 1) -> str:
     """为前端历史消息生成稳定 id。
 
     旧实现用列表 index 作为 id，checkpoint 新增消息后 index 会变化，前端容易把旧消息
@@ -243,7 +266,8 @@ def stable_history_message_id(thread_id: str, author: str, content: str) -> str:
     """
 
     digest = sha1(f"{author}\n{_compact_content(content)}".encode("utf-8")).hexdigest()[:16]
-    return f"{thread_id}-history-{author}-{digest}"
+    suffix = f"-{occurrence}" if occurrence > 1 else ""
+    return f"{thread_id}-history-{author}-{digest}{suffix}"
 
 
 def visible_checkpoint_messages(thread_id: str) -> list[dict[str, Any]]:
@@ -251,7 +275,7 @@ def visible_checkpoint_messages(thread_id: str) -> list[dict[str, Any]]:
 
     返回值只包含前端真正需要展示的 user/agent 正文：
     - user：尽量还原输入框里的原始文本。
-    - agent：保留技术方案、审查报告、总结、问答等有价值正文。
+    - agent：每轮最终回复无论长短都保留，较长的过程仍可展示。
     - tool/system/短过程消息：过滤。
 
     如果 checkpoint 读取失败或没有可用消息，返回空列表。前端历史不再回退读取 Store，
@@ -260,11 +284,14 @@ def visible_checkpoint_messages(thread_id: str) -> list[dict[str, Any]]:
 
     visible: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
+    occurrences: dict[tuple[str, str], int] = {}
     pending_citations: list[dict[str, Any]] = []
     seen_citation_sources: dict[int, tuple[Any, ...]] = {}
     conflicting_citation_ids: set[int] = set()
 
-    for message in _delta_messages_from_checkpoint(thread_id):
+    messages = _delta_messages_from_checkpoint(thread_id)
+    final_assistant_indexes = _final_assistant_indexes(messages)
+    for index, message in enumerate(messages):
         if isinstance(message, ToolMessage):
             by_key = {
                 (item["kind"], item["doc_id"], item["page"], item["snippet"]): item
@@ -290,12 +317,15 @@ def visible_checkpoint_messages(thread_id: str) -> list[dict[str, Any]]:
             continue
 
         if role == "user":
+            # Deduplicate checkpoint seed/writes within a turn, not across
+            # separate questions: users may ask the same thing twice.
+            seen.clear()
             pending_citations = []
             conflicting_citation_ids = set()
             text = _extract_user_prompt(text)
         else:
             text = strip_risk_result_block(text)
-            if not _has_visible_markdown_value(text):
+            if index not in final_assistant_indexes and not _has_visible_markdown_value(text):
                 continue
 
         text = text.strip()
@@ -305,8 +335,9 @@ def visible_checkpoint_messages(thread_id: str) -> list[dict[str, Any]]:
         if key in seen:
             continue
         seen.add(key)
+        occurrences[key] = occurrences.get(key, 0) + 1
         visible_message = {
-                "message_id": stable_history_message_id(thread_id, role, text),
+                "message_id": stable_history_message_id(thread_id, role, text, occurrences[key]),
                 "author": role,
                 "content": text,
                 "source": "checkpoint",

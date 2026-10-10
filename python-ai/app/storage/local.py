@@ -133,6 +133,11 @@ class LocalObjectStore:
     def object_exists(self, bucket: str, key: str) -> bool:
         return self._object_path(bucket, key).is_file()
 
+    def delete_object(self, bucket: str, key: str) -> None:
+        """Delete one object and its sidecar metadata; missing objects are harmless."""
+        self._object_path(bucket, key).unlink(missing_ok=True)
+        self._meta_path(bucket, key).unlink(missing_ok=True)
+
     def generate_presigned_url(
         self,
         bucket: str,

@@ -797,7 +797,7 @@ def run_plan_response_task(
     record_event(thread_id, "created", "任务已创建", status="completed")
     repo = parse_gitee_repo_url(repo_url) if isinstance(repo_url, str) and repo_url.strip() else None
     if repo is None:
-        record_event(thread_id, "workspace", "使用会话本地工作目录", status="completed")
+        record_event(thread_id, "workspace", "使用沙箱 /projects 工作目录" if thread_id and "_coding_" in thread_id else "使用会话本地工作目录", status="completed")
     else:
         record_event(thread_id, "repo", "解析 Gitee 仓库", status="completed")
 
@@ -995,8 +995,9 @@ def run_agent_task(
     record_event(thread_id, "created", "任务已创建", status="completed")
     repo = parse_gitee_repo_url(repo_url) if isinstance(repo_url, str) and repo_url.strip() else None
     if repo is None:
-        record_event(thread_id, "workspace", "使用会话本地工作目录", status="completed")
-        logger.info("本轮不绑定 Gitee 仓库，使用会话本地工作目录：thread_id=%s", thread_id)
+        workspace_label = "沙箱 /projects 工作目录" if coding_sandbox else "会话本地工作目录"
+        record_event(thread_id, "workspace", f"使用{workspace_label}", status="completed")
+        logger.info("本轮不绑定 Gitee 仓库，使用%s：thread_id=%s", workspace_label, thread_id)
     else:
         logger.info("Gitee 仓库解析成功：owner=%s repo=%s", repo.owner, repo.repo)
         record_event(thread_id, "repo", "解析 Gitee 仓库", status="completed")

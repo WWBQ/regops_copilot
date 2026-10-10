@@ -18,10 +18,11 @@ import {
   downloadCodingSnapshot,
   getCodingHealth,
   getCodingOptions,
-  getCodingProjects,
   getCodingThread,
   listCodingThreads,
+  prepareCodingSandbox,
   streamCodingMessage,
+  uploadCodingFile,
 } from '../../api/codingAgent'
 import type { ChatMessage as ChatMessageType, Citation, RiskAuditResult } from '../../types/chat'
 import ChatInput from '../../components/chat/ChatInput.vue'
@@ -45,23 +46,31 @@ const ready = ref(false)
 const agentOk = ref<boolean | null>(null)
 const availableModels = ref<string[]>([])
 const selectedModel = ref('')
-const projects = ref<string[]>([])
-const selectedProject = ref('')
-const sandboxMode = ref(false)
-const activeSandboxProject = ref('')
 const activeSandboxReady = ref(false)
+const showExportReminder = ref(false)
+const workspaceNotice = ref('')
+const sandboxActionBusy = ref(false)
 const error = ref('')
 const listRef = ref<HTMLElement | null>(null)
 const activeEvidence = ref<Citation | null>(null)
-const projectRequired = computed(() => isCoding.value && sandboxMode.value && !selectedProject.value)
 const inputUnavailableText = computed(() => {
   if (!ready.value) return '正在连接 Agent 服务…'
   if (agentOk.value === false) return isCoding.value ? 'AI Coding 暂不可用' : '金融风险审计助手暂不可用'
   if (!selectedModel.value) return '没有可用模型'
-  if (projectRequired.value) return '请先选择上方的工作项目'
   return isCoding.value ? 'AI Coding 暂不可用' : '金融风险审计助手暂不可用'
 })
+const codingSandboxHint = computed(() => {
+  if (error.value) return error.value
+  if (workspaceNotice.value) return workspaceNotice.value
+  return currentThreadId.value
+    ? '当前会话还没有沙箱；可新建后上传代码。'
+    : '沙箱会在需要运行代码时自动创建；也可以先新建，再上传代码。'
+})
+const showSandboxNotice = computed(() => isCoding.value && (
+  !!error.value || !!workspaceNotice.value || !activeSandboxReady.value
+))
 let abortController: AbortController | null = null
+let workspaceNoticeTimer: ReturnType<typeof setTimeout> | null = null
 let disposed = false
 let runParts: AgentTextPart[] = []
 let activeReplyId: string | null = null
@@ -114,7 +123,7 @@ function syncBridge() {
   if (!bridge || disposed) return
   bridge.value = {
     ready: ready.value,
-    busy: loading.value,
+    busy: loading.value || sandboxActionBusy.value,
     canRename: false,
     activeSessionId: currentThreadId.value ?? '',
     sessions: threads.value.map((thread) => ({
@@ -141,7 +150,6 @@ async function reloadThreads() {
 
 async function reloadModels() {
   const options = await (isCoding.value ? getCodingOptions() : getRiskAgentOptions())
-  sandboxMode.value = isCoding.value && 'execution_backend' in options && options.execution_backend === 'opensandbox'
   availableModels.value = options.models.map((item) => item.id)
   let stored = ''
   try { stored = localStorage.getItem(isCoding.value ? 'regops_coding_agent_model' : 'regops_risk_agent_model') ?? '' } catch { /* private mode */ }
@@ -169,15 +177,15 @@ async function retryConnection() {
 }
 
 async function selectThread(id: string) {
-  if (loading.value) return
+  if (loading.value || sandboxActionBusy.value) return
   error.value = ''
   try {
     const thread = await (isCoding.value ? getCodingThread(id) : getRiskAgentThread(id))
     activeEvidence.value = null
     currentThreadId.value = thread.id
-    activeSandboxProject.value = thread.sandboxProject ?? ''
+    workspaceNotice.value = ''
     activeSandboxReady.value = !!thread.sandboxReady
-    if (activeSandboxProject.value) selectedProject.value = activeSandboxProject.value
+    showExportReminder.value = isCoding.value && thread.snapshotReady === true
     messages.value = restoreMessages(thread)
     activeReplyId = null
     activeUserId = null
@@ -190,10 +198,11 @@ async function selectThread(id: string) {
 }
 
 function newChat() {
-  if (loading.value) return
+  if (loading.value || sandboxActionBusy.value) return
   currentThreadId.value = null
-  activeSandboxProject.value = ''
+  workspaceNotice.value = ''
   activeSandboxReady.value = false
+  showExportReminder.value = false
   messages.value = []
   activeEvidence.value = null
   activeReplyId = null
@@ -204,7 +213,7 @@ function newChat() {
 }
 
 async function deleteThread(id: string) {
-  if (loading.value) return
+  if (loading.value || sandboxActionBusy.value) return
   try {
     await (isCoding.value ? deleteCodingThread(id) : deleteRiskAgentThread(id))
     if (currentThreadId.value === id) newChat()
@@ -218,7 +227,6 @@ function applyEvent({ event, data }: RiskAgentEvent) {
   const threadId = typeof data.thread_id === 'string' ? data.thread_id : null
   if (event === 'thread_snapshot' && typeof data.id === 'string') {
     currentThreadId.value = data.id
-    activeSandboxProject.value = typeof data.sandboxProject === 'string' ? data.sandboxProject : ''
     activeSandboxReady.value = data.sandboxReady === true
     syncBridge()
     return
@@ -258,10 +266,19 @@ function applyEvent({ event, data }: RiskAgentEvent) {
     return
   }
   if (event === 'thread_done') {
-    if (isCoding.value) activeSandboxReady.value = data.sandboxReady === true
+    if (isCoding.value) {
+      activeSandboxReady.value = data.sandboxReady === true
+      showExportReminder.value = data.snapshotReady === true
+    }
     const reply = activeReply()
     if (reply && !reply.content) updateReply('')
     if (reply) reply.statusText = ''
+  }
+  if (event === 'export_warning' && isCoding.value) {
+    error.value = String(data.message ?? '导出快照保存失败，请手动导出')
+  }
+  if (event === 'workspace_notice' && isCoding.value) {
+    workspaceNotice.value = String(data.message ?? '已创建新的空沙箱工作区')
   }
 }
 
@@ -279,20 +296,78 @@ async function exportSandbox() {
     link.remove()
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
   } catch (cause) {
+    error.value = cause instanceof ApiRequestError
+      ? `导出失败：${cause.message}`
+      : formatUserFacingError(cause)
+  }
+}
+
+async function prepareSandbox() {
+  if (!isCoding.value || loading.value || sandboxActionBusy.value) return
+  sandboxActionBusy.value = true
+  error.value = ''
+  workspaceNotice.value = ''
+  syncBridge()
+  try {
+    const result = await prepareCodingSandbox(currentThreadId.value)
+    agentOk.value = true
+    currentThreadId.value = result.thread.id
+    activeSandboxReady.value = result.thread.sandboxReady === true
+    workspaceNotice.value = result.workspace_notice
+      || (result.sandbox_created ? '沙箱已创建，可以上传或编写代码。' : '沙箱已连接，可以继续使用。')
+    await reloadThreads()
+  } catch (cause) {
     error.value = formatUserFacingError(cause)
+  } finally {
+    sandboxActionBusy.value = false
+    syncBridge()
+  }
+}
+
+async function onCodeFilesSelected(files: File[]) {
+  if (!files.length || loading.value || sandboxActionBusy.value) return
+  sandboxActionBusy.value = true
+  error.value = ''
+  workspaceNotice.value = ''
+  syncBridge()
+  let uploaded = 0
+  try {
+    for (const file of files) {
+      if (!file.size || file.size > 20 * 1024 * 1024) throw new Error(`${file.name} 不能为空或超过 20 MiB`)
+    }
+    let threadId = currentThreadId.value
+    if (!threadId) {
+      const prepared = await prepareCodingSandbox(null)
+      agentOk.value = true
+      threadId = prepared.thread.id
+      currentThreadId.value = threadId
+      activeSandboxReady.value = prepared.thread.sandboxReady === true
+    }
+    for (const file of files) {
+      const result = await uploadCodingFile(threadId, file)
+      agentOk.value = true
+      uploaded += result.file_count
+      activeSandboxReady.value = result.thread.sandboxReady === true
+      if (result.workspace_notice) workspaceNotice.value = result.workspace_notice
+      if (!result.snapshot_saved) throw new Error(result.message)
+    }
+    workspaceNotice.value = `${workspaceNotice.value ? `${workspaceNotice.value} ` : ''}已导入 ${uploaded} 个文件，代码快照已保存。`
+    showExportReminder.value = true
+    await reloadThreads()
+  } catch (cause) {
+    error.value = `${uploaded ? `已导入 ${uploaded} 个文件；` : ''}${formatUserFacingError(cause)}`
+    try { await reloadThreads() } catch { /* Keep the original upload error visible. */ }
+  } finally {
+    sandboxActionBusy.value = false
+    syncBridge()
   }
 }
 
 async function send(text: string) {
   const content = text.trim()
-  if (!content || loading.value || !selectedModel.value) return
-  if (projectRequired.value) {
-    error.value = '请先选择工作项目。'
-    return
-  }
-  const requestContent = isCoding.value && selectedProject.value
-    ? `目标项目：/projects/${selectedProject.value}\n用户任务：${content}`
-    : content
+  if (!content || loading.value || sandboxActionBusy.value || !selectedModel.value) return
+  const requestContent = content
+  showExportReminder.value = false
   error.value = ''
   const localId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
   activeUserId = `local-user-${localId}`
@@ -301,7 +376,7 @@ async function send(text: string) {
   messages.value.push({ id: activeUserId, role: 'user', content: requestContent })
   messages.value.push({
     id: activeReplyId, role: 'assistant', content: '', route: isCoding.value ? 'coding_agent' : 'risk_agent',
-    streaming: true, statusText: isCoding.value ? '正在准备 AI Coding 工作区…' : '正在启动金融风险初筛…', stages: [],
+    streaming: true, statusText: isCoding.value ? '正在处理 AI Coding 请求…' : '正在启动金融风险初筛…', stages: [],
   })
   loading.value = true
   syncBridge()
@@ -311,10 +386,10 @@ async function send(text: string) {
       currentThreadId.value, requestContent, selectedModel.value, applyEvent, abortController.signal,
     )
   } catch (cause) {
-    if (cause instanceof ApiRequestError && [502, 503, 504].includes(cause.status)) agentOk.value = false
     if (cause instanceof DOMException && cause.name === 'AbortError') {
       error.value = '已停止接收；后台任务可能仍在运行，请稍后刷新会话。'
     } else {
+      if (cause instanceof ApiRequestError && [502, 503, 504].includes(cause.status)) agentOk.value = false
       error.value = formatUserFacingError(cause)
     }
     const reply = activeReply()
@@ -354,16 +429,12 @@ async function scrollToBottom() {
 }
 
 watch(messages, () => { void scrollToBottom() }, { deep: true })
-watch(selectedProject, () => {
-  if (error.value === '请先选择工作项目。') error.value = ''
+watch(workspaceNotice, (notice) => {
+  if (workspaceNoticeTimer) clearTimeout(workspaceNoticeTimer)
+  workspaceNoticeTimer = notice ? setTimeout(() => { workspaceNotice.value = '' }, 6000) : null
 })
-
 onMounted(async () => {
   try {
-    if (isCoding.value) {
-      projects.value = (await getCodingProjects()).projects
-      if (projects.value.length === 1) selectedProject.value = projects.value[0]
-    }
     await reloadModels()
     await reloadThreads()
     if (threads.value.length) await selectThread(threads.value[0].id)
@@ -379,6 +450,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   disposed = true
   abortController?.abort()
+  if (workspaceNoticeTimer) clearTimeout(workspaceNoticeTimer)
   if (bridge) bridge.value = createEmptyChatBridge()
 })
 </script>
@@ -389,26 +461,15 @@ onBeforeUnmount(() => {
       <header class="chat-header">
         <div>
           <h1>{{ isCoding ? 'AI Coding' : '金融风险审计助手' }}</h1>
-          <p v-if="isCoding">使用 DeepAgents 分析、实现和审查工作区代码。开发任务会先给出方案，确认后再实施；{{ sandboxMode ? '当前为 OpenSandbox 隔离模式，修改需导出后人工合并。' : '当前为本机工作区模式。' }}</p>
+          <p v-if="isCoding">使用 DeepAgents 在独立沙箱中分析、实现和审查代码。开发任务先给出方案，确认后再实施；完成后请导出代码。</p>
           <p v-else>对公开财报做风险线索初筛，结合财务事实与年报证据提出待核查问题；不出具审计或投资结论。</p>
         </div>
       </header>
 
-      <div v-if="isCoding" class="coding-project-bar">
-        <label for="coding-project">工作项目</label>
-        <select id="coding-project" v-model="selectedProject" :disabled="loading || (sandboxMode && activeSandboxReady)">
-          <option value="">{{ sandboxMode ? '请选择项目' : '整个工作区' }}</option>
-          <option v-if="activeSandboxProject && !projects.includes(activeSandboxProject)" :value="activeSandboxProject">{{ activeSandboxProject }}（沙箱快照）</option>
-          <option v-for="project in projects" :key="project" :value="project">{{ project }}</option>
-        </select>
-        <span>{{ sandboxMode ? '首次运行复制所选项目快照；沙箱创建后不能在同一会话切换。' : '仅可操作配置的 /projects 工作区；选择项目会将路径写入任务。' }}</span>
-        <button v-if="sandboxMode && activeSandboxReady && activeSandboxProject" type="button" :disabled="loading" @click="exportSandbox">导出沙箱项目 ZIP</button>
-      </div>
-
       <div ref="listRef" class="message-list">
         <div v-if="!messages.length" class="risk-welcome">
           <h2>{{ isCoding ? '从一个代码任务开始' : '从一个核查目标开始' }}</h2>
-          <p>{{ isCoding ? '例如：分析选中项目的目录结构和测试入口，先给出实施建议。' : '例如：检查美的集团近三年财务数据中值得人工复核的风险信号，并列明证据缺口。' }}</p>
+          <p>{{ isCoding ? '例如：在沙箱 /projects 中创建一个 Python 小项目，先给出实施方案。' : '例如：检查美的集团近三年财务数据中值得人工复核的风险信号，并列明证据缺口。' }}</p>
         </div>
         <ChatMessage
           v-for="message in messages"
@@ -420,21 +481,36 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="chat-composer-dock">
-        <div v-if="error" class="risk-error" role="alert">
+        <div v-if="showSandboxNotice" class="coding-sandbox-notice" :class="{ 'is-error': !!error }" :role="error ? 'alert' : 'status'">
+          <span>{{ codingSandboxHint }}</span>
+          <div class="coding-sandbox-controls">
+            <button v-if="agentOk === false" type="button" :disabled="loading || sandboxActionBusy" @click="retryConnection">重试连接</button>
+            <button type="button" :disabled="loading || sandboxActionBusy" @click="prepareSandbox">
+              {{ sandboxActionBusy ? '正在处理…' : currentThreadId ? '重连/新建沙箱' : '新建沙箱' }}
+            </button>
+          </div>
+        </div>
+        <div v-if="isCoding && showExportReminder" class="export-reminder" role="status">
+          <span>如需在本地保留代码，可下载 ZIP；下载需要已保存的快照或仍可用的沙箱。</span>
+          <button class="export-reminder-button" type="button" :disabled="loading" @click="exportSandbox">导出代码 ZIP</button>
+        </div>
+        <div v-if="error && !isCoding" class="risk-error" role="alert">
           {{ error }}
           <button v-if="agentOk === false" type="button" @click="retryConnection">重试连接</button>
         </div>
         <div v-if="!messages.length" class="example-chips">
-          <button type="button" class="example-chip" @click="send(isCoding ? '分析项目结构、关键模块和测试入口，暂不修改代码' : '对美的集团2024年财报做风险线索初筛，列出需要人工核查的问题和证据缺口')">
-            {{ isCoding ? '分析项目结构' : '美的 2024 风险初筛' }}
+          <button type="button" class="example-chip" @click="send(isCoding ? '在沙箱中创建一个 Python 示例项目，先给出方案，暂不修改代码' : '对美的集团2024年财报做风险线索初筛，列出需要人工核查的问题和证据缺口')">
+            {{ isCoding ? '创建 Python 项目' : '美的 2024 风险初筛' }}
           </button>
         </div>
         <ChatInput
           :loading="loading"
-          :disabled="!ready || !selectedModel || projectRequired"
+          :disabled="!ready || !selectedModel || sandboxActionBusy"
           :java-ok="true"
           :python-ok="agentOk"
-          :allow-attachment="false"
+          :allow-attachment="isCoding"
+          :attachment-kind="isCoding ? 'code' : 'pdf'"
+          :uploading="sandboxActionBusy"
           :models="availableModels"
           :model="selectedModel"
           @update:model="selectModel"
@@ -443,6 +519,7 @@ onBeforeUnmount(() => {
           :unavailable-text="inputUnavailableText"
           @send="send"
           @stop="stopReceiving"
+          @attach-files="onCodeFilesSelected"
         />
       </div>
     </section>
@@ -470,11 +547,22 @@ onBeforeUnmount(() => {
 .risk-welcome { margin: auto; text-align: center; color: var(--muted); max-width: 500px; }
 .risk-welcome h2 { color: var(--text-strong); font-size: 18px; margin-bottom: 8px; }
 .risk-error { margin: 0 0 10px; padding: 10px 14px; border: 1px solid #fecaca; border-radius: 10px; background: #fef2f2; color: #991b1b; }
-.coding-project-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 18px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 13px; }
-.coding-project-bar label { font-weight: 600; color: var(--text-strong); }
-.coding-project-bar select { border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; background: white; color: var(--text-strong); }
+.coding-sandbox-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 10px 14px; border: 1px solid #ccece5; border-radius: 12px; background: #f2faf8; color: #14574c; font-size: 13px; line-height: 1.5; }
+.coding-sandbox-notice.is-error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+.coding-sandbox-controls { display: flex; flex: none; gap: 8px; }
+.coding-sandbox-controls button { border: 1px solid currentColor; border-radius: 8px; background: #fff; color: inherit; padding: 7px 12px; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.coding-sandbox-controls button:hover:not(:disabled) { background: #ecfdf5; }
+.coding-sandbox-notice.is-error .coding-sandbox-controls button:hover:not(:disabled) { background: #fff1f2; }
+.coding-sandbox-controls button:disabled { opacity: .55; cursor: not-allowed; }
+.export-reminder { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 10px 14px; border: 1px solid #ccece5; border-radius: 12px; background: #f2faf8; color: #14574c; font-size: 13px; line-height: 1.5; }
+.export-reminder-button { flex: none; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent); color: #fff; padding: 7px 12px; font: inherit; font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.export-reminder-button:hover:not(:disabled) { border-color: var(--accent-hover); background: var(--accent-hover); }
+.export-reminder-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.export-reminder-button:disabled { opacity: .55; cursor: not-allowed; }
 
 @media (max-width: 800px) {
+  .coding-sandbox-notice { flex-wrap: wrap; }
+  .export-reminder { flex-wrap: wrap; }
   .risk-agent-workspace { position: relative; }
   .risk-agent-workspace.with-evidence .risk-agent-panel { max-width: 960px; }
   .risk-agent-workspace :deep(.risk-evidence-panel) {

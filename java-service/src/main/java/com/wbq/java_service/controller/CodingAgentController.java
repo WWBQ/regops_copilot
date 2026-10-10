@@ -22,9 +22,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
-/** AI Coding executes commands in the configured workspace; only admins may use it. */
+/** AI Coding executes commands only in its per-thread sandbox; only admins may use it. */
 @RestController
 @RequestMapping("/api/coding-agent")
 @PreAuthorize("hasRole('ADMIN')")
@@ -51,11 +53,6 @@ public class CodingAgentController {
         return client.get(UPSTREAM + "/options", userId());
     }
 
-    @GetMapping("/projects")
-    public Object projects() {
-        return client.get(UPSTREAM + "/projects", userId());
-    }
-
     @GetMapping("/threads")
     public Object threads() {
         return client.get(UPSTREAM + "/threads", userId());
@@ -64,6 +61,34 @@ public class CodingAgentController {
     @GetMapping("/threads/{threadId}")
     public Object thread(@PathVariable String threadId) {
         return client.get(UPSTREAM + "/threads/" + checkedThreadId(threadId), userId());
+    }
+
+    @PostMapping("/threads/sandbox")
+    public Object createSandbox() {
+        return client.post(UPSTREAM + "/threads/sandbox", userId());
+    }
+
+    @PostMapping("/threads/{threadId}/sandbox")
+    public Object prepareSandbox(@PathVariable String threadId) {
+        return client.post(UPSTREAM + "/threads/" + checkedThreadId(threadId) + "/sandbox", userId());
+    }
+
+    @PostMapping(value = "/threads/{threadId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Object uploadCodeFile(@PathVariable String threadId, @RequestParam("file") MultipartFile file) {
+        if (file.isEmpty() || file.getSize() > 20 * 1024 * 1024) {
+            throw new PythonAiException(413, "上传文件必须在 1 字节至 20 MiB 之间", "upload_too_large");
+        }
+        String filename = file.getOriginalFilename();
+        if (filename == null || filename.isBlank() || filename.contains("/") || filename.contains("\\")) {
+            throw new PythonAiException(422, "上传文件名无效", "bad_request");
+        }
+        try {
+            return client.uploadCodeFile(
+                    UPSTREAM + "/threads/" + checkedThreadId(threadId) + "/files",
+                    filename, file.getBytes(), userId());
+        } catch (java.io.IOException ex) {
+            throw new PythonAiException(400, "上传文件读取失败", "bad_request");
+        }
     }
 
     @GetMapping(value = "/threads/{threadId}/export", produces = "application/zip")

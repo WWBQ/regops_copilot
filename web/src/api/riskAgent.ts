@@ -8,6 +8,7 @@ export interface RiskAgentThread {
   updatedAt: number
   sandboxProject?: string
   sandboxReady?: boolean
+  snapshotReady?: boolean
   messages: Array<{
     id: string
     author: string

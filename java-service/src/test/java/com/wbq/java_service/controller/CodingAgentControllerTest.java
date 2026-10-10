@@ -1,7 +1,6 @@
 package com.wbq.java_service.controller;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import com.wbq.java_service.auth.AuthUser;
@@ -16,12 +15,16 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -50,11 +53,18 @@ class CodingAgentControllerTest {
                 .andExpect(status().isOk());
         verify(client).get("/regops/coding-agent/threads", USER_ID);
 
-        when(client.get("/regops/coding-agent/projects", USER_ID))
-                .thenReturn(Map.of("projects", List.of("demo")));
         mvc.perform(get("/api/coding-agent/projects").header("Authorization", "Bearer valid"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.projects[0]").value("demo"));
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void hostProjectCreationIsUnavailable() throws Exception {
+        authenticate(Role.ADMIN);
+        mvc.perform(post("/api/coding-agent/projects")
+                        .header("Authorization", "Bearer valid")
+                        .contentType("application/json")
+                        .content("{\"name\":\"new-project\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -77,6 +87,42 @@ class CodingAgentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().bytes(new byte[] {1, 2, 3}));
         verify(client).downloadArchive(path, USER_ID);
+    }
+
+    @Test
+    void adminCanCreateSandboxAndUploadCodeThroughBff() throws Exception {
+        authenticate(Role.ADMIN);
+        String threadId = USER_ID + "_coding_11111111-1111-1111-1111-111111111111";
+        when(client.post("/regops/coding-agent/threads/" + threadId + "/sandbox", USER_ID))
+                .thenReturn(java.util.Map.of("sandbox_created", true));
+        mvc.perform(post("/api/coding-agent/threads/" + threadId + "/sandbox")
+                        .header("Authorization", "Bearer valid"))
+                .andExpect(status().isOk());
+        verify(client).post("/regops/coding-agent/threads/" + threadId + "/sandbox", USER_ID);
+
+        byte[] code = "print(1)".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        MockMultipartFile file = new MockMultipartFile("file", "main.py", "text/plain", code);
+        when(client.uploadCodeFile(eq("/regops/coding-agent/threads/" + threadId + "/files"),
+                eq("main.py"), any(byte[].class), eq(USER_ID)))
+                .thenReturn(java.util.Map.of("file_count", 1));
+        mvc.perform(multipart("/api/coding-agent/threads/" + threadId + "/files")
+                        .file(file).header("Authorization", "Bearer valid"))
+                .andExpect(status().isOk());
+        verify(client).uploadCodeFile(eq("/regops/coding-agent/threads/" + threadId + "/files"),
+                eq("main.py"), any(byte[].class), eq(USER_ID));
+    }
+
+    @Test
+    void analystCannotCreateSandboxOrUploadCode() throws Exception {
+        authenticate(Role.ANALYST);
+        String threadId = USER_ID + "_coding_11111111-1111-1111-1111-111111111111";
+        mvc.perform(post("/api/coding-agent/threads/" + threadId + "/sandbox")
+                        .header("Authorization", "Bearer valid"))
+                .andExpect(status().isForbidden());
+        mvc.perform(multipart("/api/coding-agent/threads/" + threadId + "/files")
+                        .file(new MockMultipartFile("file", "main.py", "text/plain", new byte[] {1}))
+                        .header("Authorization", "Bearer valid"))
+                .andExpect(status().isForbidden());
     }
 
     private void authenticate(Role role) {

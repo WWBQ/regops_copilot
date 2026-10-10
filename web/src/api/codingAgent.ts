@@ -17,8 +17,35 @@ export function getCodingHealth(): Promise<{ ok: boolean }> {
   return apiFetch('/coding-agent/health')
 }
 
-export function getCodingOptions(): Promise<RiskAgentOptions & { execution_backend: 'local' | 'opensandbox' }> {
+export function getCodingOptions(): Promise<RiskAgentOptions & { execution_backend: 'opensandbox' }> {
   return apiFetch('/coding-agent/options')
+}
+
+export interface CodingSandboxResponse {
+  thread: Pick<RiskAgentThread, 'id' | 'title' | 'status' | 'sandboxReady'>
+  sandbox_created: boolean
+  workspace_notice: string | null
+}
+
+export interface CodingUploadResponse {
+  thread: CodingSandboxResponse['thread']
+  file_count: number
+  snapshot_saved: boolean
+  message: string
+  workspace_notice: string | null
+}
+
+export function prepareCodingSandbox(threadId: string | null): Promise<CodingSandboxResponse> {
+  const path = threadId
+    ? `/coding-agent/threads/${encodeURIComponent(threadId)}/sandbox`
+    : '/coding-agent/threads/sandbox'
+  return apiFetch(path, { method: 'POST' })
+}
+
+export function uploadCodingFile(threadId: string, file: File): Promise<CodingUploadResponse> {
+  const body = new FormData()
+  body.append('file', file, file.name)
+  return apiFetch(`/coding-agent/threads/${encodeURIComponent(threadId)}/files`, { method: 'POST', body })
 }
 
 export async function downloadCodingSnapshot(threadId: string): Promise<Blob> {
@@ -31,10 +58,6 @@ export async function downloadCodingSnapshot(threadId: string): Promise<Blob> {
     throw new ApiRequestError(formatErrorDetail(body.detail, response.status), response.status, body.extra?.error_code)
   }
   return response.blob()
-}
-
-export function getCodingProjects(): Promise<{ projects: string[] }> {
-  return apiFetch('/coding-agent/projects')
 }
 
 export function streamCodingMessage(

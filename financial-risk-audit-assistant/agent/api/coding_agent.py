@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import threading
 import uuid
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
@@ -21,12 +23,23 @@ from agent.api.auth import require_regops_user
 from agent.core.checkpoint_history import visible_checkpoint_messages
 from agent.core.model import available_agent_models, default_agent_model_id, require_agent_model_id
 from agent.core.runtime import delete_task, get_task, initialize_task_record, list_tasks
-from agent.coding.service import available_projects, run_coding_task
-from agent.coding.service import selected_project
-from agent.backends.open_sandbox import destroy_sandbox_for_thread, execution_backend, export_project_zip
 from agent.core.graph import get_store
+from agent.coding.service import run_coding_task
+from agent.backends.coding_upload import UploadRejected, upload_to_workspace
+from agent.backends.open_sandbox import (
+    SandboxExpiredError,
+    delete_saved_export,
+    destroy_sandbox_for_thread,
+    consume_workspace_notice,
+    execution_backend,
+    export_project_zip,
+    ensure_sandbox_for_thread,
+    save_export_snapshot,
+)
+from agent.backends.coding_snapshot_memory import recall_snapshot
 
 coding_agent_router = APIRouter(prefix="/regops/coding-agent")
+logger = logging.getLogger(__name__)
 
 
 class CodingMessageRequest(BaseModel):
@@ -57,15 +70,14 @@ def _thread_meta(thread: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": thread["thread_id"],
         "title": thread.get("title") or "AI Coding 任务",
-        "status": "running" if status == "running" else "error" if status == "failed" else "finished",
+        "status": "running" if status in {"running", "pending"} else "error" if status == "failed" else "idle" if status == "idle" else "finished",
         "createdAt": timestamp(thread.get("created_at")),
         "updatedAt": timestamp(thread.get("updated_at")),
-        "sandboxProject": thread.get("sandbox_project") or "",
         "sandboxReady": bool(thread.get("sandbox_id")),
     }
 
 
-def _thread_payload(thread: dict[str, Any]) -> dict[str, Any]:
+def _thread_payload(thread: dict[str, Any], *, include_snapshot: bool = False) -> dict[str, Any]:
     messages = []
     for index, item in enumerate(visible_checkpoint_messages(str(thread["thread_id"]))):
         content = str(item.get("content") or "").strip()
@@ -77,22 +89,24 @@ def _thread_payload(thread: dict[str, Any]) -> dict[str, Any]:
             "timestamp": item.get("created_at") or thread.get("created_at"),
             "chunks": [{"kind": "text", "text": content}],
         })
-    return {**_thread_meta(thread), "messages": messages}
+    payload = {**_thread_meta(thread), "messages": messages}
+    if include_snapshot:
+        payload["snapshotReady"] = recall_snapshot(str(thread["thread_id"])) is not None
+    return payload
 
 
 @coding_agent_router.get("/options")
 def options(_user_id: str = Depends(require_regops_user)) -> dict[str, Any]:
+    try:
+        backend = execution_backend()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     models = available_agent_models()
     return {
         "models": [{"id": model_id, "label": model_id} for model_id in models],
         "default_agent_model": default_agent_model_id(models),
-        "execution_backend": execution_backend(),
+        "execution_backend": backend,
     }
-
-
-@coding_agent_router.get("/projects")
-def projects(_user_id: str = Depends(require_regops_user)) -> dict[str, list[str]]:
-    return {"projects": available_projects()}
 
 
 @coding_agent_router.get("/threads")
@@ -106,7 +120,73 @@ def thread_detail(thread_id: str, user_id: str = Depends(require_regops_user)) -
     task = get_task(_owned_thread_id(user_id, thread_id))
     if task is None:
         raise HTTPException(status_code=404, detail="thread not found")
-    return _thread_payload(task)
+    return _thread_payload(task, include_snapshot=True)
+
+
+def _prepare_sandbox(thread_id: str) -> dict[str, Any]:
+    task = get_task(thread_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="thread not found")
+    if task.get("latest_run_status") in {"running", "pending"}:
+        raise HTTPException(status_code=409, detail="任务执行中，不能重建沙箱")
+    try:
+        execution_backend()
+        backend = ensure_sandbox_for_thread(thread_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    notice = consume_workspace_notice(thread_id)
+    current = get_task(thread_id) or task
+    return {
+        "thread": _thread_meta(current),
+        "sandbox_created": str(task.get("sandbox_id") or "") != backend.id,
+        "workspace_notice": notice,
+    }
+
+
+@coding_agent_router.post("/threads/sandbox")
+def create_thread_sandbox(user_id: str = Depends(require_regops_user)) -> dict[str, Any]:
+    thread_id = f"{user_id}_coding_{uuid.uuid4()}"
+    get_store().upsert_thread(thread_id=thread_id, title="AI Coding 会话", latest_run_status="idle")
+    try:
+        return _prepare_sandbox(thread_id)
+    except Exception:
+        delete_task(thread_id)
+        raise
+
+
+@coding_agent_router.post("/threads/{thread_id}/sandbox")
+def prepare_thread_sandbox(thread_id: str, user_id: str = Depends(require_regops_user)) -> dict[str, Any]:
+    return _prepare_sandbox(_owned_thread_id(user_id, thread_id))
+
+
+@coding_agent_router.post("/threads/{thread_id}/files")
+async def upload_code_file(
+    thread_id: str, request: Request,
+    filename: str = Query(..., min_length=1, max_length=512),
+    user_id: str = Depends(require_regops_user),
+) -> dict[str, Any]:
+    owned_id = _owned_thread_id(user_id, thread_id)
+    task = get_task(owned_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="thread not found")
+    if task.get("latest_run_status") in {"running", "pending"}:
+        raise HTTPException(status_code=409, detail="任务执行中，不能上传代码")
+    if int(request.headers.get("content-length") or 0) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="上传文件超过 20 MiB")
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > 20 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="上传文件超过 20 MiB")
+        chunks.append(chunk)
+    try:
+        result = await run_in_threadpool(upload_to_workspace, owned_id, filename, b"".join(chunks))
+    except UploadRejected as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"thread": _thread_meta(get_task(owned_id) or task), **result}
 
 
 @coding_agent_router.get("/threads/{thread_id}/export")
@@ -121,6 +201,8 @@ def export_thread_project(thread_id: str, user_id: str = Depends(require_regops_
         _project, archive = export_project_zip(owned_id)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except SandboxExpiredError as exc:
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return Response(
@@ -140,24 +222,11 @@ def _stream_response(thread_id: str, content: str, model_id: str | None) -> Stre
         selected_model = require_agent_model_id(model_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    prior_thread = get_task(thread_id)
-    mode = execution_backend()
-    if prior_thread and prior_thread.get("sandbox_id") and mode == "local":
-        raise HTTPException(status_code=409, detail="此会话已绑定 OpenSandbox，不能切回本机执行")
-    project_name = None
-    if mode == "opensandbox":
-        try:
-            project_name = selected_project(content, (prior_thread or {}).get("sandbox_project"))
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if not project_name and not (prior_thread and prior_thread.get("sandbox_project")):
-            raise HTTPException(status_code=422, detail="OpenSandbox 模式请先选择一个项目")
-        if (prior_thread and prior_thread.get("sandbox_id") and project_name
-                and project_name != prior_thread.get("sandbox_project")):
-            raise HTTPException(status_code=409, detail="沙箱已绑定项目，不能在同一会话切换")
+    try:
+        execution_backend()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     initialize_task_record(repo_url=None, prompt=content, thread_id=thread_id)
-    if project_name:
-        get_store().set_thread_sandbox(thread_id, project_name=project_name)
     initial = get_task(thread_id)
     if initial is None:
         raise HTTPException(status_code=500, detail="task was not persisted")
@@ -176,17 +245,28 @@ def _stream_response(thread_id: str, content: str, model_id: str | None) -> Stre
             emit(event, data)
 
         def worker() -> None:
+            run_completed = False
+            snapshot_saved = False
             try:
                 result = run_coding_task(prompt=content, thread_id=thread_id,
                                          model_id=selected_model, event_sink=sink)
+                run_completed = True
                 answer = result.get("final_answer")
                 if isinstance(answer, str) and answer.strip():
                     emit("final_answer", {"content": answer})
-                emit("thread_done", _thread_meta(get_task(thread_id) or initial))
             except Exception as exc:
                 emit("error", {"message": str(exc), "detail": str(exc)})
-                emit("thread_done", _thread_meta(get_task(thread_id) or initial))
             finally:
+                notice = consume_workspace_notice(thread_id)
+                if notice:
+                    emit("workspace_notice", {"message": notice})
+                if run_completed and (get_task(thread_id) or {}).get("sandbox_id"):
+                    try:
+                        snapshot_saved = save_export_snapshot(thread_id)
+                    except Exception:
+                        logger.exception("AI Coding 导出快照保存失败：thread_id=%s", thread_id)
+                        emit("export_warning", {"message": "自动保存导出快照失败，请在沙箱过期前手动导出"})
+                emit("thread_done", {**_thread_meta(get_task(thread_id) or initial), "snapshotReady": snapshot_saved})
                 emit("done", {})
 
         yield _sse("thread_snapshot", _thread_meta(initial))
@@ -217,7 +297,8 @@ def stream_existing(
     user_id: str = Depends(require_regops_user),
 ) -> StreamingResponse:
     _owned_thread_id(user_id, thread_id)
-    if get_task(thread_id) is None:
+    task = get_task(thread_id)
+    if task is None:
         raise HTTPException(status_code=404, detail="thread not found")
     return _stream_response(thread_id, body.content, body.model_id)
 
@@ -228,5 +309,6 @@ def delete_thread(thread_id: str, user_id: str = Depends(require_regops_user)) -
     existing = get_task(owned_id)
     if existing and existing.get("sandbox_id"):
         destroy_sandbox_for_thread(owned_id)
+    delete_saved_export(owned_id)
     if not delete_task(owned_id):
         raise HTTPException(status_code=404, detail="thread not found")

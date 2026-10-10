@@ -44,7 +44,7 @@ flowchart LR
     JAVA -->|金融风险会话、SSE| AGENT[Agent FastAPI<br/>:2024]
     JAVA -->|管理员 AI Coding 会话、SSE| AGENT
     AGENT --> RISK[金融风险 Agent<br/>LangChain]
-    AGENT --> CODING[AI Coding<br/>DeepAgents · 工作区]
+    AGENT --> CODING[AI Coding<br/>DeepAgents · 独立沙箱]
     RISK -->|FastMCP · 仅两项只读工具| MCP
     RISK -->|内部只读工具| SEARCH[Web Search<br/>外部风险线索]
 
@@ -69,7 +69,7 @@ flowchart LR
 |------|--------|------|
 | `python-ai` | FastAPI · Python 3.14 | LLM 调用、RAG 检索与引用、问数、文档解析入库、评测任务 |
 | `java-service` | Spring Boot · JDK 21 | 对外 API 聚合、认证与 RBAC、审计 |
-| `agent` | FastAPI · LangChain · DeepAgents | 风险初筛与 AI Coding 使用独立 API、会话命名空间和前端页面；AI Coding 可选 OpenSandbox 隔离执行，默认仍为本地模式；见 [`financial-risk-audit-assistant/`](./financial-risk-audit-assistant/) |
+| `agent` | FastAPI · LangChain · DeepAgents | 风险初筛与 AI Coding 使用独立 API、会话命名空间和前端页面；AI Coding 仅在 OpenSandbox 中创建和修改代码，完成后导出 ZIP；见 [`financial-risk-audit-assistant/`](./financial-risk-audit-assistant/) |
 | `web` | Vue 3 · Vite | 合规问答、金融风险审计助手、管理员 AI Coding、文档标注、评测与运维看板 |
 
 服务边界、端点契约、`X-Request-ID` 关联 ID 约定见 [`docs/api-spec.md`](./docs/api-spec.md)。

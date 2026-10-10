@@ -14,6 +14,7 @@ const props = withDefaults(
     javaOk?: boolean | null
     pythonOk?: boolean | null
     allowAttachment?: boolean
+    attachmentKind?: 'pdf' | 'code'
     showModelSelector?: boolean
     placeholderText?: string
     stopLabel?: string
@@ -26,6 +27,7 @@ const props = withDefaults(
     javaOk: undefined,
     pythonOk: undefined,
     allowAttachment: true,
+    attachmentKind: 'pdf',
     showModelSelector: true,
     placeholderText: '',
     stopLabel: '停止',
@@ -36,6 +38,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   send: [message: string]
   attach: [file: File]
+  'attach-files': [files: File[]]
   stop: []
   'update:model': [model: string]
 }>()
@@ -125,7 +128,7 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 function openFilePicker() {
-  if (props.loading || props.uploading || props.disabled || pythonOk.value === false) {
+  if (props.loading || props.uploading || (props.attachmentKind === 'pdf' && (props.disabled || pythonOk.value === false))) {
     return
   }
   fileInputRef.value?.click()
@@ -133,8 +136,13 @@ function openFilePicker() {
 
 function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
+  const files = Array.from(input.files ?? [])
   input.value = ''
+  if (props.attachmentKind === 'code') {
+    if (files.length) emit('attach-files', files)
+    return
+  }
+  const file = files[0]
   if (!file) {
     return
   }
@@ -158,8 +166,9 @@ function onModelChange(event: Event) {
         v-if="allowAttachment"
         type="button"
         class="attach-btn"
-        title="上传 PDF（本会话有效）"
-        :disabled="loading || uploading || disabled || pythonOk === false"
+        :title="attachmentKind === 'code' ? '上传代码文件或 ZIP' : '上传 PDF（本会话有效）'"
+        :aria-label="attachmentKind === 'code' ? '上传代码文件或 ZIP' : '上传 PDF'"
+        :disabled="loading || uploading || (attachmentKind === 'pdf' && (disabled || pythonOk === false))"
         @click="openFilePicker"
       >
         {{ uploading ? '…' : '📎' }}
@@ -168,7 +177,8 @@ function onModelChange(event: Event) {
         v-if="allowAttachment"
         ref="fileInputRef"
         type="file"
-        accept=".pdf,application/pdf"
+        :accept="attachmentKind === 'pdf' ? '.pdf,application/pdf' : undefined"
+        :multiple="attachmentKind === 'code'"
         class="hidden-file"
         @change="onFileChange"
       />

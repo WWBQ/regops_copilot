@@ -4,7 +4,7 @@
 
 前端已集成到 RegOps：风险初筛在 <http://localhost:5173/risk-agent>，AI Coding 在 <http://localhost:5173/ai-coding>（仅管理员）。本目录不再维护独立 Web UI，也不需要安装成 Python package，直接从源码启动 `agent.app:app`。
 
-两个产品运行在同一 FastAPI 进程，但使用独立的 `/regops/agent`、`/regops/coding-agent` 路由和互不重叠的会话 ID。风险初筛强制只读金融模式；AI Coding 使用 DeepAgents 工作区模式，不装配金融 MCP 工具。两者只共用模型配置、运行记录、事件流与 PostgreSQL 持久化基础设施。AI Coding 默认仍是本机执行，仅管理员可访问；可显式切换到 OpenSandbox 隔离模式。
+两个产品运行在同一 FastAPI 进程，但使用独立的 `/regops/agent`、`/regops/coding-agent` 路由和互不重叠的会话 ID。风险初筛强制只读金融模式；AI Coding 使用 DeepAgents 工作区模式，不装配金融 MCP 工具。两者只共用模型配置、运行记录、事件流与 PostgreSQL 持久化基础设施。AI Coding 只通过 OpenSandbox 执行代码，不回退本机执行。
 
 ## 已实现能力
 
@@ -156,15 +156,19 @@ AGENT_DATABASE_URL=postgresql://regops:password@localhost:5432/regops_db
 
 ### AI Coding 的 OpenSandbox 模式
 
-在根目录 `.env` 或子项目 `.env` 配置 `AI_CODING_EXECUTION_BACKEND=opensandbox`，并填写 `AI_CODING_SANDBOX_DOMAIN`（`host:port`）、`AI_CODING_SANDBOX_API_KEY`。可选 `AI_CODING_SANDBOX_PROTOCOL=https`、`AI_CODING_SANDBOX_IMAGE=opensandbox/code-interpreter:v1.1.0`。本机启动与 Compose 部署时，`DOMAIN` 必须分别是 Agent 进程可达的地址；不要在容器内填宿主机的 `localhost`。
+AI Coding 只支持 OpenSandbox。根目录 `.env` 或子项目 `.env` 填写 `AI_CODING_SANDBOX_DOMAIN`（`host:port`）、`AI_CODING_SANDBOX_API_KEY`；可选 `AI_CODING_SANDBOX_PROTOCOL=https`、`AI_CODING_SANDBOX_IMAGE=opensandbox/code-interpreter:v1.1.0`。本机启动与 Compose 部署时，`DOMAIN` 必须分别是 Agent 进程可达的地址；不要在容器内填宿主机的 `localhost`。服务不可用或配置成 `local` 时拒绝执行，不回退到本机。
 
 本地沙箱服务使用独立的 kind + Kubernetes 集群，部署步骤见 [`deploy/opensandbox/README.md`](../deploy/opensandbox/README.md)。OpenSandbox 生命周期服务通过 Kubernetes API 创建 Pod，不挂载宿主机 Docker socket。API 和网关分别通过仅绑定 `127.0.0.1` 的端口转发提供给本机 Agent。先验证鉴权、创建沙箱、命令执行和实际断网，再把执行模式切为 `opensandbox`。
 
 沙箱由独立的 OpenSandbox 服务创建，60 分钟自动过期，限制 1 CPU/2 GiB，请求默认拒绝外网。kind 部署启用 OpenSandbox egress sidecar；仅在 SDK 中传 `deny` 而未实测断网，不可视为完成网络隔离。kind 是本地学习环境，不能等同于生产级多租户安全边界；生产环境还需强化节点隔离、镜像准入、资源配额、网络策略和审计。
 
-用户在 AI Coding 页面选择项目后，首次运行会把 `workspace/projects/<项目名>` 的受限文件快照和三项 AI Coding Skills 复制到沙箱；跳过常见隐藏凭据、`.git`、虚拟环境、依赖目录和符号链接，超过 2000 文件或 20 MiB 则拒绝。不会挂载宿主目录，也不会主动注入模型 Key 或 Gitee Token；但普通源码文件也可能含敏感信息，选择项目之前仍需检查。沙箱 ID 写入 `agent.threads`，后续轮次和服务重启后尝试连接同一实例并续期 60 分钟；实例过期或连接失败会报错，不新建空沙箱、不回退本机。删除会话时销毁对应沙箱。当前仅有进程内创建锁，多实例部署前还需加数据库级会话锁，避免同一会话并发创建多个容器。
+AI Coding 的项目工作目录固定为每个会话独立沙箱的 `/projects`，由 Agent 在其中新建和修改代码；不再选择、创建或复制本机项目。普通问答和方案讨论不会主动创建沙箱；首次调用文件或命令工具时才创建或连接沙箱，并只将三项静态 AI Coding Skills 复制进去。不挂载宿主目录，也不注入模型 Key 或 Gitee Token。沙箱 ID 写入 `agent.threads`；删除会话时销毁对应沙箱。当前仅有进程内创建锁，多实例部署前还需加数据库级会话锁，避免同一会话并发创建多个容器。
 
-沙箱模式提供容器内读写与命令执行，任务结束后可在 AI Coding 页面导出所选项目的 ZIP 快照；下载内容再次排除隐藏文件、凭据和符号链接，并限制为 2000 文件 / 20 MiB。不装配本机 Gitee、Web Search 或 Reviewer 工具，也不自动把 ZIP 合并回宿主项目。下载后需人工检查与合并；不要把沙箱里的“修改完成”等同于宿主项目已经修改。
+AI Coding 页面也可主动点击「新建沙箱」创建空会话及沙箱；已有会话的「重连/新建沙箱」会连接仍可用的沙箱，过期时创建新沙箱，并在存在已保存快照时恢复 `/projects`。点击「上传代码 / ZIP」可导入单个或多个文件，ZIP 保留包内目录结构；不能覆盖已有文件。单次文件不超过 20 MiB，工作区最多 2000 个文件、20 MiB；隐藏凭据、符号链接及越界路径会被拒绝。上传成功后立即保存对象存储快照，页面会报告快照是否保存成功。上传只允许管理员，并限制在当前登录用户自己的会话中。
+
+旧版本机工作区文件不会自动迁移或删除。历史对话保留，但不代表旧代码一定在新沙箱中。
+
+沙箱提供容器内读写与命令执行。每轮有沙箱参与的任务结束时，服务端会把 `/projects` 打包为最新 ZIP 快照，经带服务令牌的内部 API 保存到 RegOps 现有对象存储，key 为 `coding-snapshots/{thread_id}.zip`；稳定的 `object://` 引用及 SHA-256 哈希记入按用户和会话隔离的 LangGraph 长期 Store，不保存短期有效的签名 URL。当前对象存储实现是 `python-ai` 的 `LocalObjectStore`，默认实际目录为 `python-ai/data/objects/regops-docs/coding-snapshots/`；Compose 使用持久化的 `python_data` volume，并非云端 S3/COS。沙箱过期后，首次需要代码时才从对象存储下载、校验 ZIP 并恢复到新沙箱；若引用和快照都没有，就在同一会话中创建空沙箱并提示旧文件不可用。长期记忆指向的快照丢失、哈希不一致或对象存储故障时拒绝恢复，不会将故障误判为空工作区。旧版 Agent 本地快照首次使用时会迁移到对象存储。导出内容排除隐藏文件、凭据和符号链接，并限制为 2000 文件 / 20 MiB。不装配本机 Gitee、Web Search 或 Reviewer 工具，也不自动把 ZIP 合并回宿主项目。生产多实例部署需替换为真正独立的持久对象存储；不要把沙箱里的“修改完成”等同于宿主项目已经修改。
 
 完整示例见根目录 [`.env.example`](../.env.example)。
 

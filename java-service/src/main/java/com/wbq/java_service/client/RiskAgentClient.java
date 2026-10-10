@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -41,6 +42,38 @@ public class RiskAgentClient {
             HttpRequest request = request(path, userId)
                     .timeout(Duration.ofSeconds(30))
                     .GET()
+                    .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            checkResponse(response.statusCode(), response.body());
+            return mapper.readValue(response.body(), Object.class);
+        } catch (PythonAiException ex) {
+            throw ex;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw unavailable();
+        } catch (Exception ex) {
+            throw unavailable();
+        }
+    }
+
+    public Object post(String path, UUID userId) {
+        return postBytes(path, new byte[0], "application/json", userId);
+    }
+
+    public Object uploadCodeFile(String path, String filename, byte[] content, UUID userId) {
+        if (content == null || content.length == 0 || content.length > 20 * 1024 * 1024) {
+            throw new PythonAiException(413, "上传文件必须在 1 字节至 20 MiB 之间", "upload_too_large");
+        }
+        String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8);
+        return postBytes(path + "?filename=" + encoded, content, "application/octet-stream", userId);
+    }
+
+    private Object postBytes(String path, byte[] content, String contentType, UUID userId) {
+        try {
+            HttpRequest request = request(path, userId)
+                    .timeout(Duration.ofMinutes(4))
+                    .header("Content-Type", contentType)
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(content))
                     .build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             checkResponse(response.statusCode(), response.body());

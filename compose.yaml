@@ -160,6 +160,7 @@ services:
       AGENT_DATABASE_URL: postgresql://regops:${POSTGRES_PASSWORD:-regops123}@db:5432/regops_db
       FIN_RISK_AUDIT_DATA_DIR: /app/data
       REGOPS_MCP_URL: http://python-ai:8000/mcp/
+      REGOPS_API_BASE_URL: http://python-ai:8000
       FIN_RISK_AUDIT_LOG_DIR: /app/data/logs
       AI_WORKSPACE_ROOT: /app/workspace
       SEARXNG_BASE_URL: http://searxng:8080

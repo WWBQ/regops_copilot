@@ -14,6 +14,7 @@ from app.prompts.router import router as prompts_router
 from app.quality.router import router as quality_router
 from app.sessions.router import router as sessions_router
 from app.storage.router import router as storage_router
+from app.storage.coding_snapshots import router as coding_snapshots_router
 from app.security.service_auth import require_service_token
 
 api_router = APIRouter()
@@ -32,6 +33,7 @@ for feature_router in (
     quality_router,
     evaluation_router,
     prompts_router,
+    coding_snapshots_router,
 ):
     api_router.include_router(
         feature_router,
