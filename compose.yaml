@@ -213,7 +213,7 @@ services:
     container_name: regops-web
     restart: unless-stopped
     ports:
-      - "8088:80"
+      - "${WEB_PORT:-8088}:80"
     depends_on:
       java-service:
         condition: service_healthy

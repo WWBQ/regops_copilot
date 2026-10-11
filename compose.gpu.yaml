@@ -1,0 +1,8 @@
+# 有 NVIDIA 驱动和 nvidia-container-toolkit 时一起使用：
+#   docker compose -f compose.yaml -f compose.gpu.yaml up -d
+# 没有 GPU 的机器不要加这个文件，否则 Compose 会因为找不到显卡设备而失败。
+services:
+  python-ai:
+    gpus: all
+  ingest-worker:
+    gpus: all
