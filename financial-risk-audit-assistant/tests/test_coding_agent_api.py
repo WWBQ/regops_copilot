@@ -129,6 +129,12 @@ class CodingAgentApiTest(unittest.TestCase):
         thread = {
             "thread_id": CODING_ID, "title": "修复测试", "latest_run_status": "completed",
             "created_at": "2026-10-09T00:00:00+00:00", "updated_at": "2026-10-09T00:01:00+00:00",
+            "run_events": [
+                {"kind": "todo", "detail": '{"todos":[{"content":"读取代码","status":"in_progress"}]}',
+                 "updated_at": "2026-10-09T00:00:01+00:00"},
+                {"kind": "todo", "detail": '{"todos":[{"content":"读取代码","status":"completed"},{"content":"验证","status":"in_progress"}]}',
+                 "updated_at": "2026-10-09T00:00:02+00:00"},
+            ],
         }
         with patch("agent.api.coding_agent.get_task", return_value=thread), patch(
             "agent.api.coding_agent.visible_checkpoint_messages", return_value=[
@@ -140,6 +146,29 @@ class CodingAgentApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual([item["author"] for item in response.json()["messages"]], ["user", "agent"])
         self.assertFalse(response.json()["snapshotReady"])
+        self.assertEqual(response.json()["latestTodos"], [
+            {"content": "读取代码", "status": "completed"},
+            {"content": "验证", "status": "in_progress"},
+        ])
+
+    def test_older_coding_thread_reads_todos_from_checkpoint(self):
+        thread = {
+            "thread_id": CODING_ID, "title": "旧任务", "latest_run_status": "completed",
+            "created_at": "2026-10-09T00:00:00+00:00", "updated_at": "2026-10-09T00:01:00+00:00",
+            "run_events": [],
+        }
+        todos = [{"content": "核对代码", "status": "completed"}]
+        with patch("agent.api.coding_agent.get_task", return_value=thread), patch(
+            "agent.api.coding_agent.visible_checkpoint_messages", return_value=[
+                {"message_id": "u1", "author": "user", "content": "核对代码"},
+                {"message_id": "a1", "author": "agent", "content": "已核对"},
+            ],
+        ), patch("agent.api.coding_agent.recall_snapshot", return_value=None), patch(
+            "agent.api.coding_agent.latest_checkpoint_todos", return_value=todos,
+        ):
+            response = self.client.get(f"/regops/coding-agent/threads/{CODING_ID}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["latestTodos"], todos)
 
     def test_export_returns_zip_only_for_owned_completed_thread(self):
         thread = {"thread_id": CODING_ID, "latest_run_status": "completed", "sandbox_id": "sandbox-1"}

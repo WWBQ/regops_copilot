@@ -331,7 +331,10 @@ def _extract_todos(tool_call: Any) -> list[dict[str, str]]:
     return todos
 
 
-def _record_write_todos(thread_id: str, run_id: str, tool_call: Any, index: int) -> bool:
+def _record_write_todos(
+    thread_id: str, run_id: str, tool_call: Any, index: int,
+    event_sink: StreamEventSink | None = None,
+) -> bool:
     """只把 DeepAgents 内置 write_todos 转成结构化任务清单事件。"""
 
     tool_name = str(_safe_field(tool_call, "tool_name", "") or _safe_field(tool_call, "name", "") or "")
@@ -341,13 +344,9 @@ def _record_write_todos(thread_id: str, run_id: str, tool_call: Any, index: int)
     if not todos:
         return True
     call_id = str(_safe_field(tool_call, "id", "") or _safe_field(tool_call, "tool_call_id", "") or index)
-    record_event(
-        thread_id,
-        f"todos:{run_id}:{call_id}",
-        "任务清单",
-        kind="todo",
-        status="completed",
-        detail=json.dumps({"todos": todos}, ensure_ascii=False),
+    _record_todos(
+        thread_id, run_id, call_id, todos,
+        status="completed", event_sink=event_sink,
     )
     return True
 
@@ -579,6 +578,7 @@ def _consume_raw_event_stream(
     last_flushed_length = 0
     write_todo_args_by_call: dict[str, str] = {}
     write_todo_last_payload_by_call: dict[str, str] = {}
+    write_todo_call_by_block: dict[str, str] = {}
     saw_write_todos = False
     limit_tracker = AgentRunLimitTracker(task_kind=task_kind)
     active_tools: dict[str, str] = {}
@@ -651,12 +651,22 @@ def _consume_raw_event_stream(
 
         tool_chunk = _tool_chunk_from_message_event(event)
         if tool_chunk is not None:
-            tool_name = str(tool_chunk.get("name") or "")
+            payload = _message_event_payload(event) or {}
+            block_key = str(payload.get("index") if payload.get("index") is not None else "default")
+            tool_name = str(tool_chunk.get("name") or tool_chunk.get("tool_name") or "")
             if tool_name == "write_todos":
+                write_todo_call_by_block[block_key] = str(
+                    tool_chunk.get("id") or tool_chunk.get("tool_call_id") or f"block-{block_key}"
+                )
+            if tool_name == "write_todos" or (not tool_name and block_key in write_todo_call_by_block):
                 # write_todos 的参数本身就是任务清单，因此要尽早解析出来给前端展示。
                 saw_write_todos = True
-                call_id = str(tool_chunk.get("id") or tool_chunk.get("tool_call_id") or "write_todos")
-                args = tool_chunk.get("args")
+                call_id = str(
+                    tool_chunk.get("id") or tool_chunk.get("tool_call_id")
+                    or write_todo_call_by_block[block_key]
+                )
+                write_todo_call_by_block[block_key] = call_id
+                args = tool_chunk.get("args", tool_chunk.get("input"))
                 if isinstance(args, dict):
                     # 完整 dict：通常代表工具调用参数已经完整。
                     todos = _extract_todos({"input": args})
@@ -673,8 +683,10 @@ def _consume_raw_event_stream(
                         write_todo_last_payload_by_call[call_id] = payload_text
                 elif isinstance(args, str):
                     # 字符串 chunk：JSON 可能还没闭合，用正则提取已完整的 todo。
-                    write_todo_args_by_call[call_id] = args
-                    todos = _todos_from_args_text(args)
+                    previous_args = write_todo_args_by_call.get(call_id, "")
+                    accumulated_args = args if args.startswith(previous_args) else previous_args + args
+                    write_todo_args_by_call[call_id] = accumulated_args
+                    todos = _todos_from_args_text(accumulated_args)
                     payload_text = json.dumps(todos, ensure_ascii=False)
                     if todos and payload_text != write_todo_last_payload_by_call.get(call_id):
                         _record_todos(
@@ -686,6 +698,8 @@ def _consume_raw_event_stream(
                             event_sink=event_sink,
                         )
                         write_todo_last_payload_by_call[call_id] = payload_text
+                if payload.get("event") == "content-block-finish":
+                    write_todo_call_by_block.pop(block_key, None)
             continue
 
         tool_call = _tool_call_from_event(event)
@@ -695,7 +709,7 @@ def _consume_raw_event_stream(
             proposed_tool_name = _trace_tool_name(_safe_field(tool_call, "tool_name") or _safe_field(tool_call, "name"))
             _trace(run_id, thread_id, f"model:tool-request:{tool_call_index}", "model",
                    f"模型请求工具 · {proposed_tool_name}", "completed")
-            if _record_write_todos(thread_id, run_id, tool_call, tool_call_index):
+            if _record_write_todos(thread_id, run_id, tool_call, tool_call_index, event_sink):
                 saw_write_todos = True
                 continue
             logger.debug(

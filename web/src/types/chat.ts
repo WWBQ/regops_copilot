@@ -130,6 +130,8 @@ export interface ChatMessage {
   streaming?: boolean
   /** 流式等待时的状态文案 */
   statusText?: string
+  /** AI Coding 当前轮由 write_todos 产生的任务进度。 */
+  todos?: Array<{ content: string; status: 'pending' | 'in_progress' | 'completed' }>
   /** Agent 单轮执行中的已完成阶段；最终结论仍放在 content */
   stages?: string[]
   /** 当前正在生成的阶段文本 */

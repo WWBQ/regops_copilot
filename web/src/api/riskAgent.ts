@@ -9,6 +9,7 @@ export interface RiskAgentThread {
   sandboxProject?: string
   sandboxReady?: boolean
   snapshotReady?: boolean
+  latestTodos?: Array<{ content: string; status: 'pending' | 'in_progress' | 'completed' }>
   messages: Array<{
     id: string
     author: string

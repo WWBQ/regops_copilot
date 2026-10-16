@@ -139,7 +139,19 @@ function syncBridge() {
 }
 
 function restoreMessages(thread: RiskAgentThread): ChatMessageType[] {
-  return groupAgentHistory(thread.messages, isCoding.value ? 'coding_agent' : 'risk_agent')
+  const restored = groupAgentHistory(thread.messages, isCoding.value ? 'coding_agent' : 'risk_agent')
+  if (isCoding.value && thread.latestTodos?.length) {
+    const lastMessage = restored.at(-1)
+    if (lastMessage?.role === 'assistant') {
+      lastMessage.todos = thread.latestTodos
+    } else if (lastMessage?.role === 'user') {
+      restored.push({
+        id: `${thread.id}-latest-todos`, role: 'assistant', route: 'coding_agent',
+        content: '', todos: thread.latestTodos, streaming: thread.status === 'running',
+      })
+    }
+  }
+  return restored
 }
 
 async function reloadThreads() {
@@ -238,10 +250,20 @@ function applyEvent({ event, data }: RiskAgentEvent) {
     return
   }
   if (event === 'todo_delta') {
-    const todos = Array.isArray(data.todos) ? data.todos : []
-    const active = todos.find((item) => item && typeof item === 'object' && item.status === 'in_progress') as { content?: string } | undefined
     const reply = activeReply()
-    if (active?.content && reply) reply.statusText = active.content
+    if (isCoding.value && reply && Array.isArray(data.todos)) {
+      const todos = data.todos.filter((item): item is { content: string; status: 'pending' | 'in_progress' | 'completed' } => {
+        if (!item || typeof item !== 'object') return false
+        const todo = item as { content?: unknown; status?: unknown }
+        return typeof todo.content === 'string'
+          && ['pending', 'in_progress', 'completed'].includes(String(todo.status))
+      })
+      if (todos.length) {
+        reply.todos = todos
+        const active = todos.find((item) => item.status === 'in_progress')
+        if (active) reply.statusText = active.content
+      }
+    }
     return
   }
   if (event === 'text_delta') {

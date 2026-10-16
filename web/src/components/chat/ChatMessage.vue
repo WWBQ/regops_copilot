@@ -214,6 +214,19 @@ function evidenceCitationTitle(evidenceId: number): string {
         {{ message.statusText || '正在回复…' }}
       </p>
       <details
+        v-if="message.route === 'coding_agent' && message.todos?.length"
+        class="agent-todos"
+        :open="message.streaming && !message.content"
+      >
+        <summary>任务清单（{{ message.todos.filter((todo) => todo.status === 'completed').length }}/{{ message.todos.length }} 已完成）</summary>
+        <ol>
+          <li v-for="(todo, index) in message.todos" :key="`${index}-${todo.content}`" :data-status="todo.status">
+            <span class="agent-todo-state" aria-hidden="true">{{ todo.status === 'completed' ? '✓' : todo.status === 'in_progress' ? '●' : '○' }}</span>
+            <span>{{ todo.content }}</span>
+          </li>
+        </ol>
+      </details>
+      <details
         v-if="(message.route === 'risk_agent' || message.route === 'coding_agent') && ((message.stages?.length ?? 0) > 0 || message.stageText)"
         class="agent-stages"
         :open="Boolean(message.streaming && !message.content)"
@@ -426,6 +439,24 @@ function evidenceCitationTitle(evidenceId: number): string {
 .agent-current-stage {
   color: var(--text-strong);
 }
+
+.agent-todos {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #ccece5;
+  border-radius: 10px;
+  background: #f2faf8;
+  color: var(--text-strong);
+  font-size: 13px;
+}
+
+.agent-todos summary { cursor: pointer; font-weight: 600; }
+.agent-todos ol { margin: 10px 0 0; padding-left: 22px; }
+.agent-todos li { margin: 6px 0; padding-left: 2px; overflow-wrap: anywhere; }
+.agent-todo-state { display: inline-block; width: 20px; color: var(--muted); }
+.agent-todos li[data-status='completed'] { color: var(--muted); }
+.agent-todos li[data-status='completed'] .agent-todo-state { color: #0f766e; }
+.agent-todos li[data-status='in_progress'] .agent-todo-state { color: #0f766e; }
 
 .risk-result {
   margin-top: 14px;

@@ -20,7 +20,7 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from agent.api.auth import require_regops_user
-from agent.core.checkpoint_history import visible_checkpoint_messages
+from agent.core.checkpoint_history import latest_checkpoint_todos, visible_checkpoint_messages
 from agent.core.model import available_agent_models, default_agent_model_id, require_agent_model_id
 from agent.core.runtime import delete_task, get_task, initialize_task_record, list_tasks
 from agent.core.graph import get_store
@@ -92,7 +92,40 @@ def _thread_payload(thread: dict[str, Any], *, include_snapshot: bool = False) -
     payload = {**_thread_meta(thread), "messages": messages}
     if include_snapshot:
         payload["snapshotReady"] = recall_snapshot(str(thread["thread_id"])) is not None
+        run_events = thread.get("run_events") or []
+        payload["latestTodos"] = _latest_todos(run_events)
+        if not run_events and not payload["latestTodos"]:
+            payload["latestTodos"] = latest_checkpoint_todos(str(thread["thread_id"]))
     return payload
+
+
+def _latest_todos(events: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """从最近一轮运行事件恢复最后一次 write_todos 的完整状态。"""
+
+    candidates = [
+        (index, event) for index, event in enumerate(events)
+        if event.get("kind") == "todo" and event.get("detail")
+    ]
+    for _, event in sorted(
+        candidates,
+        key=lambda item: (str(item[1].get("updated_at") or ""), item[0]),
+        reverse=True,
+    ):
+        try:
+            payload = json.loads(str(event["detail"]))
+        except (TypeError, ValueError):
+            continue
+        raw = payload.get("todos") if isinstance(payload, dict) else None
+        if not isinstance(raw, list):
+            continue
+        todos = [
+            {"content": str(item["content"]).strip(), "status": str(item.get("status") or "pending")}
+            for item in raw
+            if isinstance(item, dict) and str(item.get("content") or "").strip()
+        ]
+        if todos:
+            return todos
+    return []
 
 
 @coding_agent_router.get("/options")

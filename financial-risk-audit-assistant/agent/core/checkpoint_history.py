@@ -14,6 +14,50 @@ from agent.financial.risk_result import strip_risk_result_block
 logger = logging.getLogger("agent.checkpoint_history")
 
 
+def latest_checkpoint_todos(thread_id: str) -> list[dict[str, str]]:
+    """兼容旧会话：从 LangGraph 的 todos 状态读取最近一份任务清单。"""
+
+    config = {"configurable": {"thread_id": thread_id}}
+
+    def normalize(value: Any) -> list[dict[str, str]]:
+        if not isinstance(value, list):
+            return []
+        return [
+            {"content": str(item["content"]).strip(), "status": str(item.get("status") or "pending")}
+            for item in value
+            if isinstance(item, dict) and str(item.get("content") or "").strip()
+        ]
+
+    try:
+        checkpointer = get_checkpointer()
+        checkpoint_tuple = checkpointer.get_tuple(config)
+        if checkpoint_tuple is None:
+            return []
+        checkpoint = getattr(checkpoint_tuple, "checkpoint", None)
+        if isinstance(checkpoint, dict):
+            values = checkpoint.get("channel_values")
+            if isinstance(values, dict):
+                todos = normalize(values.get("todos"))
+                if todos:
+                    return todos
+
+        # Delta checkpointer 可能把 todos 保存在通道写入记录中。
+        history = checkpointer.get_delta_channel_history(config=config, channels=["todos"])
+        channel = history.get("todos") if isinstance(history, dict) else None
+        if not isinstance(channel, dict):
+            return []
+        latest = normalize(getattr(channel.get("seed"), "value", channel.get("seed")))
+        for write in channel.get("writes") or []:
+            if isinstance(write, tuple) and len(write) >= 3:
+                candidate = normalize(write[2])
+                if candidate:
+                    latest = candidate
+        return latest
+    except Exception:
+        logger.exception("读取 checkpoint 任务清单失败：thread_id=%s", thread_id)
+        return []
+
+
 def _content_to_text(content: Any) -> str:
     """把 LangChain message.content 转成普通文本。
 
